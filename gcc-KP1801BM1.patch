@@ -1,0 +1,88 @@
+diff -urp a/gcc/config/pdp11/pdp11.cc b/src/gcc-14.2.0/gcc/config/pdp11/pdp11.cc
+--- a/gcc/config/pdp11/pdp11.cc	2024-08-01 11:17:14.000000000 +0300
++++ b/gcc-14.2.0/src/gcc-14.2.0/gcc/config/pdp11/pdp11.cc	2025-01-03 23:56:58.555977060 +0300
+@@ -2063,8 +2063,12 @@ pdp11_assemble_shift (rtx *operands, mac
+   if (!small)
+     {
+       /* Loop case, emit the count-down and branch if not done.  */
+-      output_asm_insn ("dec\t%2", operands);
+-      output_asm_insn ("bne\t%l0", lb);
++      rtx tmpops[2];    
++      tmpops[0] = operands[2];
++      tmpops[1] = lb[0];
++      output_asm_insn ("sob\t%0, %l1", tmpops);
++      // output_asm_insn ("dec\t%2", operands);
++      // output_asm_insn ("bne\t%l0", lb);
+     }
+   return "";
+ }
+
+diff -urp a/gcc/config/pdp11/pdp11.md b/gcc-14.2.0/src/gcc-14.2.0/gcc/config/pdp11/pdp11.md
+--- a/gcc/config/pdp11/pdp11.md	2024-08-01 11:17:14.000000000 +0300
++++ b/gcc-14.2.0/src/gcc-14.2.0/gcc/config/pdp11/pdp11.md	2025-01-03 22:32:28.201616716 +0300
+@@ -333,7 +333,7 @@
+ 	      (set (match_dup 0)
+ 		   (plus:HI (match_dup 0)
+ 			 (const_int -1)))])]
+-  "TARGET_40_PLUS"
++  ""
+   "{
+     if (GET_MODE (operands[0]) != HImode)
+       FAIL;
+@@ -351,9 +351,9 @@
+    (set (match_dup 0)
+ 	(plus:HI (match_dup 0)
+ 		 (const_int -1)))]
+-  "TARGET_40_PLUS"
++  ""
+   "#"
+-  "&& reload_completed"
++  "reload_completed"
+   [(parallel [(set (pc)
+ 		   (if_then_else
+ 		    (ne (match_dup 0) (const_int 1))
+@@ -380,7 +380,7 @@
+ 	(plus:HI (match_dup 0)
+ 	      (const_int -1)))
+    (clobber (reg:CC CC_REGNUM))]
+-  "TARGET_40_PLUS && reload_completed"
++  "reload_completed"
+   "*
+ {
+  rtx lb[1];
+@@ -746,13 +746,7 @@
+     output_asm_insn (\"mov\t(%1)+,(%0)+\", operands);
+   else
+     output_asm_insn (\"movb\t(%1)+,(%0)+\", operands);
+-  if (TARGET_40_PLUS)
+-    output_asm_insn (\"sob\t%0,%l1\", lb);
+-  else
+-    {
+-      output_asm_insn (\"dec\t%0\", lb);
+-      output_asm_insn (\"bne\t%l1\", lb);
+-    }
++    output_asm_insn (\"sob\t%0,%l1\", lb);  
+   return \"\";
+ }"
+   [(set (attr "length")
+@@ -1541,9 +1535,9 @@
+   [(set (match_operand:HI 0 "nonimmediate_operand" "=rR,Q")
+ 	(xor:HI (match_operand:HI 1 "general_operand" "%0,0")
+ 		(match_operand:HI 2 "register_operand" "r,r")))]
+-  "TARGET_40_PLUS"
++  ""
+   "#"
+-  "&& reload_completed"
++  "reload_completed"
+   [(parallel [(set (match_dup 0)
+ 		   (xor:HI (match_dup 1) (match_dup 2)))
+ 	      (clobber (reg:CC CC_REGNUM))])]
+@@ -1555,7 +1549,7 @@
+ 	(xor:HI (match_operand:HI 1 "general_operand" "%0,0")
+ 	     (match_operand:HI 2 "register_operand" "r,r")))
+    (clobber (reg:CC CC_REGNUM))]
+-  "TARGET_40_PLUS && reload_completed"
++  "reload_completed"
+   "xor\t%2,%0"
+   [(set_attr "length" "2,4")])
+ 
