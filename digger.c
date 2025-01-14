@@ -50,11 +50,12 @@ enum bug_types : uint8_t
  */
 enum direction : uint8_t
 {
-    DIR_STOP = 0, // Стоит на месте
-    DIR_LEFT,     // Движется налево
+    DIR_LEFT = 0, // Движется налево
     DIR_RIGHT,    // Движется направо
     DIR_UP,       // Движется вверх
-    DIR_DOWN      // Движется вниз
+    DIR_DOWN,     // Движется вниз
+    DIR_STOP      // Стоит на месте
+
 };
 
 /**
@@ -503,20 +504,6 @@ void init_level()
 }
 
 /**
- * @brief Возвращает направление противоположное переданному
- *
- * @param dir - направлкние
- *
- * @return - направление противоположное переданному в параметре
- */
-inline enum direction rev_dir(enum direction dir)
-{
-    static const enum direction rev_dir[5] = { DIR_STOP, DIR_RIGHT, DIR_LEFT, DIR_DOWN, DIR_UP };
-
-    return rev_dir[dir];
-}
-
-/**
  * @brief Определяет по состоянию байта клетки, что клетка полностью проедена
  *
  * @param byte - байт с состоянием клетки
@@ -758,7 +745,7 @@ void move_bug(struct bug_info *bug)
         }
 
         // Сделать движение назад последним выбором при определении направления
-        enum direction dir = rev_dir(bug->dir);
+        enum direction dir = bug->dir ^ 1; // инвертировать направление движения
 
         if (dir == dir_1) // Если движение назад наболее приоритетно
         {
