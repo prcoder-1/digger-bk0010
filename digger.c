@@ -200,22 +200,22 @@ int16_t lives;       // Количество жизней
 uint32_t score;      // Количество очков
 
 // Переменные отвечающие за вывод звуков
-uint8_t man_rip_snd;      // Флаг, означающий, что звук и анимация RIP включены
-uint8_t chase_snd;        // Флаг, означающий, что звук включения бонус-режима активн
-uint8_t chase_snd_flip;   // Флаг переключающий тональность звука при включении/выключении бонус-режима
-uint8_t loose_snd;        // Флаг, означающий, что звук качающегося мешка включен
+uint8_t  man_rip_snd;     // Флаг, означающий, что звук и анимация RIP включены
+uint8_t  chase_snd;       // Флаг, означающий, что звук включения бонус-режима активн
+uint8_t  chase_snd_flip;  // Флаг переключающий тональность звука при включении/выключении бонус-режима
+uint8_t  loose_snd;       // Флаг, означающий, что звук качающегося мешка включен
 uint16_t loose_snd_phase; // Фаза звука качающегося мешка
-uint8_t fall_snd;         // Флаг, означающий, что звук летящего мешка включен
-uint8_t fall_snd_phase;   // Фаза звука падающего мешка
+uint8_t  fall_snd;        // Флаг, означающий, что звук летящего мешка включен
+uint8_t  fall_snd_phase;  // Фаза звука падающего мешка
 uint16_t fall_period;     // Период звука летящего мешка
-uint8_t break_bag_snd;    // Флаг, означающий, что звук разбивающегося мешка включен
-uint8_t money_snd;        // Флаг, означающий, что звук съедания золота включен
-uint8_t coin_snd;         // Флаг, означающий, что звук съедания монетки включен
-int8_t coin_snd_period;   // Номер ноты при съедании монетки (драгоценного камня)
-uint8_t coin_time;        // Таймер между последовательными съедениями драгоценных камней (монеток)
-uint8_t done_snd;         // Флаг, означающий, что звук завершения уровня включен
-uint8_t bug_snd;          // Флаг, означающий, что звук съедания врага в бонус-режиме включен
-uint8_t life_snd;         // Флаг, означающий, что звук получения дополнительной жизни включен
+uint8_t  break_bag_snd;   // Флаг, означающий, что звук разбивающегося мешка включен
+uint8_t  money_snd;       // Флаг, означающий, что звук съедания золота включен
+uint8_t  coin_snd;        // Флаг, означающий, что звук съедания монетки включен
+int8_t   coin_snd_period; // Номер ноты при съедании монетки (драгоценного камня)
+uint8_t  coin_time;       // Таймер между последовательными съедениями драгоценных камней (монеток)
+uint8_t  done_snd;        // Флаг, означающий, что звук завершения уровня включен
+uint8_t  bug_snd;         // Флаг, означающий, что звук съедания врага в бонус-режиме включен
+uint8_t  life_snd;        // Флаг, означающий, что звук получения дополнительной жизни включен
 
 #ifdef DEBUG
 /**
@@ -734,14 +734,14 @@ void move_bug(struct bug_info *bug)
         if (bonus_state == BONUS_ON)
         {
             // Наиболее приоритетное направление поменять с наименее приоритетным
-            enum direction tmp = dir_1;
-            dir_1 = dir_4;
-            dir_4 = tmp;
+            dir_1 ^= dir_4;
+            dir_4 ^= dir_1;
+            dir_1 ^= dir_4;
 
             // Более приоритетное поменять с менее приоритетным
-            tmp = dir_2;
-            dir_2 = dir_3;
-            dir_3 = tmp;
+            dir_2 ^= dir_3;
+            dir_3 ^= dir_2;
+            dir_2 ^= dir_3;
         }
 
         // Сделать движение назад последним выбором при определении направления
@@ -778,9 +778,9 @@ void move_bug(struct bug_info *bug)
         {
             // В одном из (5 + difficulty) случаев поменять наиболее
             // приоритетное направление с менее приоритетным
-            enum direction tmp = dir_1;
-            dir_1 = dir_3;
-            dir_3 = tmp;
+            dir_1 ^= dir_3;
+            dir_3 ^= dir_1;
+            dir_1 ^= dir_3;
         }
 
         if (bug->type == BUG_NOBBIN)
@@ -804,13 +804,13 @@ void move_bug(struct bug_info *bug)
     }
 
     // Остановить врага при попытке выхода за пределы экрана
-    if ((bug->dir == DIR_RIGHT && bug_x_graph >= MAX_X_POS) ||
-        (bug->dir == DIR_LEFT  && bug_x_graph <= MIN_X_POS) ||
-        (bug->dir == DIR_DOWN  && bug_y_graph >= MAX_Y_POS) ||
-        (bug->dir == DIR_UP    && bug_y_graph <= MIN_Y_POS))
-    {
-        bug->dir = DIR_STOP;
-    }
+    // if ((bug->dir == DIR_RIGHT && bug_x_graph >= MAX_X_POS) ||
+    //     (bug->dir == DIR_LEFT  && bug_x_graph <= MIN_X_POS) ||
+    //     (bug->dir == DIR_DOWN  && bug_y_graph >= MAX_Y_POS) ||
+    //     (bug->dir == DIR_UP    && bug_y_graph <= MIN_Y_POS))
+    // {
+    //     bug->dir = DIR_STOP;
+    // }
 
     // Сохранить предыдущее направление движения влево-вправо
     if (bug->dir == DIR_LEFT || bug->dir == DIR_RIGHT) bug->old_dir = bug->dir;
@@ -868,7 +868,7 @@ void move_bug(struct bug_info *bug)
         }
     }
 
-    if (man_state == CREATURE_ALIVE)
+    if (man_state == CREATURE_ALIVE) // Если Диггер жив
     {
         // Выждать время задержки перед запуском нового врага
         if (bug->start_delay) bug->start_delay--;
@@ -896,79 +896,44 @@ void move_bug(struct bug_info *bug)
     // Переключить направление изменения фазы, если фаза дошла до предельного значения
     if (!bug->image_phase || bug->image_phase >= 2) bug->image_phase_inc = -bug->image_phase_inc;
 
-    switch (bug->type)
+    if (bug->x_graph != bug_x_graph || bug->y_graph != bug_y_graph) // Если изменилось положение
     {
-        case BUG_NOBBIN:
+        // Подтереть след с нужной стороны
+        switch (bug->dir)
         {
-            if (bug->x_graph != bug_x_graph || bug->y_graph != bug_y_graph)
+            case DIR_RIGHT:
             {
-                switch (bug->dir)
-                {
-                    case DIR_RIGHT:
-                    {
-                        sp_paint_brick(bug->x_graph - MOVE_X_STEP, bug->y_graph, MOVE_X_STEP, sizeof(image_nobbin[0]) / sizeof(image_nobbin[0][0]), 0);
-                        break;
-                    }
-
-                    case DIR_LEFT:
-                    {
-                        sp_paint_brick(bug->x_graph + sizeof(image_nobbin[0][0]), bug->y_graph, MOVE_X_STEP, sizeof(image_nobbin[0]) / sizeof(image_nobbin[0][0]), 0);
-                        break;
-                    }
-
-                    case DIR_DOWN:
-                    {
-                        sp_paint_brick(bug->x_graph, bug->y_graph - MOVE_Y_STEP, sizeof(image_nobbin[0][0]), MOVE_Y_STEP, 0);
-                        break;
-                    }
-
-                    case DIR_UP:
-                    {
-                        sp_paint_brick(bug->x_graph, bug->y_graph + sizeof(image_nobbin[0]) / sizeof(image_nobbin[0][0]), sizeof(image_nobbin[0][0]), MOVE_Y_STEP, 0);
-                        break;
-                    }
-                }
+                sp_paint_brick(bug_x_graph, bug_y_graph, MOVE_X_STEP, 15, 0);
+                break;
             }
 
-            // Нарисовать новую фазу по новым координатам
-            sp_4_15_put(bug->x_graph, bug->y_graph, (uint8_t *)image_nobbin[bug->image_phase]);
+            case DIR_LEFT:
+            {
+                sp_paint_brick(bug_x_graph + 4 - MOVE_X_STEP, bug_y_graph, MOVE_X_STEP, 15, 0);
+                break;
+            }
 
-            break;
+            case DIR_DOWN:
+            {
+                sp_paint_brick(bug_x_graph, bug_y_graph, 4, MOVE_Y_STEP, 0);
+                break;
+            }
+
+            case DIR_UP:
+            {
+                sp_paint_brick(bug_x_graph, bug_y_graph + 15 - MOVE_Y_STEP, 4, MOVE_Y_STEP, 0);
+                break;
+            }
         }
 
-        case BUG_HOBBIN:
+        if (bug->type == BUG_NOBBIN)
+        {
+            // Для Ноббина
+            sp_4_15_put(bug->x_graph, bug->y_graph, (uint8_t *)image_nobbin[bug->image_phase]);
+        }
+        else
         {
             // Для Хоббина
-            if (bug->x_graph != bug_x_graph || bug->y_graph != bug_y_graph)
-            {
-                switch (bug->dir)
-                {
-                    case DIR_RIGHT:
-                    {
-                        sp_paint_brick(bug_x_graph, bug_y_graph, MOVE_X_STEP, sizeof(image_nobbin[0]) / sizeof(image_nobbin[0][0]), 0);
-                        break;
-                    }
-
-                    case DIR_LEFT:
-                    {
-                        sp_paint_brick(bug_x_graph + sizeof(image_nobbin[0][0]) - MOVE_X_STEP, bug_y_graph, MOVE_X_STEP, sizeof(image_nobbin[0]) / sizeof(image_nobbin[0][0]), 0);
-                        break;
-                    }
-
-                    case DIR_DOWN:
-                    {
-                        sp_paint_brick(bug_x_graph, bug_y_graph, sizeof(image_nobbin[0][0]), MOVE_Y_STEP, 0);
-                        break;
-                    }
-
-                    case DIR_UP:
-                    {
-                        sp_paint_brick(bug_x_graph, bug_y_graph + (sizeof(image_nobbin[0]) / sizeof(image_nobbin[0][0])) - MOVE_Y_STEP, sizeof(image_nobbin[0][0]), MOVE_Y_STEP, 0);
-                        break;
-                    }
-                }
-            }
-
             if (bug->old_dir == DIR_RIGHT)
             {
                 sp_4_15_put(bug->x_graph, bug->y_graph, (uint8_t *)image_hobbin_right[bug->image_phase]);
@@ -977,8 +942,6 @@ void move_bug(struct bug_info *bug)
             {
                 sp_4_15_h_mirror_put(bug->x_graph, bug->y_graph, (uint8_t *)image_hobbin_right[bug->image_phase]);
             }
-
-            break;
         }
     }
 }
