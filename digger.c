@@ -1006,13 +1006,13 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
     }
 
     // Проверить перемещается ли мешок за пределы экрана
-    if ((x_graph >= MAX_X_POS && dir == DIR_RIGHT) ||
-        (x_graph <= MIN_X_POS && dir == DIR_LEFT) ||
-        (y_graph >= MAX_Y_POS && dir == DIR_DOWN) ||
-        (y_graph <= MIN_Y_POS && dir == DIR_UP))
-    {
-        return 1; // Если мешок пытался переместиться за пределы экрана
-    }
+    // if ((x_graph >= MAX_X_POS && dir == DIR_RIGHT) ||
+    //     (x_graph <= MIN_X_POS && dir == DIR_LEFT) ||
+    //     (y_graph >= MAX_Y_POS && dir == DIR_DOWN) ||
+    //     (y_graph <= MIN_Y_POS && dir == DIR_UP))
+    // {
+    //     return 1; // Если мешок пытался переместиться за пределы экрана
+    // }
 
     switch (dir)
     {
@@ -1027,18 +1027,8 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
                 // TODO: Удалить мешки встречающиеся на пути (dest_coin(x, y))
             }
 
-            y_graph += 2 * MOVE_Y_STEP;
+            y_graph += 2 * MOVE_Y_STEP; // Скорость падения мешка вдвое выше скорости перемещения врагов
 
-            break;
-        }
-    }
-
-    uint8_t rv = 0;
-
-    switch (dir)
-    {
-        case DIR_DOWN:
-        {
             // Стереть падающий мешок по старым координатам
             if (bag->floors_count)
             {
@@ -1082,51 +1072,49 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
 
             break;
         }
+    }
 
-        case DIR_LEFT:
-        case DIR_RIGHT:
-        {
-            bag->fall_count = DROP_WAIT;
-            bag->loose = 0; // Мешок должен перестать раскачиваться, если его двигают
+    uint8_t rv = 0;
 
-            // Отрисовка спрайта передвигаемого мешка
-            sp_put(x_graph, y_graph, sizeof(image_bag[0]), sizeof(image_bag) / sizeof(image_bag[0]), (uint8_t *)image_bag, (uint8_t *)outline_bag);
+    if (dir == DIR_LEFT || dir == DIR_RIGHT)
+    {
+        bag->fall_count = DROP_WAIT;
+        bag->loose = 0; // Мешок должен перестать раскачиваться, если его двигают
 
+        // Отрисовка спрайта передвигаемого мешка
+        sp_put(x_graph, y_graph, sizeof(image_bag[0]), sizeof(image_bag) / sizeof(image_bag[0]), (uint8_t *)image_bag, (uint8_t *)outline_bag);
 /*
-            // Проверка соприкосновение с другими мешками
-            for (uint8_t i = 0; i < MAX_BAGS; ++i)
-            {
-                struct bag_info *bag = &bags[i]; // Структура с информацией о мешке
-                if (bag == bi) continue; // Пропустить мешок, процедуру обработки которого вызвали
+        // Проверка соприкосновение с другими мешками
+        for (uint8_t i = 0; i < MAX_BAGS; ++i)
+        {
+            struct bag_info *bag = &bags[i]; // Структура с информацией о мешке
+            if (bag == bi) continue; // Пропустить мешок, процедуру обработки которого вызвали
 
-                if (bag->active) // Если мешок активен
+            if (bag->active) // Если мешок активен
+            {
+                if (!bag->broken_count) // Если мешок не разбит
                 {
-                    if (!bag->broken_count) // Если мешок не разбит
+                    // Проверить, что мешок соприкоснулся с другим мешком
+                    if (check_collision(bi->x_graph, bi->y_graph, bag->x_graph, bag->y_graph, 4, 15))
                     {
-                        // Проверить, что мешок соприкоснулся с другим мешком
-                        if (check_collision(bi->x_graph, bi->y_graph, bag->x_graph, bag->y_graph, 4, 15))
+                        break_snd_stat = 1; // Издать звук разбившегося мешка
+                        if (move_bag(bag, dir)) // Взывать перемещение мешка с которым обнаружена коллизия
                         {
-                            break_snd_stat = 1; // Издать звук разбившегося мешка
-                            if (move_bag(bag, dir)) // Взывать перемещение мешка с которым обнаружена коллизия
-                            {
-                                rv = 1; // Отменить перемещение мешка
-                                break;
-                            }
+                            rv = 1; // Отменить перемещение мешка
+                            break;
                         }
                     }
                 }
             }
-*/
-            // TODO: Проверить соприкосновение с Диггером
-            // TODO: Проверить соприкосновение с врагом
-            // if (!move_all_bags(dir,colision)) { // Если другие мешки не могут быть подвинуты
-            //     x=old_x; y=old_y;               // Восстановить исходные координаты
-            //     draw_bag(bag_num,BAG_0,x,y);    // Нарисовать мешок в прежнем положении
-            //     return 0;
-            // }
-
-            break;
         }
+*/
+        // TODO: Проверить соприкосновение с Диггером
+        // TODO: Проверить соприкосновение с врагом
+        // if (!move_all_bags(dir,colision)) { // Если другие мешки не могут быть подвинуты
+        //     x=old_x; y=old_y;               // Восстановить исходные координаты
+        //     draw_bag(bag_num,BAG_0,x,y);    // Нарисовать мешок в прежнем положении
+        //     return 0;
+        // }
     }
 
     if (!rv)
