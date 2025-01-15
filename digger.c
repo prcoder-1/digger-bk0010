@@ -367,13 +367,8 @@ void init_level_state()
 
         if (bug->active)
         {
+            erase_4_15(bug->x_graph, bug->y_graph);
             bug->active = 0;
-
-            if (bug->state != CREATURE_AFTER_RIP)
-            {
-                erase_4_15(bug->x_graph, bug->y_graph);
-                bug->state = CREATURE_AFTER_RIP;
-            }
         }
     }
 
@@ -435,10 +430,7 @@ void init_level()
 
     for (uint8_t i = 0; i < MAX_BUGS; ++i)
     {
-        struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
-
-        bug->active = 0;
-        bug->state = CREATURE_AFTER_RIP;
+        bugs[i].active = 0;
     }
 
     const uint16_t bg_block_width = sizeof(image_background[0][0]); // Ширина блока фона
@@ -1485,9 +1477,7 @@ void move_man()
 
             // Стереть съеденного врага
             erase_4_15(bug->x_graph, bug->y_graph);
-
             bug->active = 0; // Деактивировать врага
-            bug->state = CREATURE_AFTER_RIP; // Враг мёртв и исчез
 
             bugs_active--; // Уменьшить количество активных врагов
             bugs_total++;  // Увеличить количество создаваемых врагов компенсируя съеденных
@@ -1863,8 +1853,6 @@ void main()
 
                         // Стирание убитого врага
                         erase_4_15(bug->x_graph, bug->y_graph);
-
-                        bug->state = CREATURE_AFTER_RIP; // Враг дохлый и исчез
                         bug->active = 0; // Декативировать убитого врага
                         bugs_active--;   // Уменьшить количество активных врагов
 
