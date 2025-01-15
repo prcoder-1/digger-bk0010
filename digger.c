@@ -805,38 +805,30 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
             }
         }
 
-/*
         // Проверка соприкосновение с другими мешками
         for (uint8_t i = 0; i < MAX_BAGS; ++i)
         {
-            struct bag_info *bag = &bags[i]; // Структура с информацией о мешке
-            if (bag == bi) continue; // Пропустить мешок, процедуру обработки которого вызвали
+            struct bag_info *another_bag = &bags[i]; // Структура с информацией о мешке
 
-            if (bag->active) // Если мешок активен
+            if (another_bag == bag) continue; // Пропустить мешок, процедуру обработки которого вызвали
+            if (!another_bag->active) continue; // Пропустить не активные мешки
+            if (bag->broken_count) continue;// Пропустить разбитые мешки
+
+            // Проверить, что мешок соприкоснулся с другим мешком
+            if (check_collision(bag->x_graph, bag->y_graph, another_bag->x_graph, another_bag->y_graph, 4, 15))
             {
-                if (!bag->broken_count) // Если мешок не разбит
+                if (((dir == DIR_RIGHT) && (another_bag->x_graph > bag->x_graph)) ||
+                    ((dir == DIR_LEFT)  && (bag->x_graph > another_bag->x_graph)))
                 {
-                    // Проверить, что мешок соприкоснулся с другим мешком
-                    if (check_collision(bi->x_graph, bi->y_graph, bag->x_graph, bag->y_graph, 4, 15))
+                    if (move_bag(another_bag, dir)) // Взывать перемещение мешка с которым обнаружена коллизия
                     {
-                        break_snd_stat = 1; // Издать звук разбившегося мешка
-                        if (move_bag(bag, dir)) // Взывать перемещение мешка с которым обнаружена коллизия
-                        {
-                            rv = 1; // Отменить перемещение мешка
-                            break;
-                        }
+                        // Если другой мешок не смог переместиться
+                        rv = 1; // Отменить перемещение и этого мешка
+                        break;
                     }
                 }
             }
         }
-*/
-
-        // TODO: Проверить соприкосновение с врагом
-        // if (!move_all_bags(dir,colision)) { // Если другие мешки не могут быть подвинуты
-        //     x=old_x; y=old_y;               // Восстановить исходные координаты
-        //     draw_bag(bag_num,BAG_0,x,y);    // Нарисовать мешок в прежнем положении
-        //     return 0;
-        // }
 
         // Отрисовка спрайта передвигаемого мешка
         sp_put(x_graph, y_graph, sizeof(image_bag[0]), sizeof(image_bag) / sizeof(image_bag[0]), (uint8_t *)image_bag, (uint8_t *)outline_bag);
@@ -1682,7 +1674,7 @@ void main()
     volatile uint16_t *t_limit = (volatile uint16_t *)REG_TVE_LIMIT;
     volatile union TVE_CSR *tve_csr = (volatile union TVE_CSR *)REG_TVE_CSR;
 
-    const uint16_t FPS = 12; // Частота обновления кадров
+    const uint16_t FPS = 11; // Частота обновления кадров
     *t_limit = 3000000 / 128 / 4 / FPS;
     tve_csr->reg = (1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN) | (1 << TVE_CSR_D4);
 
