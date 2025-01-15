@@ -1549,25 +1549,26 @@ void sound_effect()
     if (man_rip_snd) // Звук гибели Диггера плюс анимация подпрыгивания, надгробный камень и траурный марш
     {
         // Звук убиения Диггера
-        uint16_t period = 19000 / N;
 
-        int16_t y = 0;
+        static uint8_t bounce[8] = { 3, 5, 6, 6, 5, 4, 3, 0 };
+
+        uint16_t period = 19000 / N;
         uint16_t i = 0;
-        while (period < 30000 / N)
+        while (period < 36000 / N)
         {
             sound(period, 2);
 
-            sp_4_15_put(man_x_graph, man_y_graph + (y >> 2) - 4, (uint8_t *)image_digger_turned_over);
+            uint16_t y_graph = man_y_graph - bounce[i >> 3];
+            era_up(man_x_graph, y_graph);
+            sp_4_15_put(man_x_graph, y_graph, (uint8_t *)image_digger_turned_over);
 
             if (i++ < 10)
             {
                 period -= 1000 / N;
-                y -= 2;
             }
             else
             {
                 period += 500 / N;
-                y++;
             }
         }
 
@@ -2095,7 +2096,7 @@ void main()
             if (man_state == CREATURE_DEAD_MONEY_BAG)
             {
                 uint8_t bag_y_pos = man_dead_bag->y_graph; // Вертикальная позиция мешка от которого погиб Диггер
-                if (bag_y_pos + MOVE_Y_STEP > man_y_graph) man_y_graph = bag_y_pos + MOVE_Y_STEP; // Если мешок опустился ниже Диггера, Диггер перемещается за мешком
+                if (bag_y_pos > man_y_graph) man_y_graph = bag_y_pos; // Если мешок опустился ниже Диггера, Диггер перемещается за мешком
 
                 sp_4_15_put(man_x_graph, man_y_graph, (uint8_t *)image_digger_turned_over);
 
