@@ -1557,7 +1557,7 @@ void sound_effect()
         {
             sound(period, 2);
 
-            sp_put(man_x_graph, man_y_graph + (y >> 2) - 4, sizeof(image_digger_turned_over[0]), sizeof(image_digger_turned_over) / sizeof(image_digger_turned_over[0]), (uint8_t *)image_digger_turned_over, (uint8_t *)outline_digger_turned_over);
+            sp_4_15_put(man_x_graph, man_y_graph + (y >> 2) - 4, (uint8_t *)image_digger_turned_over);
 
             if (i++ < 10)
             {
