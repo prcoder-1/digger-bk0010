@@ -368,7 +368,12 @@ void init_level_state()
         if (bug->active)
         {
             bug->active = 0;
-            erase_4_15(bug->x_graph, bug->y_graph);
+
+            if (bug->state != CREATURE_AFTER_RIP)
+            {
+                erase_4_15(bug->x_graph, bug->y_graph);
+                bug->state = CREATURE_AFTER_RIP;
+            }
         }
     }
 
@@ -426,6 +431,14 @@ void init_level()
     for (uint16_t i = 0; i < MAX_BAGS; ++i)
     {
         bags[i].active = 0;
+    }
+
+    for (uint8_t i = 0; i < MAX_BUGS; ++i)
+    {
+        struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
+
+        bug->active = 0;
+        bug->state = CREATURE_AFTER_RIP;
     }
 
     const uint16_t bg_block_width = sizeof(image_background[0][0]); // Ширина блока фона
@@ -1474,7 +1487,7 @@ void move_man()
             erase_4_15(bug->x_graph, bug->y_graph);
 
             bug->active = 0; // Деактивировать врага
-            bug->state = CREATURE_RIP; // Враг мёртв
+            bug->state = CREATURE_AFTER_RIP; // Враг мёртв и исчез
 
             bugs_active--; // Уменьшить количество активных врагов
             bugs_total++;  // Увеличить количество создаваемых врагов компенсируя съеденных
@@ -1728,8 +1741,8 @@ void main()
                             bug->x_graph = bug_start_x;
                             bug->y_graph = bug_start_y;
                             bug->dead_bag = 0;
-                            bug->type = BUG_NOBBIN; // Враги рождаются в виде Ноббинов
-                            bug->state = CREATURE_ALIVE;
+                            bug->type = BUG_NOBBIN;      // Враги рождаются в виде Ноббинов
+                            bug->state = CREATURE_ALIVE; // Враг жив
                             bug->dir = DIR_LEFT;
                             bug->old_dir = DIR_LEFT;
 
@@ -1851,6 +1864,7 @@ void main()
                         // Стирание убитого врага
                         erase_4_15(bug->x_graph, bug->y_graph);
 
+                        bug->state = CREATURE_AFTER_RIP; // Враг дохлый и исчез
                         bug->active = 0; // Декативировать убитого врага
                         bugs_active--;   // Уменьшить количество активных врагов
 
