@@ -797,10 +797,13 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
             // Проверить, что мешое перемещается на врага
             if (check_collision(bag->x_graph, bag->y_graph, bug->x_graph, bug->y_graph, 4, 15))
             {
+                // Если направление перемещения вправо и враг находится правее мешка
+                // или направление перемещения влево и враг находтся левее мешка
                 if (((dir == DIR_RIGHT) && (bug->x_graph > bag->x_graph)) ||
                     ((dir == DIR_LEFT)  && (bag->x_graph > bug->x_graph)))
                 {
                     rv = 1; // Если да, отменить перемещение
+                    break;
                 }
             }
         }
@@ -817,10 +820,13 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
             // Проверить, что мешок соприкоснулся с другим мешком
             if (check_collision(bag->x_graph, bag->y_graph, another_bag->x_graph, another_bag->y_graph, 4, 15))
             {
+                // Если направление перемещения вправо и другой мешок находится правее обрабатываемого мешка
+                // или направление перемещения влево и другой мешок находтся левее обрабатываемого мешка
                 if (((dir == DIR_RIGHT) && (another_bag->x_graph > bag->x_graph)) ||
                     ((dir == DIR_LEFT)  && (bag->x_graph > another_bag->x_graph)))
                 {
-                    if (move_bag(another_bag, dir)) // Взывать перемещение мешка с которым обнаружена коллизия
+                    // Попробовать взывать перемещение мешка с которым обнаружена коллизия
+                    if (move_bag(another_bag, dir))
                     {
                         // Если другой мешок не смог переместиться
                         rv = 1; // Отменить перемещение и этого мешка
