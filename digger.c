@@ -837,8 +837,10 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
         //     draw_bag(bag_num,BAG_0,x,y);    // Нарисовать мешок в прежнем положении
         //     return 0;
         // }
-    }
 
+        // Отрисовка спрайта передвигаемого мешка
+        sp_put(x_graph, y_graph, sizeof(image_bag[0]), sizeof(image_bag) / sizeof(image_bag[0]), (uint8_t *)image_bag, (uint8_t *)outline_bag);
+    }
 
     if (rv)
     {
@@ -846,9 +848,6 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
     }
     else
     {
-        // Отрисовка спрайта передвигаемого мешка
-        sp_put(x_graph, y_graph, sizeof(image_bag[0]), sizeof(image_bag) / sizeof(image_bag[0]), (uint8_t *)image_bag, (uint8_t *)outline_bag);
-
         bag->dir = dir;
         bag->x_graph = x_graph;
         bag->y_graph = y_graph;
@@ -1683,7 +1682,7 @@ void main()
     volatile uint16_t *t_limit = (volatile uint16_t *)REG_TVE_LIMIT;
     volatile union TVE_CSR *tve_csr = (volatile union TVE_CSR *)REG_TVE_CSR;
 
-    const uint16_t FPS = 10; // Частота обновления кадров
+    const uint16_t FPS = 12; // Частота обновления кадров
     *t_limit = 3000000 / 128 / 4 / FPS;
     tve_csr->reg = (1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN) | (1 << TVE_CSR_D4);
 
