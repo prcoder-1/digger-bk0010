@@ -363,7 +363,13 @@ void init_level_state()
     // Деактивировать всех врагов
     for (uint8_t i = 0; i < MAX_BUGS; ++i)
     {
-        bugs[i].active = 0;
+        struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
+
+        if (bug->active)
+        {
+            bug->active = 0;
+            erase_4_15(bug->x_graph, bug->y_graph);
+        }
     }
 
     if (difficulty >= 9) bugs_max = 5;
