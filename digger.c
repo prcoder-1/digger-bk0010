@@ -229,6 +229,8 @@ void draw_bg_minimap()
 #define draw_bg_minimap() ;
 #endif
 
+int remove_coin(uint8_t x_log, uint8_t y_log);
+
 /**
  * @brief Вывод 16-битного десятичного числа
  *
@@ -731,7 +733,6 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
             {
                 era_up(x_graph, y_graph + 9);
                 era_background(x_graph, y_graph, dir); // Сбросить биты матрицы фона
-                // TODO: Удалить мешки встречающиеся на пути (dest_coin(x, y))
             }
 
             y_graph += 2 * MOVE_Y_STEP; // Скорость падения мешка вдвое выше скорости перемещения врагов
@@ -747,6 +748,15 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
                 // В начале полёта стираем при помощи маски
                 sp_put(old_x_graph, old_y_graph, sizeof(outline_bag_fall[0]), sizeof(outline_bag_fall) / sizeof(outline_bag_fall[0]), nullptr, (uint8_t *)outline_bag_fall);
             }
+
+            uint8_t bag_abs_x_pos = x_graph - FIELD_X_OFFSET;
+            uint8_t bag_abs_y_pos = y_graph - FIELD_Y_OFFSET;
+            uint8_t bag_x_log = bag_abs_x_pos / POS_X_STEP;
+            uint8_t bag_y_log = bag_abs_y_pos / POS_Y_STEP;
+
+            remove_coin(bag_x_log, bag_y_log);
+
+            // TODO: Удалить мешки встречающиеся на пути (dest_coin(x, y))
 
             // Нарисовать падающий мешок
             sp_put(x_graph, y_graph, sizeof(image_bag_fall[0]), sizeof(image_bag_fall) / sizeof(image_bag_fall[0]), (uint8_t *)image_bag_fall, (uint8_t *)outline_bag_fall);
@@ -1046,23 +1056,7 @@ void move_bug(struct bug_info *bug)
         uint8_t bug_x_log = bug_abs_x_pos / POS_X_STEP;
         uint8_t bug_y_log = bug_abs_y_pos / POS_Y_STEP;
 
-        uint16_t coin_mask = 1 << bug_x_log;
-        if (coins[bug_y_log] & coin_mask)
-        {
-            coins[bug_y_log] &= ~coin_mask; // Сбросить бит соответствующий съеденной врагом монете
-
-            // Стереть съеденную монету (драгоценный камешек)
-            sp_put(FIELD_X_OFFSET + bug_x_log * POS_X_STEP, FIELD_Y_OFFSET + bug_y_log * POS_Y_STEP + COIN_Y_OFFSET,
-                sizeof(outline_no_coin[0]), sizeof(outline_no_coin) / sizeof(outline_no_coin[0]), nullptr, (uint8_t *)outline_no_coin);
-
-            uint16_t level_done = 1;
-            for (uint16_t i = 0; i < sizeof(coins) / sizeof(coins[0]); ++i)
-            {
-                if (coins[i]) { level_done = 0; break; }
-            }
-
-            if (level_done) done_snd = 1;
-        }
+        remove_coin(bug_x_log, bug_y_log);
     }
 
     if (man_state == CREATURE_ALIVE) // Если Диггер жив
@@ -1281,6 +1275,39 @@ void draw_man()
 }
 
 /**
+ * @brief Удаление монеты по заданному логическому положению
+ *
+ * @param x_log - логическая координата по оси X
+ * @param y_log - логическая координата по оси Y
+ *
+ * @return 1 - монета по заданным координатам удалена, 0 - монета по заданным координатам отсутствует
+ */
+int remove_coin(uint8_t x_log, uint8_t y_log)
+{
+    uint16_t coin_mask = 1 << x_log;
+    if (coins[y_log] & coin_mask)
+    {
+        coins[y_log] &= ~coin_mask; // Сбросить бит соответствующий съеденной монете
+
+        // Стереть съеденную монету (драгоценный камешек)
+        sp_put(FIELD_X_OFFSET + x_log * POS_X_STEP, FIELD_Y_OFFSET + y_log * POS_Y_STEP + COIN_Y_OFFSET,
+               sizeof(outline_no_coin[0]), sizeof(outline_no_coin) / sizeof(outline_no_coin[0]), nullptr, (uint8_t *)outline_no_coin);
+
+        uint16_t level_done = 1;
+        for (uint16_t i = 0; i < sizeof(coins) / sizeof(coins[0]); ++i)
+        {
+            if (coins[i]) { level_done = 0; break; }
+        }
+
+        if (level_done) done_snd = 1;
+
+        return 1;
+    }
+
+    return 0;
+}
+
+/**
  * @brief Подпрограмма перемещения Диггера
  */
 void move_man()
@@ -1363,15 +1390,8 @@ void move_man()
 
     if (man_dir == DIR_STOP) man_dir = man_prev_dir;
 
-    uint16_t coin_mask = 1 << man_x_log;
-    if (coins[man_y_log] & coin_mask)
+    if (remove_coin(man_x_log, man_y_log))
     {
-        coins[man_y_log] &= ~coin_mask; // Сбросить бит соответствующий съеденной монете
-
-        // Стереть съеденную монету (драгоценный камешек)
-        sp_put(FIELD_X_OFFSET + man_x_log * POS_X_STEP, FIELD_Y_OFFSET + man_y_log * POS_Y_STEP + COIN_Y_OFFSET,
-               sizeof(outline_no_coin[0]), sizeof(outline_no_coin) / sizeof(outline_no_coin[0]), nullptr, (uint8_t *)outline_no_coin);
-
         coin_snd = 7;  // Включить звук съедения монеты
         coin_time = 9; // Взвести таймер до последующего съедения монеты
         add_score(25); // 25 очков за съеденную монету (камешек)
@@ -1380,14 +1400,6 @@ void move_man()
             coin_snd_period = -1;
             add_score(250); // 250 очков за съедение восьми последовательных монет
         }
-
-        uint16_t level_done = 1;
-        for (uint16_t i = 0; i < sizeof(coins) / sizeof(coins[0]); ++i)
-        {
-            if (coins[i]) { level_done = 0; break; }
-        }
-
-        if (level_done) done_snd = 1;
     }
 
     uint16_t collision_flag = 0;
