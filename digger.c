@@ -487,6 +487,7 @@ void init_level()
                 bag->y_graph = y_graph;      // Координата мешка по оси Y
                 bag->dir = DIR_STOP;         // Мешок стоит на месте
 
+                // Нарисовать мешок с золотом
                 sp_put(bag->x_graph, bag->y_graph, sizeof(image_bag[0]), sizeof(image_bag) / sizeof(image_bag[0]), (uint8_t *)image_bag, (uint8_t *)outline_bag);
             }
             else if (ls == LEV_H || ls == LEV_S)
@@ -857,8 +858,11 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
             }
         }
 
+        // Стирание мешка по старым координатам
+        sp_put(bag->x_graph, bag->y_graph, 4, 15, nullptr, (uint8_t *)outline_bag);
+
         // Отрисовка спрайта передвигаемого мешка
-        sp_put(x_graph, y_graph, sizeof(image_bag[0]), sizeof(image_bag) / sizeof(image_bag[0]), (uint8_t *)image_bag, (uint8_t *)outline_bag);
+        sp_put(x_graph, y_graph, 4, 15, (uint8_t *)image_bag, (uint8_t *)outline_bag);
     }
 
     if (rv)
@@ -1374,6 +1378,11 @@ void move_man()
             // Стереть вишенку
             erase_4_15(FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP, FIELD_Y_OFFSET);
         }
+        else
+        {
+            // Нарисовать вишенку в правом верхнем углу игрового поля
+            sp_4_15_put(FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP, FIELD_Y_OFFSET, (uint8_t *)image_cherry);
+        }
     }
 
     if (man_dir != DIR_STOP) era_background(man_x_graph, man_y_graph, man_dir); /* update background matrix */
@@ -1761,9 +1770,6 @@ void main()
                     if ((bonus_state == BONUS_OFF) && (bugs_created == bugs_total)) // Если Бонус (вишенка) ещё не появлялся и создано максимальное количество врагов
                     {
                         bonus_state = BONUS_READY; // Включить готовность к активации бонус-режима
-
-                        // Нарисовать вишенку в правом верхнем углу игрового поля
-                        sp_4_15_put(FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP, FIELD_Y_OFFSET, (uint8_t *)image_cherry);
                     }
                 }
             }
