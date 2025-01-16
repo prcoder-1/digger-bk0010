@@ -1368,7 +1368,8 @@ void move_man()
             bonus_count = 1;
             bonus_time = 250 - difficulty * 20;
             bonus_flash = 19;
-            score += 1000; // 1000 очков за вишенку
+
+            add_score(1000); // 1000 очков за вишенку
 
             // Стереть вишенку
             erase_4_15(FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP, FIELD_Y_OFFSET);
