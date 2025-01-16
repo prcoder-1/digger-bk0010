@@ -2177,14 +2177,6 @@ void main()
             lives--;                    // Уменьшить количество жизней
             print_lives();              // Вывести количество жизней
 
-            // uint8_t code;
-            // do
-            // {
-            //     while (((union KEY_STATE *)REG_KEY_STATE)->bits.STATE == 0);// Если не поступил новый скан-код клавиши
-            //     code = ((union KEY_DATA *)REG_KEY_DATA)->bits.CODE;
-            // }
-            // while (code != 32 && !(((union EXT_DEV *)REG_EXT_DEV)->bits.MAG_KEY)); // Пока это не будет пробел и он будет удерживаеться
-
             if (lives > 0) // Проверить остались ли ещё жизни
             {
                 // Если жизни остались
