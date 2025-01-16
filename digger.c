@@ -1703,7 +1703,7 @@ void main()
     volatile uint16_t *t_limit = (volatile uint16_t *)REG_TVE_LIMIT;
     volatile union TVE_CSR *tve_csr = (volatile union TVE_CSR *)REG_TVE_CSR;
 
-    const uint16_t FPS = 11; // Частота обновления кадров
+    const uint16_t FPS = 10; // Частота обновления кадров
     *t_limit = 3000000 / 128 / 4 / FPS;
     tve_csr->reg = (1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN) | (1 << TVE_CSR_D4);
 
