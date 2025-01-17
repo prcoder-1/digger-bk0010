@@ -387,11 +387,11 @@ void init_level_state()
     else bugs_max = 3;                      // На уровнях до шестого - максимально три варага одновременно
 
     // Переменные относщиеся к созданию и управлению врагами
-    bugs_total = difficulty + 5;       // Общее количество врагов на уровне - пять плюс уровень сложности
-    bugs_delay = 45 - difficulty << 1; // Задержка появления врагов (с ростом сложности убывает)
-    bugs_delay_counter = bugs_delay;   // Инициализация счётчика задержки врага исходным значением
-    bugs_active = 0;                   // Количество активных врагов
-    bugs_created = 0;                  // Общее количество сщзданных врагов
+    bugs_total = difficulty + 5;         // Общее количество врагов на уровне - пять плюс уровень сложности
+    bugs_delay = 45 - (difficulty << 1); // Задержка появления врагов (с ростом сложности убывает)
+    bugs_delay_counter = bugs_delay;     // Инициализация счётчика задержки врага исходным значением
+    bugs_active = 0;                     // Количество активных врагов
+    bugs_created = 0;                    // Общее количество сщзданных врагов
 
     broke_max = 150 - difficulty * 10; // Время через которое исчезнет разбившийся мешок (с ростом сложности убывает)
 
@@ -1157,52 +1157,49 @@ void move_bug(struct bug_info *bug)
     // Переключить направление изменения фазы, если фаза дошла до предельного значения
     if (!bug->image_phase || bug->image_phase >= 2) bug->image_phase_inc = -bug->image_phase_inc;
 
-    if (bug->x_graph != bug_x_graph || bug->y_graph != bug_y_graph) // Если изменилось положение
+    // Подтереть след с нужной стороны
+    switch (bug->dir)
     {
-        // Подтереть след с нужной стороны
-        switch (bug->dir)
+        case DIR_RIGHT:
         {
-            case DIR_RIGHT:
-            {
-                sp_paint_brick(bug_x_graph, bug_y_graph, MOVE_X_STEP, 15, 0);
-                break;
-            }
-
-            case DIR_LEFT:
-            {
-                sp_paint_brick(bug_x_graph + 4 - MOVE_X_STEP, bug_y_graph, MOVE_X_STEP, 15, 0);
-                break;
-            }
-
-            case DIR_DOWN:
-            {
-                sp_paint_brick(bug_x_graph, bug_y_graph, 4, MOVE_Y_STEP, 0);
-                break;
-            }
-
-            case DIR_UP:
-            {
-                sp_paint_brick(bug_x_graph, bug_y_graph + 15 - MOVE_Y_STEP, 4, MOVE_Y_STEP, 0);
-                break;
-            }
+            sp_paint_brick(bug_x_graph, bug_y_graph, MOVE_X_STEP, 15, 0);
+            break;
         }
 
-        if (bug->type == BUG_NOBBIN)
+        case DIR_LEFT:
         {
-            // Для Ноббина
-            sp_4_15_put(bug->x_graph, bug->y_graph, (uint8_t *)image_nobbin[bug->image_phase]);
+            sp_paint_brick(bug_x_graph + 4 - MOVE_X_STEP, bug_y_graph, MOVE_X_STEP, 15, 0);
+            break;
+        }
+
+        case DIR_DOWN:
+        {
+            sp_paint_brick(bug_x_graph, bug_y_graph, 4, MOVE_Y_STEP, 0);
+            break;
+        }
+
+        case DIR_UP:
+        {
+            sp_paint_brick(bug_x_graph, bug_y_graph + 15 - MOVE_Y_STEP, 4, MOVE_Y_STEP, 0);
+            break;
+        }
+    }
+
+    if (bug->type == BUG_NOBBIN)
+    {
+        // Для Ноббина
+        sp_4_15_put(bug->x_graph, bug->y_graph, (uint8_t *)image_nobbin[bug->image_phase]);
+    }
+    else
+    {
+        // Для Хоббина
+        if (bug->old_dir == DIR_RIGHT)
+        {
+            sp_4_15_put(bug->x_graph, bug->y_graph, (uint8_t *)image_hobbin_right[bug->image_phase]);
         }
         else
         {
-            // Для Хоббина
-            if (bug->old_dir == DIR_RIGHT)
-            {
-                sp_4_15_put(bug->x_graph, bug->y_graph, (uint8_t *)image_hobbin_right[bug->image_phase]);
-            }
-            else
-            {
-                sp_4_15_h_mirror_put(bug->x_graph, bug->y_graph, (uint8_t *)image_hobbin_right[bug->image_phase]);
-            }
+            sp_4_15_h_mirror_put(bug->x_graph, bug->y_graph, (uint8_t *)image_hobbin_right[bug->image_phase]);
         }
     }
 }
