@@ -1339,7 +1339,7 @@ void move_man()
             case 25: man_new_dir = DIR_RIGHT; break; // Стрелка вправо
             case 26: man_new_dir = DIR_UP;    break; // Стрелка вверх
             case 27: man_new_dir = DIR_DOWN;  break; // Стрелка вниз
-            case 32: break;
+            case 32: done_snd = 1; break;
             default: man_new_dir = DIR_STOP;
         }
     }
@@ -1644,7 +1644,7 @@ void sound_effect()
             uint16_t period = done_periods[i];
             uint16_t durance = (i == 9) ? 800 : 300;
             sound_vibrato(period, durance);
-            delay_ms(10);
+            delay_ms(2);
         }
     }
 
