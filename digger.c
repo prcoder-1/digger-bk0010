@@ -262,14 +262,17 @@ void print_lives()
 {
     const uint16_t man_x_offset = sizeof(ch_digits[0][0]) * 5 + 1; // Смещение шириной в пять символов '0' плюс один байт (4 пикселя)
     const uint16_t man_y_offset = MOVE_Y_STEP;
+    const uint16_t one_pos_width = sizeof(image_life_right[0]) + 1;
+    const uint16_t width = MAX_LIVES * one_pos_width;
+    const uint16_t height = sizeof(image_life_right) / sizeof(image_life_right[0]);
 
-    for (uint16_t i = 0; i < MAX_LIVES; ++i)
+    sp_paint_brick(man_x_offset, man_y_offset, width, height, 0);
+
+    uint16_t l = 1;
+    for (uint16_t i = man_x_offset; i < man_x_offset + width; i += one_pos_width)
     {
-        uint16_t x_pos = man_x_offset + i * (sizeof(image_life_right[0]) + 1);
-
-        uint8_t mirror;
-        if (lives && (i < lives - 1)) sp_put(x_pos, man_y_offset, sizeof(image_life_right[0]), sizeof(image_life_right) / sizeof(image_life_right[0]), (uint8_t *)image_life_right, nullptr);
-        else sp_paint_brick(x_pos, man_y_offset, sizeof(image_life_right[0]), sizeof(image_life_right) / sizeof(image_life_right[0]), 0);
+        if (++l > lives) break;
+        sp_put(i, man_y_offset, sizeof(image_life_right[0]), sizeof(image_life_right) / sizeof(image_life_right[0]), (uint8_t *)image_life_right, nullptr);
     }
 }
 
