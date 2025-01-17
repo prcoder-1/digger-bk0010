@@ -58,6 +58,19 @@ const uint8_t music2[][2] = { // Траурный марш
     { 0, 0 }
 };
 
+// const uint8_t music3[][2] = { /* tico-tico */
+//     { C5,NQ }, { AS4,NQ }, { C5,NQ }, { G4,NQ }, { DS4,NQ }, { G4,NQ }, { C4,NH },
+//     { C5,NQ }, { AS4,NQ }, { C5,NQ }, { G4,NQ }, { DS4,NQ }, { G4,NQ }, { C4,NH },
+//     { C5,NQ }, { D5,NQ }, { DS5,NQ }, { DS5,NQ }, { DS5,NQ }, { C5,NQ }, { D5,NQ }, { D5,NQ }, { D5,NQ },
+//     { AS4,NQ }, { C5,NQ }, { C5,NQ }, { C5,NQ }, { B4,NQ }, { C5,12 },
+//
+//     { C5,NQ }, { AS4,NQ }, { C5,NQ }, { G4,NQ }, { DS4,NQ }, { G4,NQ }, { C4,NH },
+//     { C5,NQ }, { AS4,NQ }, { C5,NQ }, { G4,NQ }, { DS4,NQ }, { G4,NQ }, { C4,NH },
+//     { C5,NQ }, { D5,NQ }, { DS5,NQ }, { DS5,NQ }, { DS5,NQ }, { C5,NQ }, { D5,NQ }, { D5,NQ }, { D5,NQ },
+//     { AS4,NQ }, { C5,NQ }, { C5,NQ }, { C5,NQ }, { B4,NQ }, { C5,12 },
+//     { 0, 0 }
+// };
+
 void init_music(uint8_t x)
 {
 /*
