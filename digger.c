@@ -821,7 +821,7 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
         for (uint8_t i = 0; i < bugs_max; ++i)
         {
             struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
-
+            if (!bugs_active) continue; // Пропустить неактивных врагов
             if (bug->state != CREATURE_ALIVE) continue; //  Пропустить неживых врагов
 
             // Проверить, что мешое перемещается на врага
