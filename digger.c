@@ -211,7 +211,7 @@ uint16_t fall_period;     // Период звука летящего мешка
 uint8_t  break_bag_snd;   // Флаг, означающий, что звук разбивающегося мешка включен
 uint8_t  money_snd;       // Флаг, означающий, что звук съедания золота включен
 uint8_t  coin_snd;        // Флаг, означающий, что звук съедания монетки включен
-int8_t   coin_snd_period; // Номер ноты при съедании монетки (драгоценного камня)
+int8_t   coin_snd_note;   // Номер ноты при съедании монетки (драгоценного камня)
 uint8_t  coin_time;       // Таймер между последовательными съедениями драгоценных камней (монеток)
 uint8_t  done_snd;        // Флаг, означающий, что звук завершения уровня включен
 uint8_t  bug_snd;         // Флаг, означающий, что звук съедания врага в бонус-режиме включен
@@ -291,17 +291,23 @@ void add_score(uint16_t score_add)
         print_lives(); // Вывесли количество жизней
         bonus_life_score += BONUS_LIFE_SCORE; // Количество очков до следующего бонуса в виде жизни
 
-        life_snd = 24;
+        life_snd = 24; // Издать звук получения жизни
     }
 }
 
+/**
+ * @brief Стирает блок 16x15 пикселей (4x15 байт)
+ *
+ * @param x_graph - координата X блока
+ * @param y_graph - координата Y блока
+ */
 void erase_4_15(uint16_t x_graph, uint16_t y_graph)
 {
     sp_paint_brick(x_graph, y_graph, 4, 15, 0);
 }
 
 /**
- * @brief Проверка соприкосновения по расстояниям по оси X и по оси Y
+ * @brief Проверка соприкосновения (по расстояниям) по оси X и по оси Y
  */
 int check_collision(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t dist_x, uint8_t dist_y)
 {
@@ -370,19 +376,18 @@ void init_level_state()
     {
         struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
 
-        if (bug->active)
-        {
-            erase_4_15(bug->x_graph, bug->y_graph);
-            bug->active = 0;
-        }
+        if (!bug->active) continue; // Пропустить неактивных врагов
+
+        erase_4_15(bug->x_graph, bug->y_graph); // Стереть врага
+        bug->active = 0; // Деактивировать врага
     }
 
-    if (difficulty >= 9) bugs_max = 5;
-    else if (difficulty >= 6) bugs_max = 4;
-    else bugs_max = 3;
+    if (difficulty >= 9) bugs_max = 5;      // На уровне сложности 9 и выше максимально 5 врагов одновременно
+    else if (difficulty >= 6) bugs_max = 4; // На уровне сложности с 6 до 8 *включительно) до 4 врагов одновременно
+    else bugs_max = 3;                      // На уровнях до шестого - максимально три варага одновременно
 
     // Переменные относщиеся к созданию и управлению врагами
-    bugs_total = difficulty + 5;       // Общее количество врагов на уровне
+    bugs_total = difficulty + 5;       // Общее количество врагов на уровне - пять плюс уровень сложности
     bugs_delay = 45 - difficulty << 1; // Задержка появления врагов (с ростом сложности убывает)
     bugs_delay_counter = bugs_delay;   // Инициализация счётчика задержки врага исходным значением
     bugs_active = 0;                   // Количество активных врагов
@@ -407,7 +412,7 @@ void init_level_state()
 
     // Инициализация переменных используемых для звуковых эффектов
     coin_snd = 0;
-    coin_snd_period = -1;
+    coin_snd_note = -1;
     coin_time = 0;
     loose_snd = 0;
     fall_snd = 0;
@@ -1408,9 +1413,9 @@ void move_man()
         coin_snd = 7;  // Включить звук съедения монеты
         coin_time = 9; // Взвести таймер до последующего съедения монеты
         add_score(25); // 25 очков за съеденную монету (камешек)
-        if (++coin_snd_period == 7) // Перейти к следующей ноте
+        if (++coin_snd_note == 7) // Перейти к следующей ноте
         {
-            coin_snd_period = -1;
+            coin_snd_note = -1;
             add_score(250); // 250 очков за съедение восьми последовательных монет
         }
     }
@@ -1525,7 +1530,7 @@ void sound_effect()
     if (coin_snd) // Звук съедания монеты (драгоценного камня)
     {
         static const uint16_t coin_periods[] = { C5, D5, E5, F5, G5, A5, B5, C6 };
-        uint16_t period = coin_periods[coin_snd_period & 7];
+        uint16_t period = coin_periods[coin_snd_note & 7];
         sound(period, 30);
         coin_snd--;
     }
@@ -2171,7 +2176,7 @@ void main()
 
         // Декрементировать таймер между последовательными съедениями драгоценных камней (монеток)
         if (coin_time > 0) coin_time--;
-        else coin_snd_period = -1;
+        else coin_snd_note = -1;
 
         sound_effect();
 
