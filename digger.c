@@ -821,7 +821,7 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
         for (uint8_t i = 0; i < bugs_max; ++i)
         {
             struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
-
+            if (!bugs_active) continue; // Пропустить неактивных врагов
             if (bug->state != CREATURE_ALIVE) continue; //  Пропустить неживых врагов
 
             // Проверить, что мешое перемещается на врага
@@ -1833,7 +1833,11 @@ void main()
                     case CREATURE_DEAD_MONEY_BAG: // Враг погиб от мешка с деньгами и летит вместе с ним
                     {
                         uint8_t bag_y_pos = bug->dead_bag->y_graph; // Вертикальная позиция мешка от которого погиб враг
-                        if (bag_y_pos + MOVE_Y_STEP > bug->y_graph) bug->y_graph = bag_y_pos; // Если мешок опустился ниже врага, враг перемещается за мешком
+                        if (bag_y_pos + MOVE_Y_STEP > bug->y_graph)
+                        {
+                            erase_4_15(bug->x_graph, bug->y_graph);
+                            bug->y_graph = bag_y_pos; // Если мешок опустился ниже врага, враг перемещается за мешком
+                        }
 
                         switch (bug->type)
                         {
@@ -2122,7 +2126,11 @@ void main()
             if (man_state == CREATURE_DEAD_MONEY_BAG)
             {
                 uint8_t bag_y_pos = man_dead_bag->y_graph; // Вертикальная позиция мешка от которого погиб Диггер
-                if (bag_y_pos > man_y_graph) man_y_graph = bag_y_pos; // Если мешок опустился ниже Диггера, Диггер перемещается за мешком
+                if (bag_y_pos > man_y_graph)
+                {
+                    erase_4_15(man_x_graph, man_y_graph);
+                    man_y_graph = bag_y_pos; // Если мешок опустился ниже Диггера, Диггер перемещается за мешком
+                }
 
                 sp_4_15_put(man_x_graph, man_y_graph, (uint8_t *)image_digger_turned_over);
 
