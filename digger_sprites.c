@@ -2228,7 +2228,7 @@ const uint8_t  outline_background[8][4][5] = {
         }
 };
 */
-
+/*
 const uint8_t image_life_right[12][4] = {
         0x00,0x50,0x00,0x00,
         0x00,0x54,0x01,0x00,
@@ -2243,7 +2243,7 @@ const uint8_t image_life_right[12][4] = {
         0x41,0x10,0x04,0x00,
         0x14,0x40,0x01,0x00
 };
-
+*/
 /*
 const uint8_t outline_life_right[12][4] = {
         0x00,0xFF,0x0F,0x00,

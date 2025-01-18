@@ -179,7 +179,7 @@ extern const uint8_t outline_background[8][4][5];
 /**
  * @brief Жизнь для первого игрока (смотрит вправо)
  */
-extern const uint8_t image_life_right[12][4];
+// extern const uint8_t image_life_right[12][4];
 // extern const uint8_t outline_life_right[12][4];
 
 /**

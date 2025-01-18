@@ -261,10 +261,10 @@ void print_dec(uint16_t number, uint16_t x_graph, uint16_t y_graph)
 void print_lives()
 {
     const uint16_t man_x_offset = sizeof(ch_digits[0][0]) * 5 + 1; // Смещение шириной в пять символов '0' плюс один байт (4 пикселя)
-    const uint16_t man_y_offset = MOVE_Y_STEP;
-    const uint16_t one_pos_width = sizeof(image_life_right[0]) + 1;
+    const uint16_t man_y_offset = 2;
+    const uint16_t one_pos_width = sizeof(image_digger_right[1][0]) + 1;
     const uint16_t width = MAX_LIVES * one_pos_width;
-    const uint16_t height = sizeof(image_life_right) / sizeof(image_life_right[0]);
+    const uint16_t height = sizeof(image_digger_right[1]) / sizeof(image_digger_right[1][0]);
 
     sp_paint_brick(man_x_offset, man_y_offset, width, height, 0);
 
@@ -272,7 +272,7 @@ void print_lives()
     for (uint16_t i = man_x_offset; i < man_x_offset + width; i += one_pos_width)
     {
         if (++l > lives) break;
-        sp_put(i, man_y_offset, sizeof(image_life_right[0]), sizeof(image_life_right) / sizeof(image_life_right[0]), (uint8_t *)image_life_right, nullptr);
+        sp_4_15_put(i, man_y_offset, (uint8_t *)image_digger_right[1]);
     }
 }
 
