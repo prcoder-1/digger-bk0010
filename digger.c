@@ -116,10 +116,10 @@ union back_item
 struct bag_info
 {
     enum bag_state state; // Флаг активности мешка
-    uint8_t count;        // Счётчик
+    enum direction dir;   // Направление движения мешка
     uint8_t x_graph;      // Положение по оси X в графических координатах
     uint8_t y_graph;      // Положение по оси Y в графических координатах
-    enum direction dir;   // Направление движения мешка
+    uint8_t count;        // Счётчик
 };
 
 /**
