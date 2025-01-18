@@ -35,7 +35,7 @@ extern const uint8_t image_nobbin[3][15][4];
  * @brief Падающий дохлый Ноббин
  */
 extern const uint8_t image_nobbin_dead[15][4];
-extern const uint8_t outline_nobbin_dead[15][4];
+// extern const uint8_t outline_nobbin_dead[15][4];
 
 /**
  * @brief Хоббин перемещающийся вправо
@@ -48,7 +48,7 @@ extern const uint8_t image_hobbin_right[3][15][4];
  * @brief Падающий дохлый Хоббин смотрящий вправо
  */
 extern const uint8_t image_hobbin_right_dead[15][4];
-extern const uint8_t outline_hobbin_right_dead[15][4];
+// extern const uint8_t outline_hobbin_right_dead[15][4];
 
 /**
  * @brief Хоббин перемещающийся влево
@@ -113,7 +113,7 @@ extern const uint8_t outline_coin[10][4];
 /**
  * @brief Спрайт для стирания драгоценного камня (монетки)
  */
-extern const uint8_t image_no_coin[10][4];
+// extern const uint8_t image_no_coin[10][4];
 extern const uint8_t outline_no_coin[10][4];
 
 /**
@@ -174,7 +174,7 @@ extern const uint8_t outline_blamk_down[6][6];
  * @brief Образцы фона
  */
 extern const uint8_t image_background[8][4][5];
-extern const uint8_t outline_background[8][4][5];
+// extern const uint8_t outline_background[8][4][5];
 
 /**
  * @brief Жизнь для первого игрока (смотрит вправо)
