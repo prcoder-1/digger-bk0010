@@ -107,7 +107,6 @@ union back_item
 struct bag_info
 {
     uint8_t active;       // Флаг активности мешка
-    uint8_t loose;        // Флаг. означающий, что мешок раскачивается и готов упасть
     uint8_t floors_count; // Количество этажей (клеток), которые пролетел мешок
     uint8_t fall_count;   // Счётчик времени до падения мешка
     uint8_t broken_count; // Счётчик времени существования разбившегося мешка
@@ -487,7 +486,6 @@ void init_level()
                 struct bag_info *bag = &bags[bag_num++]; // Структура с информацией об очередном мешке
 
                 bag->active = 1;             // Мешок активен
-                bag->loose = 0;              // Мешок не раскачиваетя
                 bag->floors_count = 0;       // Мешок не пролетел ни одного этажа
                 bag->fall_count = DROP_WAIT; // Время ожидания до падения
                 bag->broken_count = 0;       // Мешок ещё не разбит
@@ -738,7 +736,7 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
 
         case DIR_DOWN: // Падение мешка
         {
-            if (bag->fall_count)
+            if (!bag->fall_count)
             {
                 era_up(x_graph, y_graph + 9);
                 era_background(x_graph, y_graph, dir); // Сбросить биты матрицы фона
@@ -805,7 +803,6 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
     if (dir == DIR_LEFT || dir == DIR_RIGHT)
     {
         bag->fall_count = DROP_WAIT;
-        bag->loose = 0; // Мешок должен перестать раскачиваться, если его двигают
 
         // Проверить перемещается ли мешок на Диггера
         if (check_collision(bag->x_graph, bag->y_graph, man_x_graph, man_y_graph, 4, 15))
@@ -1216,7 +1213,6 @@ void stop_bag(struct bag_info *bag)
 
     bag->dir = DIR_STOP;
     bag->fall_count = DROP_WAIT;
-    bag->loose = 0;
 
     // sp_4_15_put(bi->x_graph, bi->y_graph, (uint8_t *)image_1);
 
@@ -1967,7 +1963,7 @@ void main()
                         {
                             if (bag_x_rem == 0 && bag_y_graph < MAX_Y_POS) // Если мешок находится в центре клетки и выше нижней границы
                             {
-                                if (bag->loose) // Если мешок раскачивается и готов упасть
+                                if (bag->fall_count != DROP_WAIT) // Если мешок раскачивается и готов упасть
                                 {
                                     if (!bag->fall_count) // Если счётчик закончился, начать падение мешка
                                     {
@@ -2009,15 +2005,14 @@ void main()
                                     if (background[bag_y_log + 1][bag_x_log].byte != 0xFF) // Если клетка ниже повреждена
                                     {
                                         if (!((man_dir == DIR_UP || man_dir == DIR_DOWN) &&  // Если Диггер двигался по-вертикали и он находится под мешком,
-                                            (man_x_log == bag_x_log && (man_y_log == bag_y_log + 1)))) bag->loose = 1; // то пока не начинать раскачивать мешок
+                                            (man_x_log == bag_x_log && (man_y_log == bag_y_log + 1)))) bag->fall_count--;; // то пока не начинать раскачивать мешок
                                     }
                                 }
                             }
                             else
                             {
-                                // Если мешок двигали в стороны, то восстановить переменные
+                                // Если мешок двигали в стороны, то восстановить состояние
                                 bag->fall_count = DROP_WAIT;
-                                bag->loose = 0;
                             }
 
                             break;
@@ -2097,8 +2092,8 @@ void main()
 
             if (bag->active) // Если мешок активен
             {
-                if (bag->dir == DIR_DOWN) bag_fall = 0; // Найден падающий мешок
-                else if (bag->loose) bag_loose = 0;     // Найден качающийся мешок
+                if (bag->dir == DIR_DOWN) bag_fall = 0;               // Найден падающий мешок
+                else if (bag->fall_count != DROP_WAIT) bag_loose = 0; // Найден качающийся мешок
             }
         }
 
