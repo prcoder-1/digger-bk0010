@@ -1446,8 +1446,9 @@ void move_man()
     }
     else
     {
-        if (man_x_graph != prev_man_x_graph || man_y_graph != prev_man_y_graph)
+        if (man_x_graph != prev_man_x_graph || man_y_graph != prev_man_y_graph) // Если Диггер переместился
         {
+            // Стереть след от Диггера с нужной стороы и нарисовать "прогрыз" со стороны в которую он движется
             switch (man_dir)
             {
                 case DIR_RIGHT:
@@ -1481,8 +1482,9 @@ void move_man()
         }
     }
 
-    draw_man();
+    draw_man(); // Нарисовать Диггера
 
+    // Проверить Диггера на сопркосновение с врагами
     for (uint8_t i = 0; i < bugs_max; ++i)
     {
         struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
@@ -1709,7 +1711,7 @@ void main()
     set_PSW(1 << PSW_I); // Замаскировать прерывания IRQ
     ((union KEY_STATE *)REG_KEY_STATE)->bits.INT_MASK = 1; // Отключить прерывание от клавиатуры
 
-    sp_paint_brick(0, 0, 64, FIELD_Y_OFFSET, 0);
+    sp_paint_brick(0, 0, 64, FIELD_Y_OFFSET, 0); // Очистить экран с верха до начала игрового поля
 
     volatile uint16_t *t_limit = (volatile uint16_t *)REG_TVE_LIMIT;
     volatile union TVE_CSR *tve_csr = (volatile union TVE_CSR *)REG_TVE_CSR;
@@ -1718,7 +1720,7 @@ void main()
     *t_limit = 3000000 / 128 / 4 / FPS;
     tve_csr->reg = (1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN) | (1 << TVE_CSR_D4);
 
-    init_game();
+    init_game(); // Начальная инициализация игры
 
     for (;;) // Основной бесконечный цикл игры
     {
@@ -2125,6 +2127,7 @@ void main()
                     man_y_graph = bag_y_pos; // Если мешок опустился ниже Диггера, Диггер перемещается за мешком
                 }
 
+                // Нарисовать перевёрнутого Диггера
                 sp_4_15_put(man_x_graph, man_y_graph, (uint8_t *)image_digger_turned_over);
 
                 if (man_dead_bag->dir == DIR_STOP)
