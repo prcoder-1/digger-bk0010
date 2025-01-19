@@ -319,6 +319,19 @@ int check_collision(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t dist
 }
 
 /**
+ * @brief Проверка на выход за пределы игрового поля
+ */
+int check_out_of_range(enum direction dir, uint16_t x_graph, uint16_t y_graph)
+{
+    return (
+        (dir == DIR_RIGHT && x_graph >= MAX_X_POS) ||
+        (dir == DIR_LEFT  && x_graph <= MIN_X_POS) ||
+        (dir == DIR_DOWN  && y_graph >= MAX_Y_POS) ||
+        (dir == DIR_UP    && y_graph <= MIN_Y_POS)
+    );
+}
+
+/**
  * @brief Стирание фона в правую сторону
  */
 void era_right(uint16_t x, uint16_t y)
@@ -696,10 +709,7 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
     uint8_t y_graph = bag->y_graph;
 
     // Проверить пытается ли переместиться мешок за пределы экрана
-    if ((dir == DIR_RIGHT && x_graph >= MAX_X_POS) ||
-        (dir == DIR_LEFT  && x_graph <= MIN_X_POS) ||
-        (dir == DIR_DOWN  && y_graph >= MAX_Y_POS) ||
-        (dir == DIR_UP    && y_graph <= MIN_Y_POS))
+    if (check_out_of_range(dir, x_graph, y_graph))
     {
         rv = 1; // Если мешок пытается переместиться за пределы экрана, отменить перемещение
     }
@@ -1022,10 +1032,7 @@ void move_bug(struct bug_info *bug)
     }
 
     // Остановить врага при попытке выхода за пределы экрана
-    if ((bug->dir == DIR_RIGHT && bug_x_graph >= MAX_X_POS) ||
-        (bug->dir == DIR_LEFT  && bug_x_graph <= MIN_X_POS) ||
-        (bug->dir == DIR_DOWN  && bug_y_graph >= MAX_Y_POS) ||
-        (bug->dir == DIR_UP    && bug_y_graph <= MIN_Y_POS))
+    if (check_out_of_range(bug->dir, bug_x_graph, bug_y_graph))
     {
         bug->dir = DIR_STOP;
     }
@@ -1340,10 +1347,7 @@ void move_man()
     if ((((union EXT_DEV *)REG_EXT_DEV)->bits.MAG_KEY)) man_dir = DIR_STOP;
 
     // Остановиться при попытке выхода за игровое поле
-    if ( (man_dir == DIR_LEFT  && man_x_graph <= MIN_X_POS) ||
-         (man_dir == DIR_RIGHT && man_x_graph >= MAX_X_POS) ||
-         (man_dir == DIR_UP && man_y_graph <= MIN_Y_POS + 1) ||
-         (man_dir == DIR_DOWN && man_y_graph >= MAX_Y_POS) )
+    if (check_out_of_range(man_dir, man_x_graph, man_y_graph))
     {
         man_dir = DIR_STOP;
     }
