@@ -1159,27 +1159,27 @@ void move_bug(struct bug_info *bug)
     // Подтереть след с нужной стороны
     switch (bug->dir)
     {
-        case DIR_RIGHT:
-        {
-            sp_paint_brick(bug_x_graph, bug_y_graph, MOVE_X_STEP, 15, 0);
-            break;
-        }
-
         case DIR_LEFT:
         {
             sp_paint_brick(bug_x_graph + 4 - MOVE_X_STEP, bug_y_graph, MOVE_X_STEP, 15, 0);
             break;
         }
 
-        case DIR_DOWN:
+        case DIR_RIGHT:
         {
-            sp_paint_brick(bug_x_graph, bug_y_graph, 4, MOVE_Y_STEP, 0);
+            sp_paint_brick(bug_x_graph, bug_y_graph, MOVE_X_STEP, 15, 0);
             break;
         }
 
         case DIR_UP:
         {
             sp_paint_brick(bug_x_graph, bug_y_graph + 15 - MOVE_Y_STEP, 4, MOVE_Y_STEP, 0);
+            break;
+        }
+
+        case DIR_DOWN:
+        {
+            sp_paint_brick(bug_x_graph, bug_y_graph, 4, MOVE_Y_STEP, 0);
             break;
         }
     }
