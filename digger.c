@@ -1184,6 +1184,7 @@ void move_bug(struct bug_info *bug)
         }
     }
 
+    // Отрисовка спрайта врага
     if (bug->type == BUG_NOBBIN)
     {
         // Для Ноббина
@@ -1212,13 +1213,14 @@ void stop_bag(struct bag_info *bag)
 {
     bag->dir = DIR_STOP; // Остановить мешок
 
-    if (bag->count > 1)
+    // Проверка разбился ли мешок
+    if (bag->count > 1) // Если мешок пролетел больше одного этажа
     {
-        bag->state = BAG_BROKEN;
+        bag->state = BAG_BROKEN; // То он разбился
     }
     else
     {
-        bag->state = BAG_STATIONARY;
+        bag->state = BAG_STATIONARY; // Иначе мешок просто остановился
     }
 
     bag->count = 0;
