@@ -660,16 +660,16 @@ void era_background(uint16_t x_graph, uint16_t y_graph, enum direction dir)
 
     switch (dir)
     {
-        case DIR_RIGHT:
         case DIR_LEFT:
+        case DIR_RIGHT:
         {
             // Стереть соответсвующий бит матрицы фона
             background[y_log][x_log].byte &= ~(1 << x_rem);
             break;
         }
 
-        case DIR_DOWN:
         case DIR_UP:
+        case DIR_DOWN:
         {
             // Стереть соответсвующий бит матрицы фона
             background[y_log][x_log].byte &= ~(1 << (y_rem + 4));
