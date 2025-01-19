@@ -319,19 +319,6 @@ int check_collision(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t dist
 }
 
 /**
- * @brief Проверка на выход за пределы игрового поля
- */
-int check_out_of_range(enum direction dir, uint16_t x_graph, uint16_t y_graph)
-{
-    return (
-        (dir == DIR_RIGHT && x_graph >= MAX_X_POS) ||
-        (dir == DIR_LEFT  && x_graph <= MIN_X_POS) ||
-        (dir == DIR_DOWN  && y_graph >= MAX_Y_POS) ||
-        (dir == DIR_UP    && y_graph <= MIN_Y_POS)
-    );
-}
-
-/**
  * @brief Стирание фона в правую сторону
  */
 void era_right(uint16_t x, uint16_t y)
@@ -694,6 +681,34 @@ void era_background(uint16_t x_graph, uint16_t y_graph, enum direction dir)
 }
 
 /**
+ * @brief Проверка на выход за пределы игрового поля
+ */
+int check_out_of_range(enum direction dir, uint16_t x_graph, uint16_t y_graph)
+{
+    return (
+        (dir == DIR_RIGHT && x_graph >= MAX_X_POS) ||
+        (dir == DIR_LEFT  && x_graph <= MIN_X_POS) ||
+        (dir == DIR_DOWN  && y_graph >= MAX_Y_POS) ||
+        (dir == DIR_UP    && y_graph <= MIN_Y_POS)
+    );
+}
+
+/**
+ * @brief Проверка на то, что перемещение по оси X происходит на заданный объект
+ *
+ * @param dir - направление перемещения
+ * @param x_graph - координата X перемещаемого объекта
+ * @param object_x_graph - координата X объекта на который возможно перемещение
+ */
+int move_to_object(enum direction dir, uint16_t x_graph, uint16_t object_x_graph)
+{
+    // Если направление перемещения вправо и объект находится правее
+    // или направление перемещения влево и объект находтся левее
+    return (((dir == DIR_RIGHT) && (object_x_graph > x_graph)) ||
+            ((dir == DIR_LEFT)  && (x_graph > object_x_graph)));
+}
+
+/**
  * @brief Переместить определённый мешок.
  * Если будут затронуты другие мешки, перемещение будет отменено и возвращено значение 0.
  *
@@ -802,8 +817,7 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
             // Проверить перемещается ли мешок на Диггера
             if (check_collision(bag->x_graph, bag->y_graph, man_x_graph, man_y_graph, 4, 15))
             {
-                if (((dir == DIR_RIGHT) && (man_x_graph > bag->x_graph)) ||
-                    ((dir == DIR_LEFT)  && (bag->x_graph > man_x_graph)))
+                if (move_to_object(dir, bag->x_graph, man_x_graph))
                 {
                     rv = 1; // Если да, отменить перемещение
                 }
@@ -816,13 +830,10 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
                 if (!bugs_active) continue; // Пропустить неактивных врагов
                 if (bug->state != CREATURE_ALIVE) continue; //  Пропустить неживых врагов
 
-                // Проверить, что мешое перемещается на врага
+                // Проверить, что мешок перемещается на врага
                 if (check_collision(bag->x_graph, bag->y_graph, bug->x_graph, bug->y_graph, 4, 15))
                 {
-                    // Если направление перемещения вправо и враг находится правее мешка
-                    // или направление перемещения влево и враг находтся левее мешка
-                    if (((dir == DIR_RIGHT) && (bug->x_graph > bag->x_graph)) ||
-                        ((dir == DIR_LEFT)  && (bag->x_graph > bug->x_graph)))
+                    if (move_to_object(dir, bag->x_graph, bug->x_graph))
                     {
                         rv = 1; // Если да, отменить перемещение
                         break;
@@ -843,8 +854,7 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
                 {
                     // Если направление перемещения вправо и другой мешок находится правее обрабатываемого мешка
                     // или направление перемещения влево и другой мешок находтся левее обрабатываемого мешка
-                    if (((dir == DIR_RIGHT) && (another_bag->x_graph > bag->x_graph)) ||
-                        ((dir == DIR_LEFT)  && (bag->x_graph > another_bag->x_graph)))
+                    if (move_to_object(dir, bag->x_graph, another_bag->x_graph))
                     {
                         // Попробовать взывать перемещение мешка с которым обнаружена коллизия
                         if (move_bag(another_bag, dir))
