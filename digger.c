@@ -64,6 +64,7 @@ enum direction : uint8_t
 enum creature_state : uint8_t
 {
     CREATURE_INACTIVE = 0,   // Не активен
+    CREATURE_STARTING,
     CREATURE_ALIVE,      // Жив
     CREATURE_DEAD_MONEY_BAG, // Убит мешком с деньгами
     CREATURE_RIP,            // Лежит дохлый
@@ -129,9 +130,8 @@ struct bag_info
 struct bug_info
 {
     uint8_t wait;              // Счётчик задержки врага
-    uint8_t stuck;             // Счётчик для измерения времени на которое застрял враг (для превращения)
+    uint8_t count;             // Счётчик
     uint8_t dead_wait;         // Время через которое спрайт поменяется на дохлого врага
-    uint8_t start_delay;       // Время задержки перед запуском нового врага
     uint8_t image_phase;       // Фаза анимации при выводе спрайта
     int8_t image_phase_inc;    // Направление изменения фазы анимации при выводе спрайта (+1 или -1)
     uint8_t x_graph;           // Положение по оси X в графических координатах
@@ -443,6 +443,7 @@ void init_level()
         bags[i].state = BAG_INACTIVE;
     }
 
+    // Деактивировать всех врагов
     for (uint8_t i = 0; i < MAX_BUGS; ++i)
     {
         bugs[i].state = CREATURE_INACTIVE;
@@ -891,9 +892,9 @@ void move_bug(struct bug_info *bug)
     if (!bug_x_rem && !bug_y_rem)
     {
         // Если Хоббин застрял на время более заданного, то превратить его в Ноббина
-        if (bug->type == BUG_HOBBIN && bug->stuck > (30 + difficulty * 2))
+        if (bug->type == BUG_HOBBIN && bug->count > (30 + difficulty * 2))
         {
-            bug->stuck = 0;         // Очистить время застревания
+            bug->count = 0;         // Очистить время застревания
             bug->type = BUG_NOBBIN; // Превратить врага в Ноббина
         }
 
@@ -1058,7 +1059,10 @@ void move_bug(struct bug_info *bug)
     if (man_state == CREATURE_ALIVE) // Если Диггер жив
     {
         // Выждать время задержки перед запуском нового врага
-        if (bug->start_delay) bug->start_delay--;
+        if (bug->state == CREATURE_STARTING)
+        {
+            if (--bug->count == 0) bug->state = CREATURE_ALIVE; // Если счётчик закончился, что оживить врага
+        }
         else
         {
             // Переместить врага на шаг в выбранном направлении
@@ -1108,8 +1112,7 @@ void move_bug(struct bug_info *bug)
                             // Если мешок не удалось подвинуть, отменить передвижение врага
                             bug->x_graph = bug_x_graph;
                             bug->y_graph = bug_y_graph;
-
-                            bug->stuck++; // Увеличить счётчик застревания
+                            bug->count++; // Увеличить счётчик застревания
                             break;
                         }
 
@@ -1133,7 +1136,7 @@ void move_bug(struct bug_info *bug)
     // Для Хоббинов увеличивать счётчик для превращения в Ноббина по времени
     if (bug->type == BUG_HOBBIN)
     {
-        if (bug->stuck < 100) bug->stuck++;
+        if (bug->count < 100) bug->count++;
     }
 
     // Увеличить/уменьшить фазу на единицу
@@ -1728,18 +1731,16 @@ void main()
                             if (bug->state != CREATURE_INACTIVE) continue; // Пропустить активных врагов
 
                             // Начальное состояние врага
-                            bug->state = CREATURE_ALIVE;
+                            bug->state = CREATURE_STARTING;
+                            bug->count = 6; // Время до запуска врага
                             bug->wait = 0;
-                            bug->stuck = 0;
                             bug->dead_wait = 0;
-                            bug->start_delay = 5;
                             bug->image_phase = 0;
                             bug->image_phase_inc = 1;
                             bug->x_graph = bug_start_x;
                             bug->y_graph = bug_start_y;
                             bug->dead_bag = 0;
                             bug->type = BUG_NOBBIN;      // Враги рождаются в виде Ноббинов
-                            bug->state = CREATURE_ALIVE; // Враг жив
                             bug->dir = DIR_LEFT;
                             bug->old_dir = DIR_LEFT;
 
@@ -1777,99 +1778,102 @@ void main()
                     if (another_bug->state == CREATURE_INACTIVE) continue; // пропустить неактивных врагов
 
                     // Если враг соприкоснулся с другим врагом, увеличить счётчик застревания
-                    if (check_collision(bug->x_graph, bug->y_graph, another_bug->x_graph, another_bug->y_graph, 4, 15)) bug->stuck++;
+                    if (check_collision(bug->x_graph, bug->y_graph, another_bug->x_graph, another_bug->y_graph, 4, 15)) bug->count++;
                 }
 
                 //  Если Ноббин застрял на определённое (зависящее от уровня сложности) время
-                if (bug->stuck > (10 - difficulty))
+                if (bug->count > (10 - difficulty))
                 {
-                    bug->stuck = 0;         // Сбросить счётчик застревания
+                    bug->count = 0;         // Сбросить счётчик застревания
                     bug->type = BUG_HOBBIN; // Переключить тип врага на Хоббина
                 }
             }
 
-            if (bug->state == CREATURE_ALIVE) // Если враг жив
+            switch (bug->state)
             {
-                // Перемещение живого врага
-
-                // Если враг в режиме ожидания
-                if (bug->wait) bug->wait--; // Уменьшить счётчик в режиме ожидания
-                else
+                case CREATURE_STARTING: // Враг ждёт старта
                 {
                     move_bug(bug); // Переместить врага
-
-                    if (bug->type == BUG_NOBBIN) // Если враг Ноббин
-                    {
-                        // Если выпало случайное число с вероятностью зависящей от уровня сложности
-                        if ((rand() & 0xF) < difficulty) move_bug(bug); // Переместить врага ещё раз для увеличения скорости
-                    }
+                    break;
                 }
-            }
-            else
-            {
-                // Перемещение убитого врага
-                switch (bug->state)
+
+                case CREATURE_ALIVE: // Перемещение живого врага
                 {
-                    case CREATURE_DEAD_MONEY_BAG: // Враг погиб от мешка с деньгами и летит вместе с ним
+                    // Если враг в режиме ожидания
+                    if (bug->wait) bug->wait--; // Уменьшить счётчик в режиме ожидания
+                    else
                     {
-                        uint8_t bag_y_pos = bug->dead_bag->y_graph; // Вертикальная позиция мешка от которого погиб враг
-                        if (bag_y_pos + MOVE_Y_STEP > bug->y_graph)
+                        move_bug(bug); // Переместить врага
+
+                        if (bug->type == BUG_NOBBIN) // Если враг Ноббин
                         {
-                            erase_4_15(bug->x_graph, bug->y_graph);
-                            bug->y_graph = bag_y_pos; // Если мешок опустился ниже врага, враг перемещается за мешком
+                            // Если выпало случайное число с вероятностью зависящей от уровня сложности
+                            if ((rand() & 0xF) < difficulty) move_bug(bug); // Переместить врага ещё раз для увеличения скорости
                         }
-
-                        switch (bug->type)
-                        {
-                            case BUG_HOBBIN:
-                            {
-                                // Нарисовать погибшего Хоббина
-                                if (bug->dir == DIR_RIGHT)
-                                {
-                                    sp_4_15_put(bug->x_graph, bug->y_graph, (uint8_t *)image_hobbin_right_dead);
-                                }
-                                else
-                                {
-                                    sp_4_15_h_mirror_put(bug->x_graph, bug->y_graph, (uint8_t *)image_hobbin_right_dead);
-                                }
-
-                                break;
-                            }
-
-                            case BUG_NOBBIN:
-                            {
-                                // Нарисовать погибшего Ноббина
-                                sp_4_15_put(bug->x_graph, bug->y_graph, (uint8_t *)image_nobbin_dead);
-                                break;
-                            }
-                        }
-
-                        bug->dead_wait = 1;
-                        bug->state = CREATURE_RIP; // Враг лежит дохлый
-                        add_score(250); // 250 очков за убитого врага
-
-                        break;
                     }
 
-                    case CREATURE_RIP: // Враг лежит дохлый
+                    break;
+                }
+
+                case CREATURE_DEAD_MONEY_BAG: // Враг погиб от мешка с деньгами и летит вместе с ним
+                {
+                    uint8_t bag_y_pos = bug->dead_bag->y_graph; // Вертикальная позиция мешка от которого погиб враг
+                    if (bag_y_pos + MOVE_Y_STEP > bug->y_graph)
                     {
-                        if (bug->dead_wait)
+                        erase_4_15(bug->x_graph, bug->y_graph);
+                        bug->y_graph = bag_y_pos; // Если мешок опустился ниже врага, враг перемещается за мешком
+                    }
+
+                    switch (bug->type)
+                    {
+                        case BUG_HOBBIN:
                         {
-                            bug->dead_wait--;
+                            // Нарисовать погибшего Хоббина
+                            if (bug->dir == DIR_RIGHT)
+                            {
+                                sp_4_15_put(bug->x_graph, bug->y_graph, (uint8_t *)image_hobbin_right_dead);
+                            }
+                            else
+                            {
+                                sp_4_15_h_mirror_put(bug->x_graph, bug->y_graph, (uint8_t *)image_hobbin_right_dead);
+                            }
+
                             break;
                         }
 
-                        // Стирание убитого врага
-                        erase_4_15(bug->x_graph, bug->y_graph);
-                        bug->state = CREATURE_INACTIVE; // Декативировать убитого врага
-                        bugs_active--;   // Уменьшить количество активных врагов
+                        case BUG_NOBBIN:
+                        {
+                            // Нарисовать погибшего Ноббина
+                            sp_4_15_put(bug->x_graph, bug->y_graph, (uint8_t *)image_nobbin_dead);
+                            break;
+                        }
+                    }
 
-                        // Количество оставшихся врагов (сколько осталось создать плюс количество активных)
-                        uint8_t creatures_left =  bugs_total - bugs_created + bugs_active;
-                        if (!creatures_left) done_snd = 1; // Если врагов больше не осталось - окончание уровня
+                    bug->dead_wait = 1;
+                    bug->state = CREATURE_RIP; // Враг лежит дохлый
+                    add_score(250); // 250 очков за убитого врага
 
+                    break;
+                }
+
+                case CREATURE_RIP: // Враг лежит дохлый
+                {
+                    if (bug->dead_wait)
+                    {
+                        bug->dead_wait--;
                         break;
                     }
+
+                    // Стирание убитого врага
+                    erase_4_15(bug->x_graph, bug->y_graph);
+                    bug->state = CREATURE_INACTIVE; // Декативировать убитого врага
+                    bugs_active--;   // Уменьшить количество активных врагов
+
+                    // Количество оставшихся врагов (сколько осталось создать плюс количество активных)
+                    uint8_t creatures_left =  bugs_total - bugs_created + bugs_active;
+                    if (!creatures_left) done_snd = 1; // Если врагов больше не осталось - окончание уровня
+
+                    break;
                 }
             }
         }
