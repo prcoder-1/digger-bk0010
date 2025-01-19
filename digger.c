@@ -64,8 +64,8 @@ enum direction : uint8_t
 enum creature_state : uint8_t
 {
     CREATURE_INACTIVE = 0,   // Не активен
-    CREATURE_STARTING,
-    CREATURE_ALIVE,      // Жив
+    CREATURE_ALIVE,          // Жив
+    CREATURE_STARTING,       // Стратует
     CREATURE_DEAD_MONEY_BAG, // Убит мешком с деньгами
     CREATURE_RIP,            // Лежит дохлый
     CREATURE_AFTER_RIP       // После того, как появился RIP
@@ -129,17 +129,16 @@ struct bag_info
  */
 struct bug_info
 {
-    uint8_t wait;              // Счётчик задержки врага
+    enum creature_state state; // Состояние врага (жив, погиб, лежит дохлый - влияет на внешний вид)
+    enum bug_types type;       // Тип врага (Ноббин или Хоббин)
+    enum direction dir;        // Направление движения врага
+    enum direction old_dir;    // Предыдущее направление движения врага (влево-вправо для отрисовки при падении)
     uint8_t count;             // Счётчик
-    uint8_t dead_wait;         // Время через которое спрайт поменяется на дохлого врага
+    uint8_t wait;              // Счётчик задержки врага (при толкании мешков, изменении направления)
     uint8_t image_phase;       // Фаза анимации при выводе спрайта
     int8_t image_phase_inc;    // Направление изменения фазы анимации при выводе спрайта (+1 или -1)
     uint8_t x_graph;           // Положение по оси X в графических координатах
     uint8_t y_graph;           // Положение по оси Y в графических координатах
-    enum bug_types type;       // Тип врага (Ноббин или Хоббин)
-    enum creature_state state; // Состояние врага (жив, погиб, лежит дохлый - влияет на внешний вид)
-    enum direction dir;        // Направление движения врага
-    enum direction old_dir;    // Предыдущее направление движения врага (влево-вправо для отрисовки при падении)
     struct bag_info *dead_bag; // Указатель на мешок от котрого погиб враг
 };
 #pragma pack(pop)
@@ -1733,8 +1732,7 @@ void main()
                             // Начальное состояние врага
                             bug->state = CREATURE_STARTING;
                             bug->count = 6; // Время до запуска врага
-                            bug->wait = 0;
-                            bug->dead_wait = 0;
+                            bug->wait = 0;  // Враг не задержан
                             bug->image_phase = 0;
                             bug->image_phase_inc = 1;
                             bug->x_graph = bug_start_x;
@@ -1791,27 +1789,25 @@ void main()
 
             switch (bug->state)
             {
-                case CREATURE_STARTING: // Враг ждёт старта
-                {
-                    move_bug(bug); // Переместить врага
-                    break;
-                }
-
                 case CREATURE_ALIVE: // Перемещение живого врага
                 {
                     // Если враг в режиме ожидания
-                    if (bug->wait) bug->wait--; // Уменьшить счётчик в режиме ожидания
-                    else
+                    if (bug->wait)
                     {
-                        move_bug(bug); // Переместить врага
-
-                        if (bug->type == BUG_NOBBIN) // Если враг Ноббин
-                        {
-                            // Если выпало случайное число с вероятностью зависящей от уровня сложности
-                            if ((rand() & 0xF) < difficulty) move_bug(bug); // Переместить врага ещё раз для увеличения скорости
-                        }
+                        bug->wait--; // Уменьшить счётчик в режиме ожидания
+                        break;
                     }
 
+                    if (bug->type == BUG_NOBBIN) // Если враг Ноббин
+                    {
+                        // Если выпало случайное число с вероятностью зависящей от уровня сложности
+                        if ((rand() & 0xF) < difficulty) move_bug(bug); // Переместить врага ещё раз для увеличения скорости
+                    }
+                }
+
+                case CREATURE_STARTING: // Враг ждёт старта
+                {
+                    move_bug(bug); // Переместить врага
                     break;
                 }
 
@@ -1849,7 +1845,7 @@ void main()
                         }
                     }
 
-                    bug->dead_wait = 1;
+                    bug->count = 1;
                     bug->state = CREATURE_RIP; // Враг лежит дохлый
                     add_score(250); // 250 очков за убитого врага
 
@@ -1858,9 +1854,9 @@ void main()
 
                 case CREATURE_RIP: // Враг лежит дохлый
                 {
-                    if (bug->dead_wait)
+                    if (bug->count)
                     {
-                        bug->dead_wait--;
+                        bug->count--;
                         break;
                     }
 
