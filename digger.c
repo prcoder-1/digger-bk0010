@@ -372,6 +372,8 @@ enum level_symbols getLevelSymbol(uint8_t y_log, uint8_t x_log)
  */
 void init_level_state()
 {
+    bonus_state = BONUS_OFF;
+
     // Отключение индикации бонус-режима
     sp_paint_brick(0, BONUS_IND_START, SCREEN_BYTE_WIDTH, SCREEN_PIX_HEIGHT - BONUS_IND_START, 0);
 
@@ -433,8 +435,6 @@ void init_level_state()
  */
 void init_level()
 {
-    bonus_state = BONUS_OFF;
-
     // Деактивировать все мешки
     for (uint16_t i = 0; i < MAX_BAGS; ++i)
     {
@@ -770,6 +770,10 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
         }
         else
         {
+            // Если мешок двигают встороны, то он перестаёт раскачиваться
+            bag->state = BAG_STATIONARY;
+            bag->count = 0;
+
             switch (dir)
             {
                 case DIR_RIGHT:
@@ -784,10 +788,6 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
                     break;
                 }
             }
-
-            // Если мешок двигают встороны, то он перестаёт раскачиваться
-            bag->state = BAG_STATIONARY;
-            bag->count = 0;
 
             // Проверить перемещается ли мешок на Диггера
             if (check_collision(bag->x_graph, bag->y_graph, man_x_graph, man_y_graph, 4, 15))
