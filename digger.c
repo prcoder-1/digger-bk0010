@@ -1411,14 +1411,15 @@ void move_man()
 
         man_wait++; // Задержать Диггера перед мешком
 
-        // Если направление движения Диггера вверх или вниз или мешок не был перемещён
-        if (man_dir == DIR_UP || man_dir == DIR_DOWN)
+        if ((bag->state == BAG_STATIONARY) || (bag->state == BAG_LOOSE))
         {
-            collision_flag = 1;
-            break;
+            // Если направление движения Диггера вверх или вниз, или мешок не удалось переместить
+            if (man_dir == DIR_UP || man_dir == DIR_DOWN || move_bag(bag, man_dir))
+            {
+                collision_flag = 1;
+                break;
+            }
         }
-
-        if ((bag->state == BAG_STATIONARY) || (bag->state == BAG_LOOSE)) move_bag(bag, man_dir);
     }
 
     if (collision_flag)
