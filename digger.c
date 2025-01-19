@@ -617,13 +617,6 @@ void era_background(uint16_t x_graph, uint16_t y_graph, enum direction dir)
 
     switch (dir)
     {
-        case DIR_RIGHT:
-        {
-            x_log++; // Следующая позиция матрицы по X
-
-            break;
-        }
-
         case DIR_LEFT:
         {
             x_rem--;
@@ -637,9 +630,9 @@ void era_background(uint16_t x_graph, uint16_t y_graph, enum direction dir)
             break;
         }
 
-        case DIR_DOWN:
+        case DIR_RIGHT:
         {
-            y_log++; // Следущая позиция матрицы по Y
+            x_log++; // Следующая позиция матрицы по X
 
             break;
         }
@@ -653,6 +646,13 @@ void era_background(uint16_t x_graph, uint16_t y_graph, enum direction dir)
                 y_rem += 4;
                 y_log--;
             }
+
+            break;
+        }
+
+        case DIR_DOWN:
+        {
+            y_log++; // Следущая позиция матрицы по Y
 
             break;
         }
