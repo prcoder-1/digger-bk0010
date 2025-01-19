@@ -204,22 +204,36 @@ int16_t lives;       // Количество жизней
 uint32_t score;      // Количество очков
 
 // Переменные отвечающие за вывод звуков
-uint8_t  man_rip_snd;     // Флаг, означающий, что звук и анимация RIP включены
-uint8_t  chase_snd;       // Флаг, означающий, что звук включения бонус-режима активн
-uint8_t  chase_snd_flip;  // Флаг переключающий тональность звука при включении/выключении бонус-режима
-uint8_t  loose_snd;       // Флаг, означающий, что звук качающегося мешка включен
+#pragma pack(push, 1)
+/**
+ * @brief Битовые поля отвечающие за вывод звуковых эффектов
+ */
+union
+{
+    struct
+    {
+        uint16_t man_rip    : 1; ///< Флаг, означающий, что звук и анимация RIP включены
+        uint16_t chase      : 1; ///< Флаг, означающий, что звук включения бонус-режима активн
+        uint16_t loose      : 1; ///< Флаг, означающий, что звук качающегося мешка включен
+        uint16_t fall       : 1; ///< Флаг, означающий, что звук летящего мешка включен
+        uint16_t break_bag  : 1; ///< Флаг, означающий, что звук разбивающегося мешка включен
+        uint16_t money      : 1; ///< Флаг, означающий, что звук съедания золота включен
+        uint16_t done       : 1; ///< Флаг, означающий, что звук завершения уровня включен
+        uint16_t bug        : 1; ///< Флаг, означающий, что звук съедания врага в бонус-режиме включен
+        uint16_t chase_flip : 1; ///< Флаг переключающий тональность звука при включении/выключении бонус-режима
+        uint16_t fall_flip  : 1; ///< Флаг, переключающий тональность звука падающего мешка
+    } bits;
+
+    uint16_t word; ///< Представление битовых полей статуса звука в виде машинного слова
+} snd;
+#pragma pack(pop)
+
 uint16_t loose_snd_phase; // Фаза звука качающегося мешка
-uint8_t  fall_snd;        // Флаг, означающий, что звук летящего мешка включен
-uint8_t  fall_snd_phase;  // Фаза звука падающего мешка
 uint16_t fall_period;     // Период звука летящего мешка
-uint8_t  break_bag_snd;   // Флаг, означающий, что звук разбивающегося мешка включен
-uint8_t  money_snd;       // Флаг, означающий, что звук съедания золота включен
-uint8_t  coin_snd;        // Флаг, означающий, что звук съедания монетки включен
+uint8_t  coin_snd;        // Счётчик звука съедания монеты
 int8_t   coin_snd_note;   // Номер ноты при съедании монетки (драгоценного камня)
 uint8_t  coin_time;       // Таймер между последовательными съедениями драгоценных камней (монеток)
-uint8_t  done_snd;        // Флаг, означающий, что звук завершения уровня включен
-uint8_t  bug_snd;         // Флаг, означающий, что звук съедания врага в бонус-режиме включен
-uint8_t  life_snd;        // Флаг, означающий, что звук получения дополнительной жизни включен
+uint8_t  life_snd;        // Период звука получения жизни
 
 #ifdef DEBUG
 /**
@@ -414,17 +428,10 @@ void init_level_state()
     // mis_explode = 0;
 
     // Инициализация переменных используемых для звуковых эффектов
-    coin_snd = 0;
+    snd.word = 0; // СБрос битовых флагов состояния звуковых эффектов
+    coin_snd = 0; // Сброс счётчика звука съедания монеты
     coin_snd_note = -1;
     coin_time = 0;
-    loose_snd = 0;
-    fall_snd = 0;
-    money_snd = 0;
-    man_rip_snd = 0;
-    chase_snd = 0;
-    chase_snd_flip = 0;
-    done_snd = 0;
-    bug_snd = 0;
     life_snd = 0;
 }
 
@@ -857,7 +864,7 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
 
     if (rv)
     {
-        break_bag_snd = 1; // Издать звук разбившегося мешка
+        snd.bits.break_bag = 1; // Издать звук разбившегося мешка
     }
     else
     {
@@ -1288,7 +1295,7 @@ int remove_coin(uint8_t x_log, uint8_t y_log)
             if (coins[i]) { level_done = 0; break; }
         }
 
-        if (level_done) done_snd = 1;
+        if (level_done) snd.bits.done = 1; // Издать звук окончания уровня
 
         return 1;
     }
@@ -1319,7 +1326,7 @@ void move_man()
             case 25: man_new_dir = DIR_RIGHT; break; // Стрелка вправо
             case 26: man_new_dir = DIR_UP;    break; // Стрелка вверх
             case 27: man_new_dir = DIR_DOWN;  break; // Стрелка вниз
-            case 32: done_snd = 1; break;
+            case 32: snd.bits.done = 1; break;
             default: man_new_dir = DIR_STOP;
         }
     }
@@ -1479,7 +1486,7 @@ void move_man()
         if (bonus_state == BONUS_ON)
         {
             // Если включен режим Бонус
-            bug_snd = 1; // Включить звук съедения врага
+            snd.bits.bug = 1; // Включить звук съедения врага
             add_score(bonus_count * 200); // 200 * bonus_count очков за каждого съеденного врага
             bonus_count <<= 1; // Удвоить bonus_count
 
@@ -1492,8 +1499,8 @@ void move_man()
         }
         else
         {
-            man_state = CREATURE_RIP;
-            man_rip_snd = 1;
+            man_state = CREATURE_RIP; // Диггер убит
+            snd.bits.man_rip = 1; // Включить звук убиения Диггера
         }
     }
 
@@ -1513,7 +1520,7 @@ void sound_effect()
         coin_snd--;
     }
 
-    if (loose_snd) // Звук раскачивающегося мешка
+    if (snd.bits.loose) // Звук раскачивающегося мешка
     {
         static const uint16_t loose_periods[] = { 2500 / N, 3000 / N, 2500 / N, 2000 / N };
         static const uint16_t loose_durances[] = { 24, 20, 24, 30 };
@@ -1527,22 +1534,24 @@ void sound_effect()
         if (++loose_snd_phase > 7) loose_snd_phase = 0;
     }
 
-    if (fall_snd) // Звук падающего мешка
+    if (snd.bits.fall) // Звук падающего мешка
     {
-        fall_snd_phase = ~fall_snd_phase;
+        snd.bits.fall_flip = ~snd.bits.fall_flip;
 
-        if (fall_snd_phase) sound(fall_period / 32, 16);
+        if (snd.bits.fall_flip) sound(fall_period / 32, 16);
         else fall_period += 48;
     }
 
-    if (break_bag_snd) // Звук разбивающегося мешка
+    if (snd.bits.break_bag) // Звук разбивающегося мешка
     {
+        snd.bits.break_bag = 0;
         sound(15000 / N, 10);
-        break_bag_snd = 0;
     }
 
-    if (money_snd) // Звук съедаемого золота
+    if (snd.bits.money) // Звук съедаемого золота
     {
+        snd.bits.money = 0;
+
         uint16_t money_snd_count_1 = 500 / N;
         uint16_t money_snd_count_2 = 4000 / N;
 
@@ -1553,13 +1562,13 @@ void sound_effect()
             money_snd_count_2 -= money_snd_count_2 >> 4;
             sound(period, 25);
         }
-
-        money_snd = 0;
     }
 
-    if (man_rip_snd) // Звук гибели Диггера плюс анимация подпрыгивания, надгробный камень и траурный марш
+    if (snd.bits.man_rip) // Звук гибели Диггера плюс анимация подпрыгивания, надгробный камень и траурный марш
     {
-        // Звук убиения Диггера
+        snd.bits.man_rip = 0;
+
+        // Звук гибели Диггера
 
         static uint8_t bounce[8] = { 3, 5, 6, 6, 5, 4, 3, 0 };
 
@@ -1605,18 +1614,17 @@ void sound_effect()
         }
 
         man_state = CREATURE_AFTER_RIP;
-        man_rip_snd = 0;
     }
 
-    if (chase_snd) // Звук включения бонус-режима
+    if (snd.bits.chase) // Звук включения бонус-режима
     {
         uint16_t durance = 100;
-        chase_snd_flip = ~chase_snd_flip;
-        if (chase_snd_flip) sound(1230 / N, durance);
+        snd.bits.chase_flip = ~snd.bits.chase_flip;
+        if (snd.bits.chase_flip) sound(1230 / N, durance);
         else sound(1513 / N, durance);
     }
 
-    if (done_snd) // Звук завершения уровня
+    if (snd.bits.done) // Звук завершения уровня
     {
         static const uint16_t done_periods[] = { C5 / NV, E5 / NV, G5 / NV, D5 / NV, F5 / NV, A5 / NV, E5 / NV, G5 / NV, B5 / NV, C5 / 2 / NV};
 
@@ -1629,8 +1637,10 @@ void sound_effect()
         }
     }
 
-    if (bug_snd) // Звук съедаемого врага в бонус-режиме
+    if (snd.bits.bug) // Звук съедаемого врага в бонус-режиме
     {
+        snd.bits.bug = 0;
+
         uint16_t c1 = 0;
         uint16_t c2 = 4;
         uint16_t bug_period = 0;
@@ -1654,8 +1664,6 @@ void sound_effect()
                 c2--;
             }
         }
-
-        bug_snd = 0;
     }
 
     if (life_snd) // Звук получения жизни
@@ -1865,7 +1873,7 @@ void main()
 
                     // Количество оставшихся врагов (сколько осталось создать плюс количество активных)
                     uint8_t creatures_left =  bugs_total - bugs_created + bugs_active;
-                    if (!creatures_left) done_snd = 1; // Если врагов больше не осталось - окончание уровня
+                    if (!creatures_left) snd.bits.done = 1; // Если врагов больше не осталось - окончание уровня
 
                     break;
                 }
@@ -1889,7 +1897,7 @@ void main()
                 if (bag->count == 1)
                 {
                     bag->state = BAG_BROKEN; // Мешок разбился
-                    break_bag_snd = 1; // Издать звук разбившегося мешка
+                    snd.bits.break_bag = 1; // Издать звук разбившегося мешка
                 }
 
                 bag->count++;
@@ -1913,7 +1921,7 @@ void main()
                         // Проверить соприкоснулся ли Диггер с разбитым мешком
                         if (check_collision(bag->x_graph, bag->y_graph, man_x_graph, man_y_graph, 4, 15))
                         {
-                            money_snd = 1; // Издать звук съедаемого золота
+                            snd.bits.money = 1; // Издать звук съедаемого золота
                             bag->state = BAG_INACTIVE; // Сделать мешок неактивным
                             add_score(500); // 500 очков за съеденное золото мешок
                             // Стереть золото из разбитого мешка
@@ -1981,14 +1989,14 @@ void main()
 
                                         // Включить звук падения мешка
                                         fall_period = 1024;
-                                        fall_snd_phase = 0;
-                                        fall_snd = 1;
+                                        snd.bits.fall_flip = 0;
+                                        snd.bits.fall = 1;
                                     }
                                     else
                                     {
-                                        if (!loose_snd)
+                                        if (!snd.bits.loose)
                                         {
-                                            loose_snd = 1;
+                                            snd.bits.loose = 1;
                                             loose_snd_phase = 0;
                                         }
 
@@ -2049,8 +2057,8 @@ void main()
 
                                     // Включить звук падения мешка
                                     fall_period = 1024;
-                                    fall_snd_phase = 0;
-                                    fall_snd = 1;
+                                    snd.bits.fall_flip = 0;
+                                    snd.bits.fall = 1;
                                 }
                                 else stop_bag(bag); // Остановить мешок если клетка под ним не прогрызена
                             }
@@ -2079,8 +2087,8 @@ void main()
             else if (bag->state == BAG_LOOSE)   bag_loose = 0; // Найден качающийся мешок
         }
 
-        if (bag_fall)  { fall_snd = 0; }  // Остановить звук падающего мешка
-        if (bag_loose) { loose_snd = 0; } // Остановить звук качающегося мешка
+        if (bag_fall)  { snd.bits.fall = 0; }  // Остановить звук падающего мешка
+        if (bag_loose) { snd.bits.loose = 0; } // Остановить звук качающегося мешка
 
         // Обработка снаряда
         // if (mis_explode) explode_missile(); // Обработка взрывающегося снаряда
@@ -2115,7 +2123,7 @@ void main()
                 {
                     man_state = CREATURE_RIP;
                     man_y_graph -= MOVE_Y_STEP;
-                    man_rip_snd = 1;
+                    snd.bits.man_rip = 1; // Диггер погиб от мешка
                 }
             }
         }
@@ -2137,11 +2145,11 @@ void main()
 
                     if (bonus_flash)
                     {
-                        chase_snd = 1; // Включить звук включения/выключения бонус-режима
+                        snd.bits.chase = 1; // Включить звук включения/выключения бонус-режима
                     }
                     else
                     {
-                        chase_snd = 0; // Выключить звук включения/выключения бонус-режима
+                        snd.bits.chase = 0; // Выключить звук включения/выключения бонус-режима
                         // TODO: Включить музыку бонус-режима
                     }
                 }
@@ -2149,7 +2157,7 @@ void main()
             else
             {
                 bonus_state = BONUS_END;
-                chase_snd = 0; // Выключить звук включения/выключения бонус-режима
+                snd.bits.chase = 0; // Выключить звук включения/выключения бонус-режима
                 bugs_delay_counter = bugs_delay; //  Перезарядить счётчик времени до появления врагов
 
                 // TODO: Включить музыку Popcorn
@@ -2180,9 +2188,9 @@ void main()
             }
         }
 
-        if (done_snd)
+        if (snd.bits.done)
         {
-            done_snd = 0;
+            snd.bits.done = 0;
 
             // Циклическое увеличение номера уровня
             level_no++;
