@@ -63,7 +63,8 @@ enum direction : uint8_t
  */
 enum creature_state : uint8_t
 {
-    CREATURE_ALIVE = 0,      // Жив
+    CREATURE_INACTIVE = 0,   // Не активен
+    CREATURE_ALIVE,      // Жив
     CREATURE_DEAD_MONEY_BAG, // Убит мешком с деньгами
     CREATURE_RIP,            // Лежит дохлый
     CREATURE_AFTER_RIP       // После того, как появился RIP
@@ -127,7 +128,6 @@ struct bag_info
  */
 struct bug_info
 {
-    uint8_t active;            // Флаг активности врага
     uint8_t wait;              // Счётчик задержки врага
     uint8_t stuck;             // Счётчик для измерения времени на которое застрял враг (для превращения)
     uint8_t dead_wait;         // Время через которое спрайт поменяется на дохлого врага
@@ -381,11 +381,10 @@ void init_level_state()
     for (uint8_t i = 0; i < MAX_BUGS; ++i)
     {
         struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
-
-        if (!bug->active) continue; // Пропустить неактивных врагов
+        if (bug->state == CREATURE_INACTIVE) continue; // Пропустить неактивных врагов
 
         erase_4_15(bug->x_graph, bug->y_graph); // Стереть врага
-        bug->active = 0; // Деактивировать врага
+        bug->state = CREATURE_INACTIVE; // Деактивировать врага
     }
 
     if (difficulty >= 9) bugs_max = 5;      // На уровне сложности 9 и выше максимально 5 врагов одновременно
@@ -446,7 +445,7 @@ void init_level()
 
     for (uint8_t i = 0; i < MAX_BUGS; ++i)
     {
-        bugs[i].active = 0;
+        bugs[i].state = CREATURE_INACTIVE;
     }
 
     const uint16_t bg_block_width = sizeof(image_background[0][0]); // Ширина блока фона
@@ -1471,7 +1470,6 @@ void move_man()
     {
         struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
 
-        if (!bug->active) continue; // Пропустить неактивных врагов
         if (bug->state != CREATURE_ALIVE) continue; // Пропустить дохлых врагов
 
         // Если Диггер не касается врага
@@ -1486,7 +1484,7 @@ void move_man()
 
             // Стереть съеденного врага
             erase_4_15(bug->x_graph, bug->y_graph);
-            bug->active = 0; // Деактивировать врага
+            bug->state = CREATURE_INACTIVE; // Деактивировать врага
 
             bugs_active--; // Уменьшить количество активных врагов
             bugs_total++;  // Увеличить количество создаваемых врагов компенсируя съеденных
@@ -1727,10 +1725,10 @@ void main()
                         {
                             struct bug_info *bug = &bugs[i];
 
-                            if (bug->active) continue;
+                            if (bug->state != CREATURE_INACTIVE) continue; // Пропустить активных врагов
 
                             // Начальное состояние врага
-                            bug->active = 1;
+                            bug->state = CREATURE_ALIVE;
                             bug->wait = 0;
                             bug->stuck = 0;
                             bug->dead_wait = 0;
@@ -1767,7 +1765,7 @@ void main()
         {
             struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
 
-            if (!bug->active) continue; // Пропустить, если враг не активен
+            if (bug->state == CREATURE_INACTIVE) continue; // Пропустить, если враг не активен
 
             if (bug->type == BUG_NOBBIN) // Если это Ноббин
             {
@@ -1776,7 +1774,7 @@ void main()
                     if (t == i) continue; // Пропустить самого себя
 
                     struct bug_info *another_bug = &bugs[t];
-                    if (!another_bug->active) continue; // пропустить неактивных врагов
+                    if (another_bug->state == CREATURE_INACTIVE) continue; // пропустить неактивных врагов
 
                     // Если враг соприкоснулся с другим врагом, увеличить счётчик застревания
                     if (check_collision(bug->x_graph, bug->y_graph, another_bug->x_graph, another_bug->y_graph, 4, 15)) bug->stuck++;
@@ -1863,7 +1861,7 @@ void main()
 
                         // Стирание убитого врага
                         erase_4_15(bug->x_graph, bug->y_graph);
-                        bug->active = 0; // Декативировать убитого врага
+                        bug->state = CREATURE_INACTIVE; // Декативировать убитого врага
                         bugs_active--;   // Уменьшить количество активных врагов
 
                         // Количество оставшихся врагов (сколько осталось создать плюс количество активных)
