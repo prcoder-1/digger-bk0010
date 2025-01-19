@@ -1404,7 +1404,7 @@ void move_man()
     {
         struct bag_info *bag = &bags[i]; // Структура с информацией о мешке
 
-        if (bag->state != BAG_STATIONARY) continue; // Если мешок неактивен
+        if (bag->state == BAG_INACTIVE) continue; // Пропустить неактивные мешки
 
         // Проверить, что Диггер соприкоснулся с мешком
         if (!check_collision(bag->x_graph, bag->y_graph, man_x_graph, man_y_graph, 4, 15)) continue; // Если Диггер не соприкоснулся с мешком
@@ -1412,11 +1412,13 @@ void move_man()
         man_wait++; // Задержать Диггера перед мешком
 
         // Если направление движения Диггера вверх или вниз или мешок не был перемещён
-        if (man_dir == DIR_UP || man_dir == DIR_DOWN || move_bag(bag, man_dir))
+        if (man_dir == DIR_UP || man_dir == DIR_DOWN)
         {
             collision_flag = 1;
             break;
         }
+
+        if ((bag->state == BAG_STATIONARY) || (bag->state == BAG_LOOSE)) move_bag(bag, man_dir);
     }
 
     if (collision_flag)
