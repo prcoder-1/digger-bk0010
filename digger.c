@@ -685,6 +685,9 @@ void era_background(uint16_t x_graph, uint16_t y_graph, enum direction dir)
  */
 int check_out_of_range(enum direction dir, uint16_t x_graph, uint16_t y_graph)
 {
+    // print_dec(x_graph, 0, MAX_Y_POS + 2 * POS_Y_STEP);
+    // print_dec(y_graph, sizeof(ch_digits[0][0]) * 5 + 1, MAX_Y_POS + 2 * POS_Y_STEP);
+
     return (
         (dir == DIR_RIGHT && x_graph >= MAX_X_POS) ||
         (dir == DIR_LEFT  && x_graph <= MIN_X_POS) ||
@@ -1338,7 +1341,8 @@ void move_man()
             case 25: man_new_dir = DIR_RIGHT; break; // Стрелка вправо
             case 26: man_new_dir = DIR_UP;    break; // Стрелка вверх
             case 27: man_new_dir = DIR_DOWN;  break; // Стрелка вниз
-            case 32: done_snd = 1; break;
+            case 76: lives++; print_lives();  break; // L
+            case 32: while (!((union KEY_STATE *)REG_KEY_STATE)->bits.STATE);
             default: man_new_dir = DIR_STOP;
         }
     }
@@ -1718,12 +1722,15 @@ void main()
 
     const uint16_t FPS = 10; // Частота обновления кадров
     *t_limit = 3000000 / 128 / 4 / FPS;
-    tve_csr->reg = (1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN) | (1 << TVE_CSR_D4);
 
     init_game(); // Начальная инициализация игры
 
     for (;;) // Основной бесконечный цикл игры
     {
+        // Настроить таймер на использование мониторинга события, включить счётчик и включить делитель на 4,
+        // а так же, сбросить флаг события таймера
+        tve_csr->reg = (1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN) | (1 << TVE_CSR_D4);
+
         // Обработка появления Бонуса (вишенки)
         if (bugs_delay_counter > 0) --bugs_delay_counter; // Отсчёт времени до появления нового врага
         else
@@ -2150,19 +2157,12 @@ void main()
                 if (bonus_flash || bonus_time < 20)
                 {
                     bonus_flash--;
+                    chase_snd = bonus_flash;
 
                     // Мигание при включении бонус-режима
                     sp_paint_brick(0, BONUS_IND_START, SCREEN_BYTE_WIDTH, SCREEN_PIX_HEIGHT - BONUS_IND_START, (bonus_time & 1) ? 0xFF : 0x00);
 
-                    if (bonus_flash)
-                    {
-                        chase_snd = 1; // Включить звук включения/выключения бонус-режима
-                    }
-                    else
-                    {
-                        chase_snd = 0; // Выключить звук включения/выключения бонус-режима
-                        // TODO: Включить музыку бонус-режима
-                    }
+                    // TODO: Включить музыку бонус-режима
                 }
             }
             else
@@ -2212,7 +2212,6 @@ void main()
             init_level(); // Инициализация нового уровня
         }
 
-        while (!tve_csr->bits.FL); // Ожидать срабатывания таймера.
-        tve_csr->bits.FL = 0; // Сбросить флаг срабатывания таймера
+        while ((tve_csr->reg & (1 << TVE_CSR_FL)) == 0); // Ожидать срабатывания таймера.
     }
 }
