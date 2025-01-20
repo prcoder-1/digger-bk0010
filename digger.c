@@ -1334,7 +1334,7 @@ void move_man()
     if (((union KEY_STATE *)REG_KEY_STATE)->reg & (1 << KEY_STATE_STATE)) // Если поступил новый скан-код клавиши
     {
         // Сохранить новое направление соответствующее полученному скан-коду
-        uint8_t code = ((union KEY_DATA *)REG_KEY_DATA)->bits.CODE;
+        uint8_t code = *((uint8_t *)REG_KEY_DATA);
         switch (code)
         {
             case 8:  man_new_dir = DIR_LEFT;  break; // Стрелка влево
