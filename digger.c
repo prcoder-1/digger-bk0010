@@ -8,7 +8,7 @@
 #include "digger_levels.h"
 #include "digger_music.h"
 
-// #define DEBUG // Режим отладки включен
+#define DEBUG // Режим отладки включен
 
 #define FIELD_X_OFFSET 2  // Смещение игрового поля по оси X
 #define FIELD_Y_OFFSET 32 // Смещение игрового поля по оси Y
@@ -34,7 +34,7 @@
 
 #define BONUS_LIFE_SCORE 20000 // Количество очков для дополнительной жизни
 #define BONUS_IND_START (MAX_Y_POS + 28)
-#define MAX_LIVES 6 // Максимальное количество жизней
+#define MAX_LIVES 4 // Максимальное количество жизней
 
 /**
  * @brief Перечисление типов врагов
@@ -201,7 +201,7 @@ uint8_t  done_snd;        // Флаг, означающий, что звук з�
 uint8_t  bug_snd;         // Флаг, означающий, что звук съедания врага в бонус-режиме включен
 uint8_t  life_snd;        // Флаг, означающий, что звук получения дополнительной жизни включен
 
-#ifdef DEBUG
+#if defined(DEBUG)
 /**
  * @brief Отладочная процедура отображения мини-карты состояния фона
  */
@@ -209,8 +209,17 @@ void draw_bg_minimap()
 {
     sp_put(48, MOVE_Y_STEP + 2, sizeof(background[0]), sizeof(background) / sizeof(background[0]), (uint8_t*)background, 0);
 }
+
+/**
+ * @brief Отладочная процедура отображения мини-карты состояния монеток (драгоценных камней)
+ */
+void draw_coin_minimap()
+{
+    sp_put(45, MOVE_Y_STEP + 2, sizeof(coins[0]), sizeof(coins) / sizeof(coins[0]), (uint8_t*)coins, 0);
+}
 #else
 #define draw_bg_minimap() ;
+#define draw_coin_minimap() ;
 #endif
 
 int remove_coin(uint8_t x_log, uint8_t y_log);
@@ -507,6 +516,7 @@ void init_level()
         y_graph += POS_Y_STEP;
     }
 
+    draw_coin_minimap();
     draw_bg_minimap();
     init_level_state();
 }
@@ -1284,6 +1294,8 @@ int remove_coin(uint8_t x_log, uint8_t y_log)
         sp_put(FIELD_X_OFFSET + x_log * POS_X_STEP, FIELD_Y_OFFSET + y_log * POS_Y_STEP + COIN_Y_OFFSET,
                sizeof(outline_no_coin[0]), sizeof(outline_no_coin) / sizeof(outline_no_coin[0]), nullptr, (uint8_t *)outline_no_coin);
 
+        draw_coin_minimap();
+
         uint16_t level_done = 1;
         for (uint16_t i = 0; i < sizeof(coins) / sizeof(coins[0]); ++i)
         {
@@ -1321,7 +1333,9 @@ void move_man()
             case 25: man_new_dir = DIR_RIGHT; break; // Стрелка вправо
             case 26: man_new_dir = DIR_UP;    break; // Стрелка вверх
             case 27: man_new_dir = DIR_DOWN;  break; // Стрелка вниз
+#if defined(DEBUG)
             case 76: lives++; print_lives();  break; // L
+#endif
             case 32: while (!((union KEY_STATE *)REG_KEY_STATE)->reg & (1 << KEY_STATE_STATE));
             default: man_new_dir = DIR_STOP;
         }
