@@ -86,6 +86,15 @@ enum REGISTERS : uint16_t
 };
 
 /**
+ * @brief Номера битов регистра состояния клавиатуры
+ */
+enum KEY_STATE_BITS
+{
+    KEY_STATE_INT_MASK = 6, /**< Маска прерываний от клавиатуры */
+    KEY_STATE_STATE         /**< Флаг состояния клавиатуры */
+};
+
+/**
  * @brief Регистр состояния клавиатуры
  */
 union KEY_STATE

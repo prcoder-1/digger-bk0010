@@ -1331,7 +1331,7 @@ void move_man()
     uint8_t man_y_rem = (man_abs_y_pos % POS_Y_STEP) >> 2;
 
     // Обработка управления с клавиатуры
-    if (((union KEY_STATE *)REG_KEY_STATE)->bits.STATE) // Если поступил новый скан-код клавиши
+    if (((union KEY_STATE *)REG_KEY_STATE)->reg & (1 << KEY_STATE_STATE)) // Если поступил новый скан-код клавиши
     {
         // Сохранить новое направление соответствующее полученному скан-коду
         uint8_t code = ((union KEY_DATA *)REG_KEY_DATA)->bits.CODE;
@@ -1342,7 +1342,7 @@ void move_man()
             case 26: man_new_dir = DIR_UP;    break; // Стрелка вверх
             case 27: man_new_dir = DIR_DOWN;  break; // Стрелка вниз
             case 76: lives++; print_lives();  break; // L
-            case 32: while (!((union KEY_STATE *)REG_KEY_STATE)->bits.STATE);
+            case 32: while (!((union KEY_STATE *)REG_KEY_STATE)->reg & (1 << KEY_STATE_STATE));
             default: man_new_dir = DIR_STOP;
         }
     }
