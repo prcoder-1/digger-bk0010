@@ -93,26 +93,6 @@ enum bonus_state : uint8_t
 
 #pragma pack(push, 1)
 /**
- * @brief Состояние ячейки фона. Установленные биты означают, что эта часть ячейки цела
- */
-union back_item
-{
-    struct
-    {
-        uint8_t h_bite_1 : 1; ///< Первый горизонтальный кусочек справа "прокушен"
-        uint8_t h_bite_2 : 1; ///< Второй горизонтальный кусочек справа "прокушен"
-        uint8_t h_bite_3 : 1; ///< Третий горизонтальный кусочек справа "прокушен"
-        uint8_t h_bite_4 : 1; ///< Четвёртый горизонтальный кусочек справа "прокушен"
-        uint8_t v_bite_1 : 1; ///< Первый вертикальный кусочек сверху "прокушен"
-        uint8_t v_bite_2 : 1; ///< Второй вертикальный кусочек сверху "прокушен"
-        uint8_t v_bite_3 : 1; ///< Третий вертикальный кусочек сверху "прокушен"
-        uint8_t v_bite_4 : 1; ///< Четвёртый вертикальный кусочек сверху "прокушен"
-    } bits;
-
-    uint8_t byte; ///< Представление ячейки фона в виде байта для работы при помощи битовых масок */
-};
-
-/**
  * @brief Состояние мешка с деньгами
  */
 struct bag_info
@@ -145,7 +125,7 @@ struct bug_info
 /**
  * @brief Поле состояний ячеек фона
  */
-union back_item background[H_MAX][W_MAX];
+uint8_t background[H_MAX][W_MAX];
 
 /**
  * @brief Поле состояний монеток. Установленный бит означает наличие монетки
@@ -475,8 +455,8 @@ void init_level()
 
         for (uint16_t x_log = 0; x_log < W_MAX; ++x_log)
         {
-            union back_item *bg = &background[y_log][x_log]; // Структура с информацией о клетке фона
-            bg->byte = 0xFF; // устанавливаем все биты h_bite и v_bite в единицу (вся клетка фона цела)
+            uint8_t *bg = &background[y_log][x_log]; // Структура с информацией о клетке фона
+            *bg = 0xFF; // устанавливаем все биты h_bite и v_bite в единицу (вся клетка фона цела)
 
             enum level_symbols ls = getLevelSymbol(y_log, x_log);
 
@@ -501,7 +481,7 @@ void init_level()
             }
             else if (ls == LEV_H || ls == LEV_S)
             {
-                bg->byte &= 0xF0;  // сбрасываем все биты h_bite фона для горизонтальных проходов
+                *bg &= 0xF0;  // сбрасываем все биты h_bite фона для горизонтальных проходов
                 era_right(x_graph - 4, y_graph);
                 era_right(x_graph - 3, y_graph);
                 era_right(x_graph - 2, y_graph);
@@ -511,7 +491,7 @@ void init_level()
 
             if (ls == LEV_V || ls == LEV_S)
             {
-                bg->byte &= 0x0F;  // сбрасываем все биты v_bite фона для вертикальных проходов
+                *bg &= 0x0F;  // сбрасываем все биты v_bite фона для вертикальных проходов
                 era_down(x_graph, y_graph - 15);
                 era_down(x_graph, y_graph - 12);
                 era_down(x_graph, y_graph - 9);
@@ -566,7 +546,7 @@ uint8_t check_path(enum direction dir, struct bug_info *bug)
         {
             if (x_log >= (W_MAX - 1)) return 0; // Если находимся у правого края
             // Если клетка правее полностью проедена, а также есть прокус слева в клетке правее или прокус справа в текущей клетке
-            if (full_bite(background[y_log][x_log + 1].byte) && ((background[y_log][x_log + 1].bits.h_bite_1 == 0) || (background[y_log][x_log].bits.h_bite_4 == 0))) return 1;
+            if (full_bite(background[y_log][x_log + 1]) && (((background[y_log][x_log + 1] & 1) == 0) || ((background[y_log][x_log] & 8) == 0))) return 1;
             break;
         }
 
@@ -574,7 +554,7 @@ uint8_t check_path(enum direction dir, struct bug_info *bug)
         {
             if (!x_log) return 0; // Если находимся у левого края
             // Если клетка левее полность проедена, и есть в ней прокус справа или прокус в текущей клетке слева клетки
-            if (full_bite(background[y_log][x_log - 1].byte) && ((background[y_log][x_log - 1].bits.h_bite_4 == 0) || (background[y_log][x_log].bits.h_bite_1 == 0))) return 1;
+            if (full_bite(background[y_log][x_log - 1]) && (((background[y_log][x_log - 1] & 8) == 0) || ((background[y_log][x_log] & 1) == 0))) return 1;
             break;
         }
 
@@ -582,7 +562,7 @@ uint8_t check_path(enum direction dir, struct bug_info *bug)
         {
             if (y_log >= (H_MAX - 1)) return 0; // Если находимся у нижнего края
             // Если клетка ниже полность проедена, и есть в ней прокус сверху или снизу текущей клетки
-            if (full_bite(background[y_log + 1][x_log].byte) && ((background[y_log + 1][x_log].bits.v_bite_1 == 0) || (background[y_log][x_log].bits.v_bite_4 == 0))) return 1;
+            if (full_bite(background[y_log + 1][x_log]) && (((background[y_log + 1][x_log] & 0x10) == 0) || ((background[y_log][x_log] & 0x80) == 0))) return 1;
             break;
         }
 
@@ -590,7 +570,7 @@ uint8_t check_path(enum direction dir, struct bug_info *bug)
         {
             if (!y_log) return 0; // Если находимся у верхнего края
             // Если клетка выше полность проедена, и есть в ней прокус снизу или сверху текущеёклетки
-            if (full_bite(background[y_log - 1][x_log].byte) && ((background[y_log - 1][x_log].bits.v_bite_4 == 0) || (background[y_log][x_log].bits.v_bite_1 == 0))) return 1;
+            if (full_bite(background[y_log - 1][x_log]) && (((background[y_log - 1][x_log] & 0x80) == 0) || ((background[y_log][x_log] & 0x10) == 0))) return 1;
             break;
         }
     }
@@ -664,7 +644,7 @@ void era_background(uint16_t x_graph, uint16_t y_graph, enum direction dir)
         case DIR_RIGHT:
         {
             // Стереть соответсвующий бит матрицы фона
-            background[y_log][x_log].byte &= ~(1 << x_rem);
+            background[y_log][x_log] &= ~(1 << x_rem);
             break;
         }
 
@@ -672,7 +652,7 @@ void era_background(uint16_t x_graph, uint16_t y_graph, enum direction dir)
         case DIR_DOWN:
         {
             // Стереть соответсвующий бит матрицы фона
-            background[y_log][x_log].byte &= ~(1 << (y_rem + 4));
+            background[y_log][x_log] &= ~(1 << (y_rem + 4));
             break;
         }
     }
@@ -1970,7 +1950,7 @@ void main()
                     {
                         bag->count++; // Увеличить количество этажей, которые пролетел мешок
                         if (bag_y_log == H_MAX - 1) stop_bag(bag); // Остановить мешок, если он долетел до последнего этажа
-                        else if (background[bag_y_log + 1][bag_x_log].byte == 0xFF) stop_bag(bag); // Остановить мешок, если клетка под ним не повреждена
+                        else if (background[bag_y_log + 1][bag_x_log] == 0xFF) stop_bag(bag); // Остановить мешок, если клетка под ним не повреждена
                     }
 
                     // Попытаться спасти врагов от падающего мешка
@@ -2037,7 +2017,7 @@ void main()
                                 }
                                 else
                                 {
-                                    if (background[bag_y_log + 1][bag_x_log].byte != 0xFF) // Если клетка ниже повреждена
+                                    if (background[bag_y_log + 1][bag_x_log] != 0xFF) // Если клетка ниже повреждена
                                     {
                                         // Если Диггер двигался вверх и он находится под мешком,
                                         if (!(man_dir == DIR_UP &&  (man_x_log == bag_x_log && (man_y_log == bag_y_log + 1)))) // то пока не начинать раскачивать мешок
@@ -2066,7 +2046,7 @@ void main()
                             if (bag_x_rem == 0) // Если мешок находится точно в клетке поля
                             {
                                 if (bag_y_log == H_MAX - 1) stop_bag(bag); // Остановить мешок, если он находится на самой нижней линии
-                                else if (background[bag_y_log + 1][bag_x_log].byte != 0xFF) // Если клетка под мешком прогрызена
+                                else if (background[bag_y_log + 1][bag_x_log] != 0xFF) // Если клетка под мешком повреждена
                                 {
                                     bag->state = BAG_FALLING; // Начать падение мешка
                                     bag->dir = DIR_DOWN; // Направление движения мешка вниз
