@@ -1334,9 +1334,10 @@ void move_man()
             case 26: man_new_dir = DIR_UP;    break; // Стрелка вверх
             case 27: man_new_dir = DIR_DOWN;  break; // Стрелка вниз
 #if defined(DEBUG)
-            case 76: lives++; print_lives();  break; // L
+            case 'L': lives++; print_lives();  break; // Добавление жизни
+            case 'N': done_snd = 1; break;            // Переход на следующий уровень
 #endif
-            case 32: while (!((union KEY_STATE *)REG_KEY_STATE)->reg & (1 << KEY_STATE_STATE));
+            case ' ': while (!((union KEY_STATE *)REG_KEY_STATE)->reg & (1 << KEY_STATE_STATE)); // Пауза
             default: man_new_dir = DIR_STOP;
         }
     }
