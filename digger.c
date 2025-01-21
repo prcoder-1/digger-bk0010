@@ -981,8 +981,7 @@ void move_bug(struct bug_info *bug)
         }
 
         // Сделать движение назад последним выбором при определении направления
-        enum direction dir = bug->dir;
-        if (dir != DIR_STOP) dir ^= 1; // Инвертировать направление движения врага
+        enum direction dir = (bug->dir) ^ 1; // Инвертировать направление движения врага
 
         if (dir == dir_1) // Если движение назад наболее приоритетно
         {
@@ -1732,11 +1731,11 @@ void main()
         // а так же, сбросить флаг события таймера
         tve_csr->reg = (1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN) | (1 << TVE_CSR_D4);
 
-        // Обработка появления Бонуса (вишенки)
+        // Обработка появления врагов
         if (bugs_delay_counter > 0) --bugs_delay_counter; // Отсчёт времени до появления нового врага
         else
         {
-            bugs_delay_counter = bugs_delay; // Перезарядить счётчик времени
+            bugs_delay_counter = bugs_delay; // Перезарядить счётчик времени до появления врага
 
             if (man_state == CREATURE_ALIVE) // Если Диггер жив
             {
