@@ -908,7 +908,7 @@ void move_bug(struct bug_info *bug)
     if (!bug_x_rem && !bug_y_rem)
     {
         // Если Хоббин застрял на время более заданного, то превратить его в Ноббина
-        if (bug->type == BUG_HOBBIN && bug->count > (30 + difficulty * 2))
+        if ((bug->type == BUG_HOBBIN) && (bug->count > (30 + difficulty * 2)))
         {
             bug->count = 0;         // Очистить время застревания
             bug->type = BUG_NOBBIN; // Превратить врага в Ноббина
@@ -1010,7 +1010,7 @@ void move_bug(struct bug_info *bug)
         }
 
         // В уровнях сложности до шестого использовать элемент случайности в выборе направления
-        if (difficulty < 6 && (rand() & 0xF) > (difficulty + 10))
+        if ((difficulty < 6) && ((rand() & 0xF) > (difficulty + 10)))
         {
             // В одном из (5 + difficulty) случаев поменять наиболее
             // приоритетное направление с менее приоритетным
@@ -1071,7 +1071,8 @@ void move_bug(struct bug_info *bug)
         // Выждать время задержки перед запуском нового врага
         if (bug->state == CREATURE_STARTING)
         {
-            if (--bug->count == 0) bug->state = CREATURE_ALIVE; // Если счётчик закончился, что оживить врага
+            if (bug->count > 0) bug->count--;
+            else bug->state = CREATURE_ALIVE; // Если счётчик закончился, что оживить врага
         }
         else
         {
@@ -1146,7 +1147,7 @@ void move_bug(struct bug_info *bug)
     // Для Хоббинов увеличивать счётчик для превращения в Ноббина по времени
     if (bug->type == BUG_HOBBIN)
     {
-        if (bug->count < 100) bug->count++;
+        if (bug->count < 100) bug->count++; // Увеличивать счётчик для автоматического превращения в Ноббина
     }
 
     // Увеличить/уменьшить фазу на единицу
@@ -1692,7 +1693,7 @@ void sound_effect()
  */
 void init_game()
 {
-    difficulty = 0; // Начальный уровень сложности
+    difficulty = 6; // Начальный уровень сложности
     level_no = 0;   // Начальный уровень
     lives = 3;      // Начальное количество жизней
     score = 0;      // Начальное количество очков
@@ -1803,6 +1804,8 @@ void main()
                 }
 
                 //  Если Ноббин застрял на определённое (зависящее от уровня сложности) время
+                print_dec(bug->count, 0, MAX_Y_POS + 2 * POS_Y_STEP);
+
                 if (bug->count > (10 - difficulty))
                 {
                     bug->count = 0;         // Сбросить счётчик застревания
