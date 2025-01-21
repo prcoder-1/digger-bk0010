@@ -77,6 +77,7 @@ enum bag_state : uint8_t
     BAG_STATIONARY,   /**< Мешок стационарен (стоит на месте) */
     BAG_LOOSE,        /**< Мешок раскачивается */
     BAG_FALLING,      /**< Мешок падает */
+    BAG_BREAKS,       /**< Мешок разбивается */
     BAG_BROKEN        /**< Мешок разбился */
 };
 
@@ -1144,10 +1145,10 @@ void move_bug(struct bug_info *bug)
         }
     }
 
-    // Для Хоббинов увеличивать счётчик для превращения в Ноббина по времени
+    // Для Хоббинов увеличивать счётчик застревания для превращения в Ноббина по времени
     if (bug->type == BUG_HOBBIN)
     {
-        if (bug->count < 100) bug->count++; // Увеличивать счётчик для автоматического превращения в Ноббина
+        if (bug->count < 100) bug->count++; // Увеличивать счётчик застревания для автоматического превращения в Ноббина
     }
 
     // Увеличить/уменьшить фазу на единицу
@@ -1215,7 +1216,7 @@ void stop_bag(struct bag_info *bag)
     // Проверка разбился ли мешок
     if (bag->count > 1) // Если мешок пролетел больше одного этажа
     {
-        bag->state = BAG_BROKEN; // То он разбился
+        bag->state = BAG_BREAKS; // То он будет разбиваться
     }
     else
     {
@@ -1797,15 +1798,13 @@ void main()
                     if (t == i) continue; // Пропустить самого себя
 
                     struct bug_info *another_bug = &bugs[t];
-                    if (another_bug->state == CREATURE_INACTIVE) continue; // пропустить неактивных врагов
+                    if (another_bug->state != CREATURE_ALIVE) continue; // Пропустить неживых врагов
 
                     // Если враг соприкоснулся с другим врагом, увеличить счётчик застревания
                     if (check_collision(bug->x_graph, bug->y_graph, another_bug->x_graph, another_bug->y_graph, 4, 15)) bug->count++;
                 }
 
-                //  Если Ноббин застрял на определённое (зависящее от уровня сложности) время
-                print_dec(bug->count, 0, MAX_Y_POS + 2 * POS_Y_STEP);
-
+                //  Если Ноббин застрял или соприкоснулся с другим на определённое (зависящее от уровня сложности) время
                 if (bug->count > (10 - difficulty))
                 {
                     bug->count = 0;         // Сбросить счётчик застревания
@@ -1882,7 +1881,7 @@ void main()
                 {
                     if (bug->count)
                     {
-                        bug->count--;
+                        bug->count--; // Уменьшить счётчик дохлого врага
                         break;
                     }
 
@@ -1906,7 +1905,7 @@ void main()
             struct bag_info *bag = &bags[i]; // Структура с информацией о мешке
             if (bag->state == BAG_INACTIVE) continue; // Пропустить неактивные мешки
 
-            if (bag->state == BAG_BROKEN) // Если мешок разбился
+            if (bag->state == BAG_BREAKS) // Если мешок разбивается
             {
                 // Анимация рабивающегося мешка (три фазы, пропуская один такт счётчика)
                 if (bag->count < 6 && (bag->count & 1))
@@ -1920,7 +1919,7 @@ void main()
                     break_bag_snd = 1; // Издать звук разбившегося мешка
                 }
 
-                bag->count++;
+                bag->count++; //  Увеличить счётчик существования разбившегося мешка
 
                 if (bag->count >= broke_max) // Если время существования разбившегося мешка достигло максимального
                 {
