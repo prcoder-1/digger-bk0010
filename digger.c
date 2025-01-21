@@ -1088,75 +1088,73 @@ void move_bug(struct bug_info *bug)
         }
     }
 
-    // Проверить соприкосновение врага с мешками
-    for (uint8_t i = 0; i < MAX_BAGS; ++i)
+    if (bug->state == CREATURE_ALIVE)
     {
-        struct bag_info *bag = &bags[i]; // Структура с информацией о мешках
-
-        if (bag->state == BAG_INACTIVE) continue; // Пропустить неактивные мешки
-
-        if (check_collision(bag->x_graph, bag->y_graph, bug_x_graph, bug_y_graph, 4, 15))
+        // Проверить соприкосновение врага с мешками
+        for (uint8_t i = 0; i < MAX_BAGS; ++i)
         {
-            uint16_t remove_bag = 0;
-            if (bug->type == BUG_HOBBIN)
-            {
-                 // Если Хоббин коснулся мешка
-                remove_bag = 1; // Удалить съеденный Хоббином мешок
-            }
-            else
-            {
-                // Если Ноббин коснулся мешка
+            struct bag_info *bag = &bags[i]; // Структура с информацией о мешках
 
-                if (bag->state == BAG_BROKEN) // Если мешок разбился
+            if (bag->state == BAG_INACTIVE) continue; // Пропустить неактивные мешки
+
+            if (check_collision(bag->x_graph, bag->y_graph, bug_x_graph, bug_y_graph, 4, 15))
+            {
+                uint16_t remove_bag = 0;
+                if (bug->type == BUG_HOBBIN)
                 {
-                    remove_bag = 1; // Удалить съеденное Ноббином золото
+                    // Если Хоббин коснулся мешка
+                    remove_bag = 1; // Удалить съеденный Хоббином мешок
                 }
                 else
                 {
-                    // Если мешок не разбит
-                    enum direction dir = bug->dir;
+                    // Если Ноббин коснулся мешка
 
-                    // Если Ноббин движется влево или вправо
-                    if ((dir == DIR_LEFT) || (dir == DIR_RIGHT))
+                    if (bag->state == BAG_BROKEN) // Если мешок разбился
                     {
-                        if (move_bag(bag, dir)) // Попытаться переместить мешок
-                        {
-                            // Если мешок не удалось подвинуть, отменить передвижение врага
-                            bug->x_graph = bug_x_graph;
-                            bug->y_graph = bug_y_graph;
-                            bug->count++; // Увеличить счётчик застревания
-                            break;
-                        }
+                        remove_bag = 1; // Удалить съеденное Ноббином золото
+                    }
+                    else
+                    {
+                        // Если мешок не разбит
+                        enum direction dir = bug->dir;
 
-                        bug->wait++; // Задержать врага перед мешком
+                        // Если Ноббин движется влево или вправо
+                        if ((dir == DIR_LEFT) || (dir == DIR_RIGHT))
+                        {
+                            if (move_bag(bag, dir)) // Попытаться переместить мешок
+                            {
+                                // Если мешок не удалось подвинуть, отменить передвижение врага
+                                bug->x_graph = bug_x_graph;
+                                bug->y_graph = bug_y_graph;
+                                bug->count++; // Увеличить счётчик застревания
+                                break;
+                            }
+
+                            bug->wait++; // Задержать врага перед мешком
+                        }
                     }
                 }
+
+                if (remove_bag)
+                {
+                    bag->state = BAG_INACTIVE; // Деактивировать мешок
+
+                    // Стереть съеденный мешок или золото
+                    sp_put(bag->x_graph, bag->y_graph, sizeof(outline_bag_fall[0]), sizeof(outline_bag_fall) / sizeof(outline_bag_fall[0]), nullptr, (uint8_t *)outline_bag_fall);
+
+                    bug->wait++; // Задержать врага перед мешком
+                }
             }
+        }
 
-            if (remove_bag)
-            {
-                bag->state = BAG_INACTIVE; // Деактивировать мешок
-
-                // Стереть съеденный мешок или золото
-                sp_put(bag->x_graph, bag->y_graph, sizeof(outline_bag_fall[0]), sizeof(outline_bag_fall) / sizeof(outline_bag_fall[0]), nullptr, (uint8_t *)outline_bag_fall);
-
-                bug->wait++; // Задержать врага перед мешком
-            }
+        // Для Хоббинов увеличивать счётчик застревания для превращения в Ноббина по времени
+        if (bug->type == BUG_HOBBIN)
+        {
+            if (bug->count < 100) bug->count++; // Увеличивать счётчик застревания для автоматического превращения в Ноббина
         }
     }
 
-    // Для Хоббинов увеличивать счётчик застревания для превращения в Ноббина по времени
-    if (bug->type == BUG_HOBBIN)
-    {
-        if (bug->count < 100) bug->count++; // Увеличивать счётчик застревания для автоматического превращения в Ноббина
-    }
-
-    // Увеличить/уменьшить фазу на единицу
-    bug->image_phase += bug->image_phase_inc;
-    // Переключить направление изменения фазы, если фаза дошла до предельного значения
-    if (!bug->image_phase || bug->image_phase >= 2) bug->image_phase_inc = -bug->image_phase_inc;
-
-    // Подтереть след с нужной стороны
+    // Подтереть след врага с нужной стороны
     switch (bug->dir)
     {
         case DIR_LEFT:
@@ -1183,6 +1181,11 @@ void move_bug(struct bug_info *bug)
             break;
         }
     }
+
+    // Увеличить/уменьшить фазу на единицу
+    bug->image_phase += bug->image_phase_inc;
+    // Переключить направление изменения фазы, если фаза дошла до предельного значения
+    if (!bug->image_phase || bug->image_phase >= 2) bug->image_phase_inc = -bug->image_phase_inc;
 
     // Отрисовка спрайта врага
     if (bug->type == BUG_NOBBIN)
