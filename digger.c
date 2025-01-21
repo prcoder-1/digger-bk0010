@@ -1337,7 +1337,7 @@ void move_man()
             case 'L': lives++; print_lives();  break; // Добавление жизни
             case 'N': done_snd = 1; break;            // Переход на следующий уровень
 #endif
-            case ' ': while (!((union KEY_STATE *)REG_KEY_STATE)->reg & (1 << KEY_STATE_STATE)); // Пауза
+            case ' ': while (!(((union KEY_STATE *)REG_KEY_STATE)->reg & (1 << KEY_STATE_STATE))); break; // Пауза
             default: man_new_dir = DIR_STOP;
         }
     }
