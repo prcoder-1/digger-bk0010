@@ -1344,6 +1344,7 @@ void move_man()
             case 26: man_new_dir = DIR_UP;    break; // Стрелка вверх
             case 27: man_new_dir = DIR_DOWN;  break; // Стрелка вниз
 #if defined(DEBUG)
+            case 'D': difficulty++; break;            // Добавление уровня сложности
             case 'L': lives++; print_lives();  break; // Добавление жизни
             case 'N': done_snd = 1; break;            // Переход на следующий уровень
 #endif
@@ -1697,7 +1698,7 @@ void sound_effect()
  */
 void init_game()
 {
-    difficulty = 6; // Начальный уровень сложности
+    difficulty = 0; // Начальный уровень сложности
     level_no = 0;   // Начальный уровень
     lives = 3;      // Начальное количество жизней
     score = 0;      // Начальное количество очков
@@ -1808,7 +1809,7 @@ void main()
                 }
 
                 //  Если Ноббин застрял или соприкоснулся с другим на определённое (зависящее от уровня сложности) время
-                if (bug->count > (10 - difficulty))
+                if (bug->count > (20 - difficulty))
                 {
                     bug->count = 0;         // Сбросить счётчик застревания
                     bug->type = BUG_HOBBIN; // Переключить тип врага на Хоббина
