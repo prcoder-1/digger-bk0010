@@ -714,20 +714,16 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
 {
     uint8_t rv = 0;
 
-    uint8_t x_graph = bag->x_graph;
-    uint8_t y_graph = bag->y_graph;
+    uint8_t bag_x_graph = bag->x_graph;
+    uint8_t bag_y_graph = bag->y_graph;
 
     // Проверить пытается ли переместиться мешок за пределы экрана
-    if (check_out_of_range(dir, x_graph, y_graph))
+    if (check_out_of_range(dir, bag_x_graph, bag_y_graph))
     {
         return 1; // Если мешок пытается переместиться за пределы экрана, отменить перемещение
     }
     else
     {
-        // Сохранить старые координаты мешка на случай неудачного перемещения
-        uint8_t old_x_graph = x_graph;
-        uint8_t old_y_graph = y_graph;
-
         // Если раскачивающийся мешок двигают встороны, то он перестаёт раскачиваться
         if (bag->state == BAG_LOOSE)
         {
@@ -739,21 +735,21 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
         {
             case DIR_RIGHT:
             {
-                x_graph += MOVE_X_STEP; // Перемещение мешка на шаг вправо
+                bag_x_graph += MOVE_X_STEP; // Перемещение мешка на шаг вправо
                 break;
             }
 
             case DIR_LEFT:
             {
-                x_graph -= MOVE_X_STEP;  // Перемещение мешка на шаг влево
+                bag_x_graph -= MOVE_X_STEP;  // Перемещение мешка на шаг влево
                 break;
             }
         }
 
         // Проверить перемещается ли мешок на Диггера
-        if (check_collision(bag->x_graph, bag->y_graph, man_x_graph, man_y_graph, 4, 15))
+        if (check_collision(bag_x_graph, bag_y_graph, man_x_graph, man_y_graph, 4, 15))
         {
-            if (move_to_object(dir, bag->x_graph, man_x_graph))
+            if (move_to_object(dir, bag_x_graph, man_x_graph))
             {
                 rv = 1; // Если да, отменить перемещение
             }
@@ -767,9 +763,9 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
             if (bug->state != CREATURE_ALIVE) continue; //  Пропустить неживых врагов
 
             // Проверить, что мешок перемещается на врага
-            if (check_collision(bag->x_graph, bag->y_graph, bug->x_graph, bug->y_graph, 4, 15))
+            if (check_collision(bag_x_graph, bag_y_graph, bug->x_graph, bug->y_graph, 4, 15))
             {
-                if (move_to_object(dir, bag->x_graph, bug->x_graph))
+                if (move_to_object(dir, bag_x_graph, bug->x_graph))
                 {
                     rv = 1; // Если да, отменить перемещение
                     break;
@@ -783,14 +779,16 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
             struct bag_info *another_bag = &bags[i]; // Структура с информацией о мешке
 
             if (another_bag == bag) continue; // Пропустить мешок, процедуру обработки которого вызвали
-            if (another_bag->state != BAG_STATIONARY) continue; // Пропустить не стационарные мешки
+
+             // Пропустить не стационарные и не качающиеся мешки
+            if ((another_bag->state != BAG_STATIONARY) && (another_bag->state != BAG_LOOSE)) continue;
 
             // Проверить, что мешок соприкоснулся с другим мешком
-            if (check_collision(bag->x_graph, bag->y_graph, another_bag->x_graph, another_bag->y_graph, 4, 15))
+            if (check_collision(bag_x_graph, bag_y_graph, another_bag->x_graph, another_bag->y_graph, 4, 15))
             {
                 // Если направление перемещения вправо и другой мешок находится правее обрабатываемого мешка
                 // или направление перемещения влево и другой мешок находтся левее обрабатываемого мешка
-                if (move_to_object(dir, bag->x_graph, another_bag->x_graph))
+                if (move_to_object(dir, bag_x_graph, another_bag->x_graph))
                 {
                     // Попробовать взывать перемещение мешка с которым обнаружена коллизия
                     if (move_bag(another_bag, dir))
@@ -802,24 +800,25 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
                 }
             }
         }
-
-        // Стирание мешка по старым координатам
-        sp_put(bag->x_graph, bag->y_graph, 4, 15, nullptr, (uint8_t *)outline_bag);
-
-        // Отрисовка спрайта передвигаемого мешка
-        sp_put(x_graph, y_graph, 4, 15, (uint8_t *)image_bag, (uint8_t *)outline_bag);
     }
 
     if (rv)
     {
+        // Мешок небыл перемещён
         break_bag_snd = 1; // Издать звук разбившегося мешка
     }
     else
     {
-        // Отмена перемещения
+        // Стирание мешка по старым координатам
+        sp_put(bag->x_graph, bag->y_graph, 4, 15, nullptr, (uint8_t *)outline_bag);
+
+        // Отрисовка спрайта передвигаемого мешка
+        sp_put(bag_x_graph, bag_y_graph, 4, 15, (uint8_t *)image_bag, (uint8_t *)outline_bag);
+
+        // Установить новые координаты мешка
         bag->dir = dir;
-        bag->x_graph = x_graph;
-        bag->y_graph = y_graph;
+        bag->x_graph = bag_x_graph;
+        bag->y_graph = bag_y_graph;
     }
 
     return rv;
