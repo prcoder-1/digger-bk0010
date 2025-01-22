@@ -1861,8 +1861,8 @@ void main()
         uint8_t man_x_log = man_abs_x_pos / POS_X_STEP;
         uint8_t man_y_log = man_abs_y_pos / POS_Y_STEP;
 
-        uint8_t bag_fall = 0;  // Флаг, показывающий, что присутствуют падающие мешки
-        uint8_t bag_loose = 0; // Флаг, показывающий, что присутствуют качающиеся мешки
+        uint8_t bags_fall = 0;  // Флаг, показывающий, что присутствуют падающие мешки
+        uint8_t bags_loose = 0; // Флаг, показывающий, что присутствуют качающиеся мешки
 
         for (uint8_t i = 0; i < MAX_BAGS; ++i)
         {
@@ -1912,14 +1912,7 @@ void main()
                                     bag->state = BAG_FALLING; // Начать падение мешка
                                     bag->dir = DIR_DOWN;      // Направление движения мешка вниз
                                     bag->count = 0;           // Сбросить счётчик этажей
-
-                                    // Включить звук падения мешка, если не включен
-                                    if (!fall_snd)
-                                    {
-                                        fall_period = 1024;
-                                        fall_snd_phase = 0;
-                                        fall_snd = 1;
-                                    }
+                                    fall_snd = 1;             // Включить звук падения мешка
 
                                     break;
                                 }
@@ -1939,7 +1932,7 @@ void main()
 
                 case BAG_LOOSE: // Мешок раскачивается
                 {
-                    bag_loose = 1; // Найден качающийся мешок
+                    bags_loose = 1; // Найден качающийся мешок
 
                     if (bag->count) // Если счётчик не закончился, мешок раскачивается
                     {
@@ -1974,14 +1967,7 @@ void main()
                         bag->state = BAG_FALLING; // Начать падение мешка
                         bag->dir = DIR_DOWN; // Направление движения мешка - вниз
                         bag->count = 0;
-
-                        // Включить звук падения мешка, если не включен
-                        if (!fall_snd)
-                        {
-                            fall_period = 1024;
-                            fall_snd_phase = 0;
-                            fall_snd = 1;
-                        }
+                        fall_snd = 1; // Включить звук падения мешка
                     }
 
                     break;
@@ -1989,7 +1975,7 @@ void main()
 
                 case BAG_FALLING: // Мешок падает
                 {
-                    bag_fall = 1; // Найден падающий мешок
+                    bags_fall = 1; // Найден падающий мешок
 
                     // Стереть фон и сбросить биты матрицы фона
                     era_up(bag_x_graph, bag_y_graph + 9);
@@ -2113,12 +2099,24 @@ void main()
             }
         }
 
-        if (!bag_fall) // Если ни один мешок не падает
+        if (fall_snd)
         {
-            fall_snd = 0; // Остановить звук падающего мешка
+            if (!bags_fall)
+            {
+                fall_snd = 0;
+            }
+        }
+        else
+        {
+            if (bags_fall)
+            {
+                fall_period = 1024;
+                fall_snd_phase = 0;
+                fall_snd = 1;
+            }
         }
 
-        if (!bag_loose) // Если ни один мешок не качается
+        if (!bags_loose) // Если ни один мешок не качается
         {
             loose_snd = 0;  // Остановить звук качающегося мешка
         }
