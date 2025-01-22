@@ -812,11 +812,6 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
         uint8_t bag_abs_x_pos = bag_x_graph - FIELD_X_OFFSET;
         uint8_t bag_x_rem = bag_abs_x_pos % POS_X_STEP;
 
-        if (bag_x_rem == 0) // Если мешок находится в середине клетки игрового поля по-горизонтали
-        {
-            dir = DIR_STOP; // Остановить мешок
-        }
-
         // Стирание мешка по старым координатам
         sp_put(bag->x_graph, bag->y_graph, 4, 15, nullptr, (uint8_t *)outline_bag);
 
@@ -1930,6 +1925,8 @@ void main()
                                 }
                             }
                         }
+
+                        bag->dir = DIR_STOP; // Остановить мешок
                     }
 
                     if (bag->dir != DIR_STOP) // Если мешок не остановлен
