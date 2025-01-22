@@ -273,9 +273,9 @@ void print_lives()
 /**
  * @brief Добавление заданного количества очков и аечать очков в левом верхнем углу экрана
  */
-void add_score(uint16_t score_add)
+void add_score(uint16_t score)
 {
-    score += score_add;
+    score += score;
     print_dec(score, 0, MOVE_Y_STEP);
 
      // Если количество жизней не достигло максимального и клоичество очков досигло бонусного для получения жизни
@@ -720,7 +720,7 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
     // Проверить пытается ли переместиться мешок за пределы экрана
     if (check_out_of_range(dir, x_graph, y_graph))
     {
-        rv = 1; // Если мешок пытается переместиться за пределы экрана, отменить перемещение
+        return 1; // Если мешок пытается переместиться за пределы экрана, отменить перемещение
     }
     else
     {
@@ -728,150 +728,86 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
         uint8_t old_x_graph = x_graph;
         uint8_t old_y_graph = y_graph;
 
-        // Игнорировать попытку перемещения падающего мешка влево и вправо,
-        // за исключением случая, когда мешок сбивает Диггера или врага
-        if (bag->state == BAG_FALLING) // Если мешок падает
+        // Если раскачивающийся мешок двигают встороны, то он перестаёт раскачиваться
+        if (bag->state == BAG_LOOSE)
         {
-            era_up(x_graph, y_graph + 9);
-            era_background(x_graph, y_graph, dir); // Сбросить биты матрицы фона
+            bag->state = BAG_STATIONARY;
+            bag->count = 0;
+        }
 
-            y_graph += 2 * MOVE_Y_STEP; // Скорость падения мешка вдвое выше скорости перемещения врагов
-
-            // Стереть падающий мешок по старым координатам
-            if (bag->count)
+        switch (dir)
+        {
+            case DIR_RIGHT:
             {
-                // Если пролетел больше одного этажа, то стираем прямоушольниками
-                erase_4_15(old_x_graph, old_y_graph);
-            }
-            else
-            {
-                // В начале полёта стираем при помощи маски
-                sp_put(old_x_graph, old_y_graph, sizeof(outline_bag_fall[0]), sizeof(outline_bag_fall) / sizeof(outline_bag_fall[0]), nullptr, (uint8_t *)outline_bag_fall);
+                x_graph += MOVE_X_STEP; // Перемещение мешка на шаг вправо
+                break;
             }
 
-            uint8_t bag_abs_x_pos = x_graph - FIELD_X_OFFSET;
-            uint8_t bag_abs_y_pos = y_graph - FIELD_Y_OFFSET;
-            uint8_t bag_x_log = bag_abs_x_pos / POS_X_STEP;
-            uint8_t bag_y_log = bag_abs_y_pos / POS_Y_STEP;
-
-            remove_coin(bag_x_log, bag_y_log);
-
-            // TODO: Удалить мешки встречающиеся на пути (dest_coin(x, y))
-
-            // Нарисовать падающий мешок
-            sp_put(x_graph, y_graph, sizeof(image_bag_fall[0]), sizeof(image_bag_fall) / sizeof(image_bag_fall[0]), (uint8_t *)image_bag_fall, (uint8_t *)outline_bag_fall);
-
-            if (man_state == CREATURE_ALIVE) //  Если Диггер жив
+            case DIR_LEFT:
             {
-                // Проверить, что Диггер попал под падающий под мешок
-                if (check_collision(man_x_graph, man_y_graph, x_graph, y_graph, 4, 12))
+                x_graph -= MOVE_X_STEP;  // Перемещение мешка на шаг влево
+                break;
+            }
+        }
+
+        // Проверить перемещается ли мешок на Диггера
+        if (check_collision(bag->x_graph, bag->y_graph, man_x_graph, man_y_graph, 4, 15))
+        {
+            if (move_to_object(dir, bag->x_graph, man_x_graph))
+            {
+                rv = 1; // Если да, отменить перемещение
+            }
+        }
+
+        // Проверить перемещается ли мешок на врага
+        for (uint8_t i = 0; i < bugs_max; ++i)
+        {
+            struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
+            if (!bugs_active) continue; // Пропустить неактивных врагов
+            if (bug->state != CREATURE_ALIVE) continue; //  Пропустить неживых врагов
+
+            // Проверить, что мешок перемещается на врага
+            if (check_collision(bag->x_graph, bag->y_graph, bug->x_graph, bug->y_graph, 4, 15))
+            {
+                if (move_to_object(dir, bag->x_graph, bug->x_graph))
                 {
-                    man_state = CREATURE_DEAD_MONEY_BAG;
-                    man_dead_bag = bag;
-                }
-            }
-
-            for (uint8_t i = 0; i < bugs_max; ++i)
-            {
-                struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
-
-                if (bug->state != CREATURE_ALIVE) continue; //  Пропустить неживых врагов
-
-                // Проверить, что враг попал под падающий мешок
-                if (check_collision(bug->x_graph, bug->y_graph, x_graph, y_graph, 4, 15))
-                {
-                    bug->state = CREATURE_DEAD_MONEY_BAG; // Враг был убит мешком с деньгами
-                    bug->dead_bag = bag; // Указатель на мешок которым был убит враг
-
-                     // В бонус-режиме увеличить количество создаваемых врагов компенсируя убитых мешками
-                    if (bonus_state == BONUS_ON)
-                    {
-                        bugs_total++; // Увеличить количество создаваемых врагов
-                        bugs_active--; // Уменьшить количество активных врагов
-                    }
+                    rv = 1; // Если да, отменить перемещение
+                    break;
                 }
             }
         }
-        else
+
+        // Проверка соприкосновение с другими мешками
+        for (uint8_t i = 0; i < MAX_BAGS; ++i)
         {
-            // Если мешок двигают встороны, то он перестаёт раскачиваться
-            bag->state = BAG_STATIONARY;
-            bag->count = 0;
+            struct bag_info *another_bag = &bags[i]; // Структура с информацией о мешке
 
-            switch (dir)
+            if (another_bag == bag) continue; // Пропустить мешок, процедуру обработки которого вызвали
+            if (another_bag->state != BAG_STATIONARY) continue; // Пропустить не стационарные мешки
+
+            // Проверить, что мешок соприкоснулся с другим мешком
+            if (check_collision(bag->x_graph, bag->y_graph, another_bag->x_graph, another_bag->y_graph, 4, 15))
             {
-                case DIR_RIGHT:
+                // Если направление перемещения вправо и другой мешок находится правее обрабатываемого мешка
+                // или направление перемещения влево и другой мешок находтся левее обрабатываемого мешка
+                if (move_to_object(dir, bag->x_graph, another_bag->x_graph))
                 {
-                    x_graph += MOVE_X_STEP; // Перемещение мешка на шаг вправо
-                    break;
-                }
-
-                case DIR_LEFT:
-                {
-                    x_graph -= MOVE_X_STEP;  // Перемещение мешка на шаг влево
-                    break;
-                }
-            }
-
-            // Проверить перемещается ли мешок на Диггера
-            if (check_collision(bag->x_graph, bag->y_graph, man_x_graph, man_y_graph, 4, 15))
-            {
-                if (move_to_object(dir, bag->x_graph, man_x_graph))
-                {
-                    rv = 1; // Если да, отменить перемещение
-                }
-            }
-
-            // Проверить перемещается ли мешок на врага
-            for (uint8_t i = 0; i < bugs_max; ++i)
-            {
-                struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
-                if (!bugs_active) continue; // Пропустить неактивных врагов
-                if (bug->state != CREATURE_ALIVE) continue; //  Пропустить неживых врагов
-
-                // Проверить, что мешок перемещается на врага
-                if (check_collision(bag->x_graph, bag->y_graph, bug->x_graph, bug->y_graph, 4, 15))
-                {
-                    if (move_to_object(dir, bag->x_graph, bug->x_graph))
+                    // Попробовать взывать перемещение мешка с которым обнаружена коллизия
+                    if (move_bag(another_bag, dir))
                     {
-                        rv = 1; // Если да, отменить перемещение
+                        // Если другой мешок не смог переместиться
+                        rv = 1; // Отменить перемещение и этого мешка
                         break;
                     }
                 }
             }
-
-            // Проверка соприкосновение с другими мешками
-            for (uint8_t i = 0; i < MAX_BAGS; ++i)
-            {
-                struct bag_info *another_bag = &bags[i]; // Структура с информацией о мешке
-
-                if (another_bag == bag) continue; // Пропустить мешок, процедуру обработки которого вызвали
-                if (another_bag->state != BAG_STATIONARY) continue; // Пропустить не стационарные мешки
-
-                // Проверить, что мешок соприкоснулся с другим мешком
-                if (check_collision(bag->x_graph, bag->y_graph, another_bag->x_graph, another_bag->y_graph, 4, 15))
-                {
-                    // Если направление перемещения вправо и другой мешок находится правее обрабатываемого мешка
-                    // или направление перемещения влево и другой мешок находтся левее обрабатываемого мешка
-                    if (move_to_object(dir, bag->x_graph, another_bag->x_graph))
-                    {
-                        // Попробовать взывать перемещение мешка с которым обнаружена коллизия
-                        if (move_bag(another_bag, dir))
-                        {
-                            // Если другой мешок не смог переместиться
-                            rv = 1; // Отменить перемещение и этого мешка
-                            break;
-                        }
-                    }
-                }
-            }
-
-            // Стирание мешка по старым координатам
-            sp_put(bag->x_graph, bag->y_graph, 4, 15, nullptr, (uint8_t *)outline_bag);
-
-            // Отрисовка спрайта передвигаемого мешка
-            sp_put(x_graph, y_graph, 4, 15, (uint8_t *)image_bag, (uint8_t *)outline_bag);
         }
+
+        // Стирание мешка по старым координатам
+        sp_put(bag->x_graph, bag->y_graph, 4, 15, nullptr, (uint8_t *)outline_bag);
+
+        // Отрисовка спрайта передвигаемого мешка
+        sp_put(x_graph, y_graph, 4, 15, (uint8_t *)image_bag, (uint8_t *)outline_bag);
     }
 
     if (rv)
@@ -1109,9 +1045,10 @@ void move_bug(struct bug_info *bug)
                 {
                     // Если Ноббин коснулся мешка
 
-                    if (bag->state == BAG_BROKEN) // Если мешок разбился
+                    if (bag->state == BAG_BROKEN) // Если мешок разбит
                     {
                         remove_bag = 1; // Удалить съеденное Ноббином золото
+                        bug->wait++; // Задержать врага съедающего золото
                     }
                     else
                     {
@@ -1220,13 +1157,8 @@ void stop_bag(struct bag_info *bag)
     if (bag->count > 1) // Если мешок пролетел больше одного этажа
     {
         bag->state = BAG_BREAKS; // То он будет разбиваться
+        bag->count = 0;
     }
-    else
-    {
-        bag->state = BAG_STATIONARY; // Иначе мешок просто остановился
-    }
-
-    bag->count = 0;
 
     // TODO: Унчтожить все мешки под тем, который остановился
 }
@@ -1425,24 +1357,40 @@ void move_man()
 
     uint16_t collision_flag = 0;
 
-    // Обработка толкания мешков
+    // Обработка толкания мешков и съедения золота
     for (uint8_t i = 0; i < MAX_BAGS; ++i)
     {
         struct bag_info *bag = &bags[i]; // Структура с информацией о мешке
-
         if (bag->state == BAG_INACTIVE) continue; // Пропустить неактивные мешки
 
-        // Проверить, что Диггер соприкоснулся с мешком
-        if (!check_collision(bag->x_graph, bag->y_graph, man_x_graph, man_y_graph, 4, 15)) continue; // Если Диггер не соприкоснулся с мешком
+        // Если Диггер не соприкоснулся с мешком, проверить следующий мешок
+        if (!check_collision(bag->x_graph, bag->y_graph, man_x_graph, man_y_graph, 4, 15)) continue;
 
-        man_wait++; // Задержать Диггера перед мешком
+        man_wait++; // Задержать Диггера перед мешком или золотом
 
-        if ((bag->state == BAG_STATIONARY) || (bag->state == BAG_LOOSE))
+        switch (bag->state)
         {
-            // Если направление движения Диггера вверх или вниз, или мешок не удалось переместить
-            if (man_dir == DIR_UP || man_dir == DIR_DOWN || move_bag(bag, man_dir))
+            case BAG_STATIONARY:
+            case BAG_LOOSE:
             {
-                collision_flag = 1;
+                // Если направление движения Диггера вверх или вниз, или мешок не удалось переместить
+                if (man_dir == DIR_UP || man_dir == DIR_DOWN || move_bag(bag, man_dir))
+                {
+                    collision_flag = 1;
+                }
+
+                break;
+            }
+
+            // case BAG_BREAKS:
+            case BAG_BROKEN:
+            {
+                money_snd = 1; // Издать звук съедаемого золота
+                bag->state = BAG_INACTIVE; // Сделать мешок неактивным
+                add_score(500); // 500 очков за съеденное золото
+                // Стереть золото из разбитого мешка
+                erase_4_15(bag->x_graph, bag->y_graph);
+
                 break;
             }
         }
@@ -1589,6 +1537,7 @@ void sound_effect()
     {
         // Звук убиения Диггера
 
+        // Последовательность высоты на которую подпрыгивает перевёрнутый Диггер
         static uint8_t bounce[8] = { 3, 5, 6, 6, 5, 4, 3, 0 };
 
         uint16_t period = 19000 / N;
@@ -1599,6 +1548,7 @@ void sound_effect()
 
             uint16_t y_graph = man_y_graph - bounce[i >> 3];
             era_up(man_x_graph, y_graph);
+            // Анимация подпрыгивающего перевёрнутого Диггера
             sp_4_15_put(man_x_graph, y_graph, (uint8_t *)image_digger_turned_over);
 
             if (i++ < 10)
@@ -1904,85 +1854,192 @@ void main()
         }
 
         // Обработка мешков
+        uint8_t man_abs_x_pos = man_x_graph - FIELD_X_OFFSET;
+        uint8_t man_abs_y_pos = man_y_graph - FIELD_Y_OFFSET;
+        uint8_t man_x_log = man_abs_x_pos / POS_X_STEP;
+        uint8_t man_y_log = man_abs_y_pos / POS_Y_STEP;
+
+        uint8_t bag_fall = 0;  // Флаг, показывающий, что присутствуют падающие мешки
+        uint8_t bag_loose = 0; // Флаг, показывающий, что присутствуют качающиеся мешки
+
         for (uint8_t i = 0; i < MAX_BAGS; ++i)
         {
             struct bag_info *bag = &bags[i]; // Структура с информацией о мешке
-            if (bag->state == BAG_INACTIVE) continue; // Пропустить неактивные мешки
 
-            if (bag->state == BAG_BREAKS) // Если мешок разбивается
+            uint8_t bag_x_graph = bag->x_graph;
+            uint8_t bag_y_graph = bag->y_graph;
+            uint8_t bag_abs_x_pos = bag_x_graph - FIELD_X_OFFSET;
+            uint8_t bag_abs_y_pos = bag_y_graph - FIELD_Y_OFFSET;
+            uint8_t bag_x_log = bag_abs_x_pos / POS_X_STEP;
+            uint8_t bag_y_log = bag_abs_y_pos / POS_Y_STEP;
+            uint8_t bag_x_rem = bag_abs_x_pos % POS_X_STEP;
+            uint8_t bag_y_rem = (bag_abs_y_pos % POS_Y_STEP) >> 2;
+
+            switch (bag->state)
             {
-                // Анимация рабивающегося мешка (три фазы, пропуская один такт счётчика)
-                if (bag->count < 6 && (bag->count & 1))
+                case BAG_INACTIVE: // Мешок неактивен
                 {
-                    sp_4_15_put(bag->x_graph, bag->y_graph, (uint8_t *)image_bag_broke[(bag->count - 1) >> 1]);
+                    continue; // Пропустить неактивные мешки
                 }
 
-                if (bag->count == 1)
+                case BAG_STATIONARY: // Мешок покоится на месте
                 {
-                    bag->state = BAG_BROKEN; // Мешок разбился
-                    break_bag_snd = 1; // Издать звук разбившегося мешка
-                }
-
-                bag->count++; //  Увеличить счётчик существования разбившегося мешка
-
-                if (bag->count >= broke_max) // Если время существования разбившегося мешка достигло максимального
-                {
-                    bag->state = BAG_INACTIVE; // Сделать мешок неактивным
-
-                    // Стереть разбившийся мешок
-                    erase_4_15(bag->x_graph, bag->y_graph);
-                }
-                else
-                {
-                    uint8_t bag_abs_x_pos = bag->x_graph - FIELD_X_OFFSET;
-                    uint8_t bag_abs_y_pos = bag->y_graph - FIELD_Y_OFFSET;
-                    uint8_t bag_x_log = bag_abs_x_pos / POS_X_STEP;
-                    uint8_t bag_y_log = bag_abs_y_pos / POS_Y_STEP;
-
-                    if (man_state == CREATURE_ALIVE) // Если Диггер жив
+                    if (bag_x_rem == 0) // Если мешок находится в серединге клетки игрового поля по-горизонтали
                     {
-                        // Проверить соприкоснулся ли Диггер с разбитым мешком
-                        if (check_collision(bag->x_graph, bag->y_graph, man_x_graph, man_y_graph, 4, 15))
+                        if (background[bag_y_log + 1][bag_x_log] != 0xFF) // Если клетка ниже повреждена
                         {
-                            money_snd = 1; // Издать звук съедаемого золота
-                            bag->state = BAG_INACTIVE; // Сделать мешок неактивным
-                            add_score(500); // 500 очков за съеденное золото мешок
-                            // Стереть золото из разбитого мешка
-                            erase_4_15(bag->x_graph, bag->y_graph);
+                            switch (bag->dir)
+                            {
+                                case DIR_STOP: // Если мешок неподвижен
+                                {
+                                    // Если Диггер двигался вверх и он находится под мешком, то пока не начинать раскачивать мешок
+                                    if (!(man_dir == DIR_UP &&  (man_x_log == bag_x_log && (man_y_log == bag_y_log + 1))))
+                                    {
+                                        // Начать раскачивать мешок
+                                        bag->state = BAG_LOOSE;  // Мешок раскачивается
+                                        bag->count = LOOSE_WAIT; // Время раскачивания мешка
+                                    }
+
+                                    break;
+                                }
+
+                                case DIR_LEFT: // Если мешок движется всторону
+                                case DIR_RIGHT:
+                                {
+                                    // Если мешок сдвинули на повреждённую область, он проваливается
+                                    bag->state = BAG_FALLING; // Начать падение мешка
+                                    bag->dir = DIR_DOWN;      // Направление движения мешка вниз
+                                    bag->count = 0;           // Сбросить счётчик этажей
+
+                                    // Включить звук падения мешка, если не включен
+                                    if (!fall_snd)
+                                    {
+                                        fall_period = 1024;
+                                        fall_snd_phase = 0;
+                                        fall_snd = 1;
+                                    }
+
+                                    break;
+                                }
+                            }
                         }
                     }
+
+                    if (bag->dir != DIR_STOP) // Если мешок не остановлен
+                    {
+                        move_bag(bag, bag->dir); // Перемещать мешок
+                    }
+
+                    break;
                 }
-            }
-            else  // Если мешок не разбит
-            {
-                uint8_t bag_x_graph = bag->x_graph;
-                uint8_t bag_y_graph = bag->y_graph;
-                uint8_t bag_abs_x_pos = bag_x_graph - FIELD_X_OFFSET;
-                uint8_t bag_abs_y_pos = bag_y_graph - FIELD_Y_OFFSET;
-                uint8_t bag_x_log = bag_abs_x_pos / POS_X_STEP;
-                uint8_t bag_y_log = bag_abs_y_pos / POS_Y_STEP;
-                uint8_t bag_x_rem = bag_abs_x_pos % POS_X_STEP;
-                uint8_t bag_y_rem = (bag_abs_y_pos % POS_Y_STEP) >> 2;
 
-                uint8_t man_abs_x_pos = man_x_graph - FIELD_X_OFFSET;
-                uint8_t man_abs_y_pos = man_y_graph - FIELD_Y_OFFSET;
-                uint8_t man_x_log = man_abs_x_pos / POS_X_STEP;
-                uint8_t man_y_log = man_abs_y_pos / POS_Y_STEP;
-
-
-                if (bag->state == BAG_FALLING)
+                case BAG_LOOSE: // Мешок раскачивается
                 {
-                    if (bag_y_rem == 0) // Если мешок находится в центре клетки по-вертикали
+                    bag_loose = 1; // Найден качающийся мешок
+
+                    if (bag->count) // Если счётчик не закончился, мешок раскачивается
+                    {
+                        if (!loose_snd) // Если звук раскачивания мешка ещё не включен
+                        {
+                            // Включить звук раскачивания мешка
+                            loose_snd = 1;
+                            loose_snd_phase = 0;
+                        }
+
+                        bag->count--; // Уменьшить счётчик отсчитывающий время до падения мешка
+
+                        uint8_t count_rem = bag->count & 7;
+                        if ((count_rem & 1) == 0) // Каждый второй вызов рисовать анимацию раскачивающегося мешка
+                        {
+                            count_rem >>= 1;
+
+                            // Порядок следования спрайтов и масок анимации раскачивающегося мешка
+                            static uint8_t *bag_images[] = { (uint8_t *)image_bag_left, (uint8_t *)image_bag, (uint8_t *)image_bag_right, (uint8_t *)image_bag };
+                            static uint8_t *bag_outlines[] = { (uint8_t *)outline_bag_left, (uint8_t *)outline_bag, (uint8_t *)outline_bag_right, (uint8_t *)outline_bag };
+
+                            uint8_t *bag_image = bag_images[count_rem];     // Указатель на спрайт
+                            uint8_t *bag_outline = bag_outlines[count_rem]; // Указатель на маску
+
+                            // Нарисовать спрайт раскачивающегося мешка
+                            sp_put(bag_x_graph, bag_y_graph, sizeof(image_bag_left[0]), sizeof(image_bag_left) / sizeof(image_bag_left[0]), bag_image, bag_outline);
+                        }
+                    }
+                    else
+                    {
+                        // Если счётчик времени до падения мешка закончился
+                        bag->state = BAG_FALLING; // Начать падение мешка
+                        bag->dir = DIR_DOWN; // Направление движения мешка - вниз
+                        bag->count = 0;
+
+                        // Включить звук падения мешка, если не включен
+                        if (!fall_snd)
+                        {
+                            fall_period = 1024;
+                            fall_snd_phase = 0;
+                            fall_snd = 1;
+                        }
+                    }
+
+                    break;
+                }
+
+                case BAG_FALLING: // Мешок падает
+                {
+                    bag_fall = 1; // Найден падающий мешок
+
+                    // Стереть фон и сбросить биты матрицы фона
+                    era_up(bag_x_graph, bag_y_graph + 9);
+                    era_background(bag_x_graph, bag_y_graph, DIR_DOWN); // Сбросить биты матрицы фона
+
+                    // Стереть падающий мешок по старым координатам
+                    if (bag->count) // Если номер этажа не нулевой
+                    {
+                        // Если пролетел больше одного этажа, то стираем прямоушольниками
+                        erase_4_15(bag->x_graph, bag->y_graph);
+                    }
+                    else
+                    {
+                        // В начале полёта стираем при помощи маски
+                        sp_put(bag->x_graph, bag->y_graph, sizeof(outline_bag_fall[0]), sizeof(outline_bag_fall) / sizeof(outline_bag_fall[0]), nullptr, (uint8_t *)outline_bag_fall);
+                    }
+
+                    // Перемещаем мешок в новое положение по оси Y
+                    bag_y_graph += 2 * MOVE_Y_STEP; // Скорость падения мешка вдвое выше скорости перемещения врагов
+                    bag_abs_y_pos = bag_y_graph - FIELD_Y_OFFSET;
+                    bag_y_log = bag_abs_y_pos / POS_Y_STEP;
+                    bag_y_rem = (bag_abs_y_pos % POS_Y_STEP) >> 2;
+
+                    if (bag_y_log == H_MAX - 1) stop_bag(bag); // Остановить мешок, если он долетел до последнего этажа
+                    else if (background[bag_y_log + 1][bag_x_log] == 0xFF) stop_bag(bag); // Остановить мешок, если клетка под ним не повреждена
+
+                    if (bag_y_rem == 0) // Если мешок находится в центре клетки по-вертикали, значит он пролетел один этаж
                     {
                         bag->count++; // Увеличить количество этажей, которые пролетел мешок
-                        if (bag_y_log == H_MAX - 1) stop_bag(bag); // Остановить мешок, если он долетел до последнего этажа
-                        else if (background[bag_y_log + 1][bag_x_log] == 0xFF) stop_bag(bag); // Остановить мешок, если клетка под ним не повреждена
+                    }
+
+                    remove_coin(bag_x_log, bag_y_log); // Удалить монету в клетке куда попал мешок
+
+                    // TODO: Удалить мешки встречающиеся на пути (dest_coin(x, y))
+
+                    // Нарисовать падающий мешок
+                    sp_put(bag_x_graph, bag_y_graph, sizeof(image_bag_fall[0]), sizeof(image_bag_fall) / sizeof(image_bag_fall[0]),
+                           (uint8_t *)image_bag_fall, (uint8_t *)outline_bag_fall);
+
+                    if (man_state == CREATURE_ALIVE) //  Если Диггер жив
+                    {
+                        // Проверить, что Диггер попал под падающий под мешок
+                        if (check_collision(man_x_graph, man_y_graph, bag_x_graph, bag_y_graph, 4, 12))
+                        {
+                            man_state = CREATURE_DEAD_MONEY_BAG; // Диггер погиб от падающего мешка
+                            man_dead_bag = bag; // Указатель на мешок от которого погиб Диггер
+                        }
                     }
 
                     // Попытаться спасти врагов от падающего мешка
                     for (uint8_t i = 0; i < bugs_max; ++i)
                     {
                         volatile struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
+                        if (bug->state != CREATURE_ALIVE) continue; // Пропустить неживых врагов
 
                         uint8_t bug_x_graph = bug->x_graph;
                         uint8_t bug_abs_x_pos = bug_x_graph - FIELD_X_OFFSET;
@@ -1992,126 +2049,75 @@ void main()
                         // Если враг находится на одной вертикальной линии с мешком и
                         // движется вверх, то изменить направление движения на движение вниз
                         if (bug_x_log == bag_x_log && bug->dir == DIR_UP) bug->dir = DIR_DOWN;
+
+                        // Проверить, что враг попал под падающий мешок
+                        if (check_collision(bug->x_graph, bug->y_graph, bag_x_graph, bag_y_graph, 4, 15))
+                        {
+                            bug->state = CREATURE_DEAD_MONEY_BAG; // Враг был убит мешком с деньгами
+                            bug->dead_bag = bag; // Указатель на мешок которым был убит враг
+
+                            // В бонус-режиме увеличить количество создаваемых врагов компенсируя убитых мешками
+                            if (bonus_state == BONUS_ON)
+                            {
+                                bugs_total++; // Увеличить количество создаваемых врагов
+                                bugs_active--; // Уменьшить количество активных врагов
+                            }
+                        }
                     }
+
+                    bag->y_graph = bag_y_graph;
+
+                    break;
                 }
-                else
+
+                case BAG_BREAKS: // Мешок разбивается
                 {
-                    switch (bag->dir)
+                    // Анимация рабивающегося мешка (три фазы, пропуская один такт счётчика)
+                    if (bag->count++ < 6)
                     {
-                        case DIR_STOP: // Если мешок стоит на месте
+                        if (bag->count & 1)
                         {
-                            if (bag_x_rem == 0 && (bag_y_log < H_MAX - 1)) // Если мешок находится в центре клетки и выше нижней границы
-                            {
-                                if (bag->state == BAG_LOOSE) // Если мешок раскачивается и готов упасть
-                                {
-                                    if (!bag->count) // Если счётчик закончился, начать падение мешка
-                                    {
-                                        bag->state = BAG_FALLING; // Начать падение мешка
-                                        bag->dir = DIR_DOWN; // Направление движения мешка - вниз
-                                        bag->count = 0;
-
-                                        // Включить звук падения мешка
-                                        fall_period = 1024;
-                                        fall_snd_phase = 0;
-                                        fall_snd = 1;
-                                    }
-                                    else
-                                    {
-                                        if (!loose_snd)
-                                        {
-                                            loose_snd = 1;
-                                            loose_snd_phase = 0;
-                                        }
-
-                                        bag->count--; // Уменьшить счётчик до падения мешка
-                                        uint8_t count_rem = bag->count & 7;
-
-                                        if ((count_rem & 1) == 0)
-                                        {
-                                            count_rem >>= 1;
-
-                                            static uint8_t *bag_images[] = { (uint8_t *)image_bag_left, (uint8_t *)image_bag, (uint8_t *)image_bag_right, (uint8_t *)image_bag };
-                                            static uint8_t *bag_outlines[] = { (uint8_t *)outline_bag_left, (uint8_t *)outline_bag, (uint8_t *)outline_bag_right, (uint8_t *)outline_bag };
-
-                                            uint8_t *bag_image = bag_images[count_rem];
-                                            uint8_t *bag_outline = bag_outlines[count_rem];
-
-                                            // Нарисовать спрайт раскачивающегося мешка
-                                            sp_put(bag_x_graph, bag_y_graph, sizeof(image_bag_left[0]), sizeof(image_bag_left) / sizeof(image_bag_left[0]), bag_image, bag_outline);
-                                        }
-                                    }
-                                }
-                                else
-                                {
-                                    if (background[bag_y_log + 1][bag_x_log] != 0xFF) // Если клетка ниже повреждена
-                                    {
-                                        // Если Диггер двигался вверх и он находится под мешком,
-                                        if (!(man_dir == DIR_UP &&  (man_x_log == bag_x_log && (man_y_log == bag_y_log + 1)))) // то пока не начинать раскачивать мешок
-                                        {
-                                            bag->state = BAG_LOOSE;
-                                            bag->count = LOOSE_WAIT;
-                                        }
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                // Если мешок двигали в стороны, то восстановить состояние
-                                bag->state = BAG_STATIONARY;
-                                bag->count = 0;
-                            }
-
-                            break;
-                        }
-
-                        case DIR_LEFT:
-                        case DIR_RIGHT:
-                        {
-                            // Проверить должен ли упасть мешок после того как его толкали влево-вправо
-
-                            if (bag_x_rem == 0) // Если мешок находится точно в клетке поля
-                            {
-                                if (bag_y_log == H_MAX - 1) stop_bag(bag); // Остановить мешок, если он находится на самой нижней линии
-                                else if (background[bag_y_log + 1][bag_x_log] != 0xFF) // Если клетка под мешком повреждена
-                                {
-                                    bag->state = BAG_FALLING; // Начать падение мешка
-                                    bag->dir = DIR_DOWN; // Направление движения мешка вниз
-                                    bag->count = 0;
-
-                                    // Включить звук падения мешка
-                                    fall_period = 1024;
-                                    fall_snd_phase = 0;
-                                    fall_snd = 1;
-                                }
-                                else stop_bag(bag); // Остановить мешок если клетка под ним не прогрызена
-                            }
-
-                            break;
+                            // Нарисовать анимацию рассыпающегося золота
+                            sp_4_15_put(bag->x_graph, bag->y_graph, (uint8_t *)image_bag_broke[(bag->count - 1) >> 1]);
                         }
                     }
+                    else
+                    {
+                        bag->state = BAG_BROKEN; // Мешок разбился
+                        bag->count = 0; // Сбросить счётчик существования разбившегося мешка
+                        break_bag_snd = 1; // Издать звук разбившегося мешка
+                    }
+
+                    break;
                 }
 
-                if (bag->dir != DIR_STOP) // Если мешок не остановлен
+                case BAG_BROKEN:  // Если мешок разбит
                 {
-                    move_bag(bag, bag->dir); // Перемещать мешок
+                    bag->count++; //  Увеличить счётчик существования разбившегося мешка
+
+                    if (bag->count >= broke_max) // Если время существования разбившегося мешка достигло максимального
+                    {
+                        bag->state = BAG_INACTIVE; // Сделать мешок неактивным
+
+                        // Стереть разбившийся мешок
+                        erase_4_15(bag->x_graph, bag->y_graph);
+                    }
+
+                    break;
                 }
+
             }
         }
 
-        uint8_t bag_fall = 1;  // Флаг, показывающий, что отсутствуют падающие мешки
-        uint8_t bag_loose = 1; // Флаг, показывающий, что отсутствуют качающиеся мешки
-
-        for (uint8_t i = 0; i < MAX_BAGS; ++i)
+        if (!bag_fall) // Если ни один мешок не падает
         {
-            struct bag_info *bag = &bags[i]; // Структура с информацией о мешках
-            if (bag->state == BAG_INACTIVE) continue; // Пропустить неактивные мешки
-
-                 if (bag->state == BAG_FALLING) bag_fall  = 0; // Найден падающий мешок
-            else if (bag->state == BAG_LOOSE)   bag_loose = 0; // Найден качающийся мешок
+            fall_snd = 0; // Остановить звук падающего мешка
         }
 
-        if (bag_fall)  { fall_snd = 0; }  // Остановить звук падающего мешка
-        if (bag_loose) { loose_snd = 0; } // Остановить звук качающегося мешка
+        if (!bag_loose) // Если ни один мешок не качается
+        {
+            loose_snd = 0;  // Остановить звук качающегося мешка
+        }
 
         // Обработка снаряда
         // if (mis_explode) explode_missile(); // Обработка взрывающегося снаряда
