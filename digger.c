@@ -492,21 +492,20 @@ void init_level()
             else if (ls == LEV_H || ls == LEV_S)
             {
                 *bg &= 0xF0;  // сбрасываем все биты h_bite фона для горизонтальных проходов
-                era_right(x_graph - 4, y_graph);
-                era_right(x_graph - 3, y_graph);
-                era_right(x_graph - 2, y_graph);
-                era_right(x_graph - 1, y_graph);
+                for (uint16_t i = 4; i > 0; --i)
+                {
+                    era_right(x_graph - i, y_graph);
+                }
                 era_left (x_graph + 1, y_graph);
             }
 
             if (ls == LEV_V || ls == LEV_S)
             {
                 *bg &= 0x0F;  // сбрасываем все биты v_bite фона для вертикальных проходов
-                era_down(x_graph, y_graph - 15);
-                era_down(x_graph, y_graph - 12);
-                era_down(x_graph, y_graph - 9);
-                era_down(x_graph, y_graph - 6);
-                era_down(x_graph, y_graph - 3);
+                for (uint16_t i = 15; i > 0; i -= 3)
+                {
+                    era_down(x_graph, y_graph - i);
+                }
                 era_up  (x_graph, y_graph + 3);
             }
 
