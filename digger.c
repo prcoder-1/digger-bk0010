@@ -1986,14 +1986,14 @@ void process_missile()
 
                         case DIR_UP:
                         {
-                            mis_x_graph = man_x_graph;
+                            mis_x_graph = man_x_graph + 1;
                             mis_y_graph = man_y_graph - MOVE_Y_STEP;
                             break;
                         }
 
                         case DIR_DOWN:
                         {
-                            mis_x_graph = man_x_graph;
+                            mis_x_graph = man_x_graph + 1;
                             mis_y_graph = man_y_graph + 15 + MOVE_Y_STEP;
                             break;
                         }
