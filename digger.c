@@ -167,11 +167,11 @@ uint8_t bugs_created;       // Общее количество сщзданны�
 uint8_t broke_max; // Время через которое исчезнет разбившийся мешок
 
 // Переменные отвечающие за бонус-режим
-enum bonus_state bonus_state;     // Состояние режима бонус
-uint16_t bonus_time;         // Время активности бонус-режима
-uint8_t  bonus_flash;        // Время мерцания при включении/выключении Бонус-режима
-uint8_t  bonus_count;        // Множитель очков в Бонус-режиме (умножается на два за каждого пойманного врага)
-uint32_t bonus_life_score;   // Количество очков для дополнительное жизни
+enum bonus_state bonus_state; // Состояние режима бонус
+uint16_t bonus_time;          // Время активности бонус-режима
+uint8_t  bonus_flash;         // Время мерцания при включении/выключении Бонус-режима
+uint8_t  bonus_count;         // Множитель очков в Бонус-режиме (умножается на два за каждого пойманного врага)
+uint32_t bonus_life_score;    // Количество очков для дополнительное жизни
 
 // Переменные отвечающие за выстрел
 // uint8_t mis_ready;   // Флаг готовности снаряда к выстрелу
@@ -181,7 +181,7 @@ uint32_t bonus_life_score;   // Количество очков для допо�
 // Переменные отвечающие за состояние игры
 uint16_t difficulty; // Уровень сложности
 uint16_t level_no;   // Текущий номер уровня
-int16_t lives;       // Количество жизней
+int16_t  lives;      // Количество жизней
 uint32_t score;      // Количество очков
 
 // Переменные отвечающие за вывод звуков
@@ -254,11 +254,11 @@ void print_dec(uint16_t number, uint16_t x_graph, uint16_t y_graph)
  */
 void print_lives()
 {
-    const uint16_t man_x_offset = sizeof(ch_digits[0][0]) * 5 + 1; // Смещение шириной в пять символов '0' плюс один байт (4 пикселя)
-    const uint16_t man_y_offset = 2;
-    const uint16_t one_pos_width = sizeof(image_digger_right[1][0]) + 1;
-    const uint16_t width = MAX_LIVES * one_pos_width;
-    const uint16_t height = sizeof(image_digger_right[1]) / sizeof(image_digger_right[1][0]);
+    constexpr uint16_t man_x_offset = sizeof(ch_digits[0][0]) * 5 + 1; // Смещение шириной в пять символов '0' плюс один байт (4 пикселя)
+    constexpr uint16_t man_y_offset = 2;
+    constexpr uint16_t one_pos_width = sizeof(image_digger_right[1][0]) + 1;
+    constexpr uint16_t width = MAX_LIVES * one_pos_width;
+    constexpr uint16_t height = sizeof(image_digger_right[1]) / sizeof(image_digger_right[1][0]);
 
     sp_paint_brick(man_x_offset, man_y_offset, width, height, 0);
 
@@ -437,11 +437,11 @@ void init_level()
         bugs[i].state = CREATURE_INACTIVE;
     }
 
-    const uint16_t bg_block_width = sizeof(image_background[0][0]); // Ширина блока фона
-    const uint16_t bg_block_height = sizeof(image_background[0]) / sizeof(image_background[0][0]); // Высота блока фона
+    constexpr uint16_t bg_block_width = sizeof(image_background[0][0]); // Ширина блока фона
+    constexpr uint16_t bg_block_height = sizeof(image_background[0]) / sizeof(image_background[0][0]); // Высота блока фона
 
-    const uint16_t x_size = 13; // Ширина поля фона в блоках
-    const uint16_t y_size = POS_Y_STEP * H_MAX / bg_block_height + MOVE_Y_STEP + 2; // Высота поля фона в блоках
+    constexpr uint16_t x_size = 13; // Ширина поля фона в блоках
+    constexpr uint16_t y_size = POS_Y_STEP * H_MAX / bg_block_height + MOVE_Y_STEP + 2; // Высота поля фона в блоках
 
     const uint8_t *back_image = (uint8_t *)image_background[level_no]; // Указатель на образец фона для текущего уровня
 
@@ -1674,7 +1674,7 @@ void main()
     volatile uint16_t *t_limit = (volatile uint16_t *)REG_TVE_LIMIT;
     volatile union TVE_CSR *tve_csr = (volatile union TVE_CSR *)REG_TVE_CSR;
 
-    const uint16_t FPS = 10; // Частота обновления кадров
+    constexpr uint16_t FPS = 10; // Частота обновления кадров
     *t_limit = 3000000 / 128 / 4 / FPS;
 
     init_game(); // Начальная инициализация игры
@@ -1698,8 +1698,8 @@ void main()
                     if (bonus_state != BONUS_ON) // Если не включен бонус-режим, запустить нового врага
                     {
                         // Координаты рожденияя врагов - в правом верхнем углу
-                        const uint8_t bug_start_x = FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP;
-                        const uint8_t bug_start_y = FIELD_Y_OFFSET + 0 * POS_Y_STEP;
+                        constexpr uint8_t bug_start_x = FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP;
+                        constexpr uint8_t bug_start_y = FIELD_Y_OFFSET + 0 * POS_Y_STEP;
 
                         for (uint16_t i = 0; i < bugs_max; ++i)
                         {
