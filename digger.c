@@ -516,9 +516,9 @@ void init_level()
         y_graph += POS_Y_STEP;
     }
 
-    draw_coin_minimap();
-    draw_bg_minimap();
-    init_level_state();
+    draw_coin_minimap(); // Нарисовать мини-карту монеток
+    draw_bg_minimap();   // Нарисовать мини-карту ячеек фона
+    init_level_state();  // Инициализировать состояние уровня
 }
 
 /**
@@ -545,10 +545,10 @@ uint16_t full_bite(uint8_t byte)
  */
 uint8_t check_path(enum direction dir, struct bug_info *bug)
 {
-    uint8_t abs_x_pos = bug->x_graph - FIELD_X_OFFSET;
-    uint8_t abs_y_pos = bug->y_graph - FIELD_Y_OFFSET;
-    uint8_t x_log = abs_x_pos / POS_X_STEP;
-    uint8_t y_log = abs_y_pos / POS_Y_STEP;
+    const uint8_t abs_x_pos = bug->x_graph - FIELD_X_OFFSET;
+    const uint8_t abs_y_pos = bug->y_graph - FIELD_Y_OFFSET;
+    const uint8_t x_log = abs_x_pos / POS_X_STEP;
+    const uint8_t y_log = abs_y_pos / POS_Y_STEP;
 
     switch (dir)
     {
