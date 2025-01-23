@@ -827,6 +827,43 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
 }
 
 /**
+ * @brief Стереть след за объектом размером 15x4
+ *
+ * @param dir -
+ * @param x_graph -
+ * @param y_graph -
+ */
+void erase_trail(enum direction dir, uint16_t x_graph, uint16_t y_graph)
+{
+    switch (dir)
+    {
+        case DIR_LEFT:
+        {
+            sp_paint_brick(x_graph + 4 - MOVE_X_STEP, y_graph, MOVE_X_STEP, 15, 0);
+            break;
+        }
+
+        case DIR_RIGHT:
+        {
+            sp_paint_brick(x_graph, y_graph, MOVE_X_STEP, 15, 0);
+            break;
+        }
+
+        case DIR_UP:
+        {
+            sp_paint_brick(x_graph, y_graph + 15 - MOVE_Y_STEP, 4, MOVE_Y_STEP, 0);
+            break;
+        }
+
+        case DIR_DOWN:
+        {
+            sp_paint_brick(x_graph, y_graph, 4, MOVE_Y_STEP, 0);
+            break;
+        }
+    }
+}
+
+/**
  * @brief Обработка перемещения Ноббина/Хоббина
  *
  * @param bug - указатель на структуру с информацией о враге
@@ -1093,32 +1130,7 @@ void move_bug(struct bug_info *bug)
     }
 
     // Подтереть след врага с нужной стороны
-    switch (bug->dir)
-    {
-        case DIR_LEFT:
-        {
-            sp_paint_brick(bug_x_graph + 4 - MOVE_X_STEP, bug_y_graph, MOVE_X_STEP, 15, 0);
-            break;
-        }
-
-        case DIR_RIGHT:
-        {
-            sp_paint_brick(bug_x_graph, bug_y_graph, MOVE_X_STEP, 15, 0);
-            break;
-        }
-
-        case DIR_UP:
-        {
-            sp_paint_brick(bug_x_graph, bug_y_graph + 15 - MOVE_Y_STEP, 4, MOVE_Y_STEP, 0);
-            break;
-        }
-
-        case DIR_DOWN:
-        {
-            sp_paint_brick(bug_x_graph, bug_y_graph, 4, MOVE_Y_STEP, 0);
-            break;
-        }
-    }
+    erase_trail(bug->dir, bug_x_graph, bug_y_graph);
 
     // Увеличить/уменьшить фазу на единицу
     bug->image_phase += bug->image_phase_inc;
@@ -1432,7 +1444,9 @@ void init_game()
     print_lives(); // Вывод начального количества жизней
 }
 
-
+/**
+ * @brief Обработка появления и перемещения врагов (Ноббинов и Хоббинов)
+ */
 void process_bugs()
 {
     // Обработка появления врагов
@@ -1603,6 +1617,9 @@ void process_bugs()
     }
 }
 
+/**
+ * @brief Обработка мешков
+ */
 void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
 {
     // Обработка мешков
@@ -1867,6 +1884,9 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
     }
 }
 
+/**
+ * @brief Обработка снаряда
+ */
 // void process_missile()
 // {
     // Обработка снаряда
@@ -1874,6 +1894,9 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
     // else move_missile(); // Обработка летящего снаряда
 // }
 
+/**
+ * @brief Обработка Диггера
+ */
 void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t man_x_rem, const uint8_t man_y_rem)
 {
     // Обработка перемещения Диггера
@@ -2024,33 +2047,32 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
             {
                 if (man_x_graph != prev_man_x_graph || man_y_graph != prev_man_y_graph) // Если Диггер переместился
                 {
-                    // Стереть след от Диггера с нужной стороы и нарисовать "прогрыз" со стороны в которую он движется
+                    // Стереть след от Диггера с нужной стороы
+                    erase_trail(man_dir, man_x_graph, man_y_graph);
+
+                    // Нарисовать "прогрыз" от движения Диггера
                     switch (man_dir)
                     {
                         case DIR_RIGHT:
                         {
-                            sp_paint_brick(man_x_graph - MOVE_X_STEP, man_y_graph, MOVE_X_STEP, 15, 0);
                             era_right(prev_man_x_graph, prev_man_y_graph);
                             break;
                         }
 
                         case DIR_LEFT:
                         {
-                            sp_paint_brick(man_x_graph + 4, man_y_graph, MOVE_X_STEP, 15, 0);
                             era_left (prev_man_x_graph, prev_man_y_graph);
                             break;
                         }
 
                         case DIR_DOWN:
                         {
-                            sp_paint_brick(man_x_graph, man_y_graph - MOVE_Y_STEP, 4, MOVE_Y_STEP, 0);
                             era_down (prev_man_x_graph, prev_man_y_graph + 2);
                             break;
                         }
 
                         case DIR_UP:
                         {
-                            sp_paint_brick(man_x_graph, man_y_graph + 15, 4, MOVE_Y_STEP, 0);
                             era_up (prev_man_x_graph, prev_man_y_graph - 2);
                             break;
                         }
@@ -2119,6 +2141,9 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
     }
 }
 
+/**
+ * @brief Обработка бонуса
+ */
 void process_bonus()
 {
     // Обработка Бонус-режима
@@ -2151,6 +2176,9 @@ void process_bonus()
     }
 }
 
+/**
+ * @brief Обработка общего состояния игры (переход на новый уровень, Game Over и т.д.)
+ */
 void process_game_state()
 {
     // Декрементировать таймер между последовательными съедениями драгоценных камней (монеток)
