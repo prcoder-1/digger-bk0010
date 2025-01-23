@@ -598,8 +598,8 @@ uint8_t check_path(enum direction dir, struct bug_info *bug)
  */
 void era_background(uint16_t x_graph, uint16_t y_graph, enum direction dir)
 {
-    uint16_t abs_x_pos = x_graph - FIELD_X_OFFSET;
-    uint16_t abs_y_pos = y_graph - FIELD_Y_OFFSET;
+    const uint16_t abs_x_pos = x_graph - FIELD_X_OFFSET;
+    const uint16_t abs_y_pos = y_graph - FIELD_Y_OFFSET;
     uint16_t x_log = abs_x_pos / POS_X_STEP;
     uint16_t y_log = abs_y_pos / POS_Y_STEP;
     int16_t x_rem = abs_x_pos % POS_X_STEP;
@@ -835,12 +835,12 @@ void move_bug(struct bug_info *bug)
 {
     enum direction dir_1, dir_2, dir_3, dir_4;
 
-    uint8_t bug_x_graph = bug->x_graph;
-    uint8_t bug_y_graph = bug->y_graph;
-    uint8_t bug_abs_x_pos = bug_x_graph - FIELD_X_OFFSET;
-    uint8_t bug_abs_y_pos = bug_y_graph - FIELD_Y_OFFSET;
-    uint8_t bug_x_rem = bug_abs_x_pos % POS_X_STEP;
-    uint8_t bug_y_rem = (bug_abs_y_pos % POS_Y_STEP) >> 2;
+    const uint8_t bug_x_graph = bug->x_graph;
+    const uint8_t bug_y_graph = bug->y_graph;
+    const uint8_t bug_abs_x_pos = bug_x_graph - FIELD_X_OFFSET;
+    const uint8_t bug_abs_y_pos = bug_y_graph - FIELD_Y_OFFSET;
+    const uint8_t bug_x_rem = bug_abs_x_pos % POS_X_STEP;
+    const uint8_t bug_y_rem = (bug_abs_y_pos % POS_Y_STEP) >> 2;
 
     // Проверка возможности изменения направления движения при нахождении на ровной границе клетки
     if (!bug_x_rem && !bug_y_rem)
@@ -1254,12 +1254,12 @@ int remove_coin(uint8_t x_log, uint8_t y_log)
  */
 void move_man()
 {
-    uint8_t man_abs_x_pos = man_x_graph - FIELD_X_OFFSET;
-    uint8_t man_abs_y_pos = man_y_graph - FIELD_Y_OFFSET;
-    uint8_t man_x_log = man_abs_x_pos / POS_X_STEP;
-    uint8_t man_y_log = man_abs_y_pos / POS_Y_STEP;
-    uint8_t man_x_rem = man_abs_x_pos % POS_X_STEP;
-    uint8_t man_y_rem = (man_abs_y_pos % POS_Y_STEP) >> 2;
+    const uint8_t man_abs_x_pos = man_x_graph - FIELD_X_OFFSET;
+    const uint8_t man_abs_y_pos = man_y_graph - FIELD_Y_OFFSET;
+    const uint8_t man_x_log = man_abs_x_pos / POS_X_STEP;
+    const uint8_t man_y_log = man_abs_y_pos / POS_Y_STEP;
+    const uint8_t man_x_rem = man_abs_x_pos % POS_X_STEP;
+    const uint8_t man_y_rem = (man_abs_y_pos % POS_Y_STEP) >> 2;
 
     // Обработка управления с клавиатуры
     if (((union KEY_STATE *)REG_KEY_STATE)->reg & (1 << KEY_STATE_STATE)) // Если поступил новый скан-код клавиши
