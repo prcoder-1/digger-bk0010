@@ -1250,230 +1250,6 @@ int remove_coin(uint8_t x_log, uint8_t y_log)
 }
 
 /**
- * @brief Подпрограмма перемещения Диггера
- */
-void move_man()
-{
-    const uint8_t man_abs_x_pos = man_x_graph - FIELD_X_OFFSET;
-    const uint8_t man_abs_y_pos = man_y_graph - FIELD_Y_OFFSET;
-    const uint8_t man_x_log = man_abs_x_pos / POS_X_STEP;
-    const uint8_t man_y_log = man_abs_y_pos / POS_Y_STEP;
-    const uint8_t man_x_rem = man_abs_x_pos % POS_X_STEP;
-    const uint8_t man_y_rem = (man_abs_y_pos % POS_Y_STEP) >> 2;
-
-    // Обработка управления с клавиатуры
-    if (((union KEY_STATE *)REG_KEY_STATE)->reg & (1 << KEY_STATE_STATE)) // Если поступил новый скан-код клавиши
-    {
-        // Сохранить новое направление соответствующее полученному скан-коду
-        uint8_t code = *((uint8_t *)REG_KEY_DATA);
-        switch (code)
-        {
-            case 8:  man_new_dir = DIR_LEFT;  break; // Стрелка влево
-            case 25: man_new_dir = DIR_RIGHT; break; // Стрелка вправо
-            case 26: man_new_dir = DIR_UP;    break; // Стрелка вверх
-            case 27: man_new_dir = DIR_DOWN;  break; // Стрелка вниз
-#if defined(DEBUG)
-            case 'D': difficulty++; break;            // Добавление уровня сложности
-            case 'L': lives++; print_lives();  break; // Добавление жизни
-            case 'N': done_snd = 1; break;            // Переход на следующий уровень
-#endif
-            case ' ': while (!(((union KEY_STATE *)REG_KEY_STATE)->reg & (1 << KEY_STATE_STATE))); break; // Пауза
-            default: man_new_dir = DIR_STOP;
-        }
-    }
-
-    // Если новое желаемое направление движения вверх-вниз, то применить его в середине клетки по-горизонтали
-    if (man_x_rem == 0 && (man_new_dir == DIR_UP || man_new_dir == DIR_DOWN))
-    {
-        man_dir = man_new_dir;
-    }
-
-    // Если новое желаемое направление движения влево-вправо, то применить его в середине клетки по-вертикали
-    if (man_y_rem == 0 && (man_new_dir == DIR_LEFT || man_new_dir == DIR_RIGHT))
-    {
-        man_dir = man_new_dir;
-    }
-
-    // Если клавишу перестали удерживать, то остановиться
-    if ((((union EXT_DEV *)REG_EXT_DEV)->bits.MAG_KEY)) man_dir = DIR_STOP;
-
-    // Остановиться при попытке выхода за игровое поле
-    if (check_out_of_range(man_dir, man_x_graph, man_y_graph))
-    {
-        man_dir = DIR_STOP;
-    }
-
-    if (bonus_state == BONUS_READY)
-    {
-        // Проверить что Диггер соприкоснулся с вишенкой
-        if (check_collision(man_x_graph, man_y_graph, FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP, FIELD_Y_OFFSET, 4, 15))
-        {
-            bonus_state = BONUS_ON;
-            bonus_count = 1;
-            bonus_time = 250 - difficulty * 20;
-            bonus_flash = 19;
-
-            add_score(1000); // 1000 очков за вишенку
-
-            // Стереть вишенку
-            erase_4_15(FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP, FIELD_Y_OFFSET);
-        }
-        else
-        {
-            // Нарисовать вишенку в правом верхнем углу игрового поля
-            sp_4_15_put(FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP, FIELD_Y_OFFSET, (uint8_t *)image_cherry);
-        }
-    }
-
-    if (man_dir != DIR_STOP) era_background(man_x_graph, man_y_graph, man_dir); /* update background matrix */
-
-    uint8_t prev_man_x_graph = man_x_graph;
-    uint8_t prev_man_y_graph = man_y_graph;
-
-    switch (man_dir)
-    {
-        case DIR_RIGHT: { man_x_graph += MOVE_X_STEP; break; }
-        case DIR_LEFT:  { man_x_graph -= MOVE_X_STEP; break; }
-        case DIR_DOWN:  { man_y_graph += MOVE_Y_STEP; break; }
-        case DIR_UP:    { man_y_graph -= MOVE_Y_STEP; break; }
-    }
-
-    if (man_dir == DIR_STOP) man_dir = man_prev_dir;
-
-    if (remove_coin(man_x_log, man_y_log))
-    {
-        coin_snd = 7;  // Включить звук съедения монеты
-        coin_time = 9; // Взвести таймер до последующего съедения монеты
-        add_score(25); // 25 очков за съеденную монету (камешек)
-        if (++coin_snd_note == 7) // Перейти к следующей ноте
-        {
-            coin_snd_note = -1;
-            add_score(250); // 250 очков за съедение восьми последовательных монет
-        }
-    }
-
-    uint16_t collision_flag = 0;
-
-    // Обработка толкания мешков и съедения золота
-    for (uint8_t i = 0; i < MAX_BAGS; ++i)
-    {
-        struct bag_info *bag = &bags[i]; // Структура с информацией о мешке
-        if (bag->state == BAG_INACTIVE) continue; // Пропустить неактивные мешки
-
-        // Если Диггер не соприкоснулся с мешком, проверить следующий мешок
-        if (!check_collision(bag->x_graph, bag->y_graph, man_x_graph, man_y_graph, 4, 15)) continue;
-
-        man_wait++; // Задержать Диггера перед мешком или золотом
-
-        switch (bag->state)
-        {
-            case BAG_STATIONARY:
-            case BAG_LOOSE:
-            {
-                // Если направление движения Диггера вверх или вниз, или мешок не удалось переместить
-                if (man_dir == DIR_UP || man_dir == DIR_DOWN || move_bag(bag, man_dir))
-                {
-                    collision_flag = 1;
-                }
-
-                break;
-            }
-
-            // case BAG_BREAKS:
-            case BAG_BROKEN:
-            {
-                money_snd = 1; // Издать звук съедаемого золота
-                bag->state = BAG_INACTIVE; // Сделать мешок неактивным
-                add_score(500); // 500 очков за съеденное золото
-                // Стереть золото из разбитого мешка
-                erase_4_15(bag->x_graph, bag->y_graph);
-
-                break;
-            }
-        }
-    }
-
-    if (collision_flag)
-    {
-        // Вернуть Диггера в прежнее положение
-        man_x_graph = prev_man_x_graph;
-        man_y_graph = prev_man_y_graph;
-    }
-    else
-    {
-        if (man_x_graph != prev_man_x_graph || man_y_graph != prev_man_y_graph) // Если Диггер переместился
-        {
-            // Стереть след от Диггера с нужной стороы и нарисовать "прогрыз" со стороны в которую он движется
-            switch (man_dir)
-            {
-                case DIR_RIGHT:
-                {
-                    sp_paint_brick(man_x_graph - MOVE_X_STEP, man_y_graph, MOVE_X_STEP, 15, 0);
-                    era_right(prev_man_x_graph, prev_man_y_graph);
-                    break;
-                }
-
-                case DIR_LEFT:
-                {
-                    sp_paint_brick(man_x_graph + 4, man_y_graph, MOVE_X_STEP, 15, 0);
-                    era_left (prev_man_x_graph, prev_man_y_graph);
-                    break;
-                }
-
-                case DIR_DOWN:
-                {
-                    sp_paint_brick(man_x_graph, man_y_graph - MOVE_Y_STEP, 4, MOVE_Y_STEP, 0);
-                    era_down (prev_man_x_graph, prev_man_y_graph + 2);
-                    break;
-                }
-
-                case DIR_UP:
-                {
-                    sp_paint_brick(man_x_graph, man_y_graph + 15, 4, MOVE_Y_STEP, 0);
-                    era_up (prev_man_x_graph, prev_man_y_graph - 2);
-                    break;
-                }
-            }
-        }
-    }
-
-    draw_man(); // Нарисовать Диггера
-
-    // Проверить Диггера на сопркосновение с врагами
-    for (uint8_t i = 0; i < bugs_max; ++i)
-    {
-        struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
-
-        if (bug->state != CREATURE_ALIVE) continue; // Пропустить дохлых врагов
-
-        // Если Диггер не касается врага
-        if (!check_collision(bug->x_graph, bug->y_graph, man_x_graph, man_y_graph, 4, 15)) continue;
-
-        if (bonus_state == BONUS_ON)
-        {
-            // Если включен режим Бонус
-            bug_snd = 1; // Включить звук съедения врага
-            add_score(bonus_count * 200); // 200 * bonus_count очков за каждого съеденного врага
-            bonus_count <<= 1; // Удвоить bonus_count
-
-            // Стереть съеденного врага
-            erase_4_15(bug->x_graph, bug->y_graph);
-            bug->state = CREATURE_INACTIVE; // Деактивировать врага
-
-            bugs_active--; // Уменьшить количество активных врагов
-            bugs_total++;  // Увеличить количество создаваемых врагов компенсируя съеденных
-        }
-        else
-        {
-            man_state = CREATURE_RIP;
-            man_rip_snd = 1;
-        }
-    }
-
-    man_prev_dir = man_dir;
-}
-
-/**
  * @brief Подпрограмма обработки звуковых эффектов
  */
 void sound_effect()
@@ -1779,6 +1555,7 @@ void main()
                         // Если выпало случайное число с вероятностью зависящей от уровня сложности
                         if ((rand() & 0xF) < difficulty) move_bug(bug); // Переместить врага ещё раз для увеличения скорости
                     }
+                    // Здесь специально нету break для проваливания в следующую секцию
                 }
 
                 case CREATURE_STARTING: // Враг ждёт старта
@@ -1851,10 +1628,12 @@ void main()
         }
 
         // Обработка мешков
-        uint8_t man_abs_x_pos = man_x_graph - FIELD_X_OFFSET;
-        uint8_t man_abs_y_pos = man_y_graph - FIELD_Y_OFFSET;
-        uint8_t man_x_log = man_abs_x_pos / POS_X_STEP;
-        uint8_t man_y_log = man_abs_y_pos / POS_Y_STEP;
+        const uint8_t man_abs_x_pos = man_x_graph - FIELD_X_OFFSET;
+        const uint8_t man_abs_y_pos = man_y_graph - FIELD_Y_OFFSET;
+        const uint8_t man_x_log = man_abs_x_pos / POS_X_STEP;
+        const uint8_t man_y_log = man_abs_y_pos / POS_Y_STEP;
+        const uint8_t man_x_rem = man_abs_x_pos % POS_X_STEP;
+        const uint8_t man_y_rem = (man_abs_y_pos % POS_Y_STEP) >> 2;
 
         uint8_t bags_fall = 0;  // Флаг, показывающий, что присутствуют падающие мешки
         uint8_t bags_loose = 0; // Флаг, показывающий, что присутствуют качающиеся мешки
@@ -2123,13 +1902,228 @@ void main()
         // Обработка перемещения Диггера
         if (man_state == CREATURE_ALIVE) // Если Диггер жив
         {
-            if (man_wait) // Если Диггер в режиме задержки (при толкании мешков)
+            if (man_wait) man_wait--; // Если Диггер в режиме задержки (при толкании мешков)
+            else
             {
-                // Нарисовать Диггера
-                draw_man();
-                man_wait--;
+                // Переместить Диггера
+                // const uint8_t man_abs_x_pos = man_x_graph - FIELD_X_OFFSET;
+                // const uint8_t man_abs_y_pos = man_y_graph - FIELD_Y_OFFSET;
+                // const uint8_t man_x_log = man_abs_x_pos / POS_X_STEP;
+                // const uint8_t man_y_log = man_abs_y_pos / POS_Y_STEP;
+                // const uint8_t man_x_rem = man_abs_x_pos % POS_X_STEP;
+                // const uint8_t man_y_rem = (man_abs_y_pos % POS_Y_STEP) >> 2;
+
+                // Обработка управления с клавиатуры
+                if (((union KEY_STATE *)REG_KEY_STATE)->reg & (1 << KEY_STATE_STATE)) // Если поступил новый скан-код клавиши
+                {
+                    // Сохранить новое направление соответствующее полученному скан-коду
+                    uint8_t code = *((uint8_t *)REG_KEY_DATA);
+                    switch (code)
+                    {
+                        case 8:  man_new_dir = DIR_LEFT;  break; // Стрелка влево
+                        case 25: man_new_dir = DIR_RIGHT; break; // Стрелка вправо
+                        case 26: man_new_dir = DIR_UP;    break; // Стрелка вверх
+                        case 27: man_new_dir = DIR_DOWN;  break; // Стрелка вниз
+#if defined(DEBUG)
+                        case 'D': difficulty++; break;            // Добавление уровня сложности
+                        case 'L': lives++; print_lives();  break; // Добавление жизни
+                        case 'N': done_snd = 1; break;            // Переход на следующий уровень
+#endif
+                        case ' ': while (!(((union KEY_STATE *)REG_KEY_STATE)->reg & (1 << KEY_STATE_STATE))); break; // Пауза
+                        default: man_new_dir = DIR_STOP;
+                    }
+                }
+
+                // Если новое желаемое направление движения вверх-вниз, то применить его в середине клетки по-горизонтали
+                if (man_x_rem == 0 && (man_new_dir == DIR_UP || man_new_dir == DIR_DOWN))
+                {
+                    man_dir = man_new_dir;
+                }
+
+                // Если новое желаемое направление движения влево-вправо, то применить его в середине клетки по-вертикали
+                if (man_y_rem == 0 && (man_new_dir == DIR_LEFT || man_new_dir == DIR_RIGHT))
+                {
+                    man_dir = man_new_dir;
+                }
+
+                // Если клавишу перестали удерживать, то остановиться
+                if ((((union EXT_DEV *)REG_EXT_DEV)->bits.MAG_KEY)) man_dir = DIR_STOP;
+
+                // Остановиться при попытке выхода за игровое поле
+                if (check_out_of_range(man_dir, man_x_graph, man_y_graph))
+                {
+                    man_dir = DIR_STOP;
+                }
+
+                if (bonus_state == BONUS_READY)
+                {
+                    // Проверить что Диггер соприкоснулся с вишенкой
+                    if (check_collision(man_x_graph, man_y_graph, FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP, FIELD_Y_OFFSET, 4, 15))
+                    {
+                        bonus_state = BONUS_ON;
+                        bonus_count = 1;
+                        bonus_time = 250 - difficulty * 20;
+                        bonus_flash = 19;
+
+                        add_score(1000); // 1000 очков за вишенку
+
+                        // Стереть вишенку
+                        erase_4_15(FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP, FIELD_Y_OFFSET);
+                    }
+                    else
+                    {
+                        // Нарисовать вишенку в правом верхнем углу игрового поля
+                        sp_4_15_put(FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP, FIELD_Y_OFFSET, (uint8_t *)image_cherry);
+                    }
+                }
+
+                if (man_dir != DIR_STOP) era_background(man_x_graph, man_y_graph, man_dir); /* update background matrix */
+
+                uint8_t prev_man_x_graph = man_x_graph;
+                uint8_t prev_man_y_graph = man_y_graph;
+
+                switch (man_dir)
+                {
+                    case DIR_RIGHT: { man_x_graph += MOVE_X_STEP; break; }
+                    case DIR_LEFT:  { man_x_graph -= MOVE_X_STEP; break; }
+                    case DIR_DOWN:  { man_y_graph += MOVE_Y_STEP; break; }
+                    case DIR_UP:    { man_y_graph -= MOVE_Y_STEP; break; }
+                }
+
+                if (man_dir == DIR_STOP) man_dir = man_prev_dir;
+
+                if (remove_coin(man_x_log, man_y_log))
+                {
+                    coin_snd = 7;  // Включить звук съедения монеты
+                    coin_time = 9; // Взвести таймер до последующего съедения монеты
+                    add_score(25); // 25 очков за съеденную монету (камешек)
+                    if (++coin_snd_note == 7) // Перейти к следующей ноте
+                    {
+                        coin_snd_note = -1;
+                        add_score(250); // 250 очков за съедение восьми последовательных монет
+                    }
+                }
+
+                uint16_t collision_flag = 0;
+
+                // Обработка толкания мешков и съедения золота
+                for (uint8_t i = 0; i < MAX_BAGS; ++i)
+                {
+                    struct bag_info *bag = &bags[i]; // Структура с информацией о мешке
+                    if (bag->state == BAG_INACTIVE) continue; // Пропустить неактивные мешки
+
+                    // Если Диггер не соприкоснулся с мешком, проверить следующий мешок
+                    if (!check_collision(bag->x_graph, bag->y_graph, man_x_graph, man_y_graph, 4, 15)) continue;
+
+                    man_wait++; // Задержать Диггера перед мешком или золотом
+
+                    switch (bag->state)
+                    {
+                        case BAG_STATIONARY:
+                        case BAG_LOOSE:
+                        {
+                            // Если направление движения Диггера вверх или вниз, или мешок не удалось переместить
+                            if (man_dir == DIR_UP || man_dir == DIR_DOWN || move_bag(bag, man_dir))
+                            {
+                                collision_flag = 1;
+                            }
+
+                            break;
+                        }
+
+                        // case BAG_BREAKS:
+                        case BAG_BROKEN:
+                        {
+                            money_snd = 1; // Издать звук съедаемого золота
+                            bag->state = BAG_INACTIVE; // Сделать мешок неактивным
+                            add_score(500); // 500 очков за съеденное золото
+                            // Стереть золото из разбитого мешка
+                            erase_4_15(bag->x_graph, bag->y_graph);
+
+                            break;
+                        }
+                    }
+                }
+
+                if (collision_flag)
+                {
+                    // Вернуть Диггера в прежнее положение
+                    man_x_graph = prev_man_x_graph;
+                    man_y_graph = prev_man_y_graph;
+                }
+                else
+                {
+                    if (man_x_graph != prev_man_x_graph || man_y_graph != prev_man_y_graph) // Если Диггер переместился
+                    {
+                        // Стереть след от Диггера с нужной стороы и нарисовать "прогрыз" со стороны в которую он движется
+                        switch (man_dir)
+                        {
+                            case DIR_RIGHT:
+                            {
+                                sp_paint_brick(man_x_graph - MOVE_X_STEP, man_y_graph, MOVE_X_STEP, 15, 0);
+                                era_right(prev_man_x_graph, prev_man_y_graph);
+                                break;
+                            }
+
+                            case DIR_LEFT:
+                            {
+                                sp_paint_brick(man_x_graph + 4, man_y_graph, MOVE_X_STEP, 15, 0);
+                                era_left (prev_man_x_graph, prev_man_y_graph);
+                                break;
+                            }
+
+                            case DIR_DOWN:
+                            {
+                                sp_paint_brick(man_x_graph, man_y_graph - MOVE_Y_STEP, 4, MOVE_Y_STEP, 0);
+                                era_down (prev_man_x_graph, prev_man_y_graph + 2);
+                                break;
+                            }
+
+                            case DIR_UP:
+                            {
+                                sp_paint_brick(man_x_graph, man_y_graph + 15, 4, MOVE_Y_STEP, 0);
+                                era_up (prev_man_x_graph, prev_man_y_graph - 2);
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                draw_man(); // Нарисовать Диггера
+
+                // Проверить Диггера на сопркосновение с врагами
+                for (uint8_t i = 0; i < bugs_max; ++i)
+                {
+                    struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
+
+                    if (bug->state != CREATURE_ALIVE) continue; // Пропустить дохлых врагов
+
+                    // Если Диггер не касается врага
+                    if (!check_collision(bug->x_graph, bug->y_graph, man_x_graph, man_y_graph, 4, 15)) continue;
+
+                    if (bonus_state == BONUS_ON)
+                    {
+                        // Если включен режим Бонус
+                        bug_snd = 1; // Включить звук съедения врага
+                        add_score(bonus_count * 200); // 200 * bonus_count очков за каждого съеденного врага
+                        bonus_count <<= 1; // Удвоить bonus_count
+
+                        // Стереть съеденного врага
+                        erase_4_15(bug->x_graph, bug->y_graph);
+                        bug->state = CREATURE_INACTIVE; // Деактивировать врага
+
+                        bugs_active--; // Уменьшить количество активных врагов
+                        bugs_total++;  // Увеличить количество создаваемых врагов компенсируя съеденных
+                    }
+                    else
+                    {
+                        man_state = CREATURE_RIP;
+                        man_rip_snd = 1;
+                    }
+                }
+
+                man_prev_dir = man_dir;
             }
-            else move_man(); // Переместить и нарисовать Диггера
         }
         else
         {
