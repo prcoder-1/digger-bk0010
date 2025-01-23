@@ -119,7 +119,8 @@ extern const uint8_t outline_no_coin[10][4];
 /**
  * @brief Летящий снаряд
  */
-// extern const uint8_t image_missile[3][7][2];
+extern const uint8_t image_missile[3][7][2];
+extern const uint8_t outline_missile[7][2];
 // extern const uint8_t outline_missile[3][7][2];
 
 /**

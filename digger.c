@@ -174,9 +174,14 @@ uint8_t  bonus_count;         /// Множитель очков в Бонус-р
 uint32_t bonus_life_score;    /// Количество очков для дополнительное жизни
 
 // Переменные отвечающие за выстрел
-// uint8_t mis_ready;   // Флаг готовности снаряда к выстрелу
-// uint8_t mis_wait;    // Задержка готовности выстрела
-// uint8_t mis_explode; // Счётчик взрывающегося снаряда
+uint16_t mis_x_graph;     /// Положение выстрела по оси X в графических координатах
+uint16_t mis_y_graph;     /// Положение выстрела по оси Y в графических координатах
+uint8_t  mis_image_phase; ///< Фаза анимации при выводе спрайта снаряда
+uint8_t  mis_fire;        /// Флаг выстрела
+uint8_t  mis_flying;      /// Флаг означающий, что снаряд летит
+uint8_t  mis_wait;        /// Задержка готовности выстрела
+uint8_t  mis_explode;     /// Счётчик взрывающегося снаряда
+enum direction mis_dir;   /// Направление полёта выстрела
 
 // Переменные отвечающие за состояние игры
 uint16_t difficulty; /// Уровень сложности
@@ -201,6 +206,8 @@ uint8_t  coin_time;       /// Таймер между последователь
 uint8_t  done_snd;        /// Флаг, означающий, что звук завершения уровня включен
 uint8_t  bug_snd;         /// Флаг, означающий, что звук съедания врага в бонус-режиме включен
 uint8_t  life_snd;        /// Флаг, означающий, что звук получения дополнительной жизни включен
+uint8_t  fire_snd;        /// Флаг, означающий, что звук выстрела включен
+uint16_t fire_snd_freq;
 
 #if defined(DEBUG)
 /**
@@ -401,9 +408,11 @@ void init_level_state()
     man_wait = 0;               // Задержка перед следующим перемещением Диггера
     man_state = CREATURE_ALIVE; // Исходное состояние - Диггер жив
 
-    // mis_ready = 1;
-    // mis_wait = 0;
-    // mis_explode = 0;
+    // Инициализация переменных снаряда
+    mis_fire = 0;
+    mis_flying = 0;
+    mis_wait = 0;
+    mis_explode = 0;
 
     // Инициализация переменных используемых для звуковых эффектов
     coin_snd = 0;
@@ -596,7 +605,7 @@ uint8_t check_path(enum direction dir, struct bug_info *bug)
  *
  * @return - 1 - движение в заданном направлении возможно, 0 - движение в заданном направлении невозможно
  */
-void era_background(uint16_t x_graph, uint16_t y_graph, enum direction dir)
+void erase_background(uint16_t x_graph, uint16_t y_graph, enum direction dir)
 {
     const uint16_t abs_x_pos = x_graph - FIELD_X_OFFSET;
     const uint16_t abs_y_pos = y_graph - FIELD_Y_OFFSET;
@@ -829,9 +838,9 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
 /**
  * @brief Стереть след за объектом размером 15x4
  *
- * @param dir -
- * @param x_graph -
- * @param y_graph -
+ * @param dir     - направление движения объекта
+ * @param x_graph - графическая координата по оси X
+ * @param y_graph - графическая координата по оси Y
  */
 void erase_trail(enum direction dir, uint16_t x_graph, uint16_t y_graph)
 {
@@ -1024,7 +1033,7 @@ void move_bug(struct bug_info *bug)
     if (bug->type == BUG_HOBBIN)
     {
         // Сделать"прокус" в массиве бит фона
-        era_background(bug_x_graph, bug_y_graph, bug->dir);
+        erase_background(bug_x_graph, bug_y_graph, bug->dir);
 
         // Стерерь кусочек фона на экране в соответствии с направлением движения и текущим положением
         switch (bug->dir)
@@ -1177,8 +1186,7 @@ void stop_bag(struct bag_info *bag)
  */
 void draw_man()
 {
-    uint8_t cab = 1;
-    // uint8_t cab = mis_ready && !mis_wait; // Флаг наличия "башенки"
+    uint8_t cab = !mis_flying && !mis_wait; // Флаг наличия "башенки"
 
     man_image_phase += man_image_phase_inc; // Переключить фазу изображения
 
@@ -1272,6 +1280,17 @@ void sound_effect()
         uint16_t period = coin_periods[coin_snd_note & 7];
         sound(period, 30);
         coin_snd--;
+    }
+
+    if (fire_snd)
+    {
+        fire_snd_freq += fire_snd_freq >> 2;
+        if (fire_snd_freq > 800) fire_snd = 0;
+        else
+        {
+            uint16_t period = fire_snd_freq + (rand() & (fire_snd_freq >> 2));
+            sound(period, 10);
+        }
     }
 
     if (loose_snd) // Звук раскачивающегося мешка
@@ -1741,7 +1760,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
 
                 // Стереть фон и сбросить биты матрицы фона
                 era_up(bag_x_graph, bag_y_graph + 9);
-                era_background(bag_x_graph, bag_y_graph, DIR_DOWN); // Сбросить биты матрицы фона
+                erase_background(bag_x_graph, bag_y_graph, DIR_DOWN); // Сбросить биты матрицы фона
 
                 // Стереть падающий мешок по старым координатам
                 if (bag->count) // Если номер этажа не нулевой
@@ -1887,12 +1906,104 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
 /**
  * @brief Обработка снаряда
  */
-// void process_missile()
-// {
+void process_missile()
+{
     // Обработка снаряда
-    // if (mis_explode) explode_missile(); // Обработка взрывающегося снаряда
-    // else move_missile(); // Обработка летящего снаряда
-// }
+    if (mis_explode)
+    {
+        // Обработка взрывающегося снаряда explode_missile()
+    }
+    else
+    {
+         // Обработка летящего снаряда move_missile()
+        if (mis_flying)
+        {
+            sp_put(mis_x_graph, mis_y_graph, 2, 7, nullptr, (uint8_t *)outline_missile);
+
+            switch (mis_dir)
+            {
+                case DIR_LEFT:
+                {
+                    mis_x_graph -= 2 * MOVE_X_STEP;
+                    break;
+                }
+
+                case DIR_RIGHT:
+                {
+                    mis_x_graph += 2 * MOVE_X_STEP;
+                    break;
+                }
+
+                case DIR_UP:
+                {
+                    mis_y_graph -= 2 * MOVE_Y_STEP;
+                    break;
+                }
+
+                case DIR_DOWN:
+                {
+                    mis_y_graph += 2 * MOVE_Y_STEP;
+                    break;
+                }
+            }
+
+            if (++mis_image_phase > 2) mis_image_phase = 0;
+
+            sp_put(mis_x_graph, mis_y_graph, 2, 7, (uint8_t *)image_missile[mis_image_phase], nullptr);
+        }
+        else
+        {
+            if (mis_wait) mis_wait--; // Уменьшить счётчик задержки выстрела
+            else
+            {
+                if (mis_fire) // Если произведён выстрел
+                {
+                    mis_fire = 0;
+                    mis_wait = 60 + difficulty * 3;
+                    mis_image_phase = 0;
+                    mis_flying = 1;
+                    mis_dir = man_dir;
+
+                    switch (mis_dir)
+                    {
+                        case DIR_LEFT:
+                        {
+                            mis_x_graph = man_x_graph - MOVE_X_STEP;
+                            mis_y_graph = man_y_graph + MOVE_Y_STEP;;
+                            break;
+                        }
+
+                        case DIR_RIGHT:
+                        {
+                            mis_x_graph = man_x_graph + 4;
+                            mis_y_graph = man_y_graph + MOVE_Y_STEP;
+                            break;
+                        }
+
+                        case DIR_UP:
+                        {
+                            mis_x_graph = man_x_graph;
+                            mis_y_graph = man_y_graph - MOVE_Y_STEP;
+                            break;
+                        }
+
+                        case DIR_DOWN:
+                        {
+                            mis_x_graph = man_x_graph;
+                            mis_y_graph = man_y_graph + 15 + MOVE_Y_STEP;
+                            break;
+                        }
+                    }
+
+                    sp_put(mis_x_graph, mis_y_graph, 2, 7, (uint8_t *)image_missile[mis_image_phase], nullptr);
+
+                    fire_snd_freq = 10;
+                    fire_snd = 1;
+                }
+            }
+        }
+    }
+}
 
 /**
  * @brief Обработка Диггера
@@ -1916,10 +2027,11 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
                     case 25: man_new_dir = DIR_RIGHT; break; // Стрелка вправо
                     case 26: man_new_dir = DIR_UP;    break; // Стрелка вверх
                     case 27: man_new_dir = DIR_DOWN;  break; // Стрелка вниз
+                    case '1': mis_fire = 1;           break; // Клавиша выстрела '1'
 #if defined(DEBUG)
-                    case 'D': difficulty++; break;            // Добавление уровня сложности
+                    case 'D': difficulty++;            break; // Добавление уровня сложности
                     case 'L': lives++; print_lives();  break; // Добавление жизни
-                    case 'N': done_snd = 1; break;            // Переход на следующий уровень
+                    case 'N': done_snd = 1;            break; // Переход на следующий уровень
 #endif
                     case ' ': while (!(((union KEY_STATE *)REG_KEY_STATE)->reg & (1 << KEY_STATE_STATE))); break; // Пауза
                     default: man_new_dir = DIR_STOP;
@@ -1969,7 +2081,7 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
                 }
             }
 
-            if (man_dir != DIR_STOP) era_background(man_x_graph, man_y_graph, man_dir); /* update background matrix */
+            if (man_dir != DIR_STOP) erase_background(man_x_graph, man_y_graph, man_dir); /* update background matrix */
 
             uint8_t prev_man_x_graph = man_x_graph;
             uint8_t prev_man_y_graph = man_y_graph;
@@ -2254,7 +2366,7 @@ void main()
 
         process_bugs();
         process_bags(man_x_log, man_y_log);
-        // process_missile();
+        process_missile();
         process_man(man_x_log, man_y_log, man_x_rem, man_y_rem);
         process_bonus();
         sound_effect();
