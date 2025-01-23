@@ -1153,11 +1153,9 @@ void move_bug(struct bug_info *bug)
  */
 void stop_bag(struct bag_info *bag)
 {
-    bag->dir = DIR_STOP; // Остановить мешок
-
     // Если мешок пролетел больше одного этажа, то он будет разбит
     bag->state = (bag->count > 1) ? BAG_BREAKS : BAG_STATIONARY; // То он будет разбиваться
-
+    bag->dir = DIR_STOP; // Остановить мешок
     bag->count = 0;
 
     // TODO: Унчтожить все мешки под тем, который остановился
