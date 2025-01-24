@@ -1856,19 +1856,20 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
 
             case BAG_BREAKS: // Мешок разбивается
             {
-
                 uint16_t *v_scroll = (uint16_t *)REG_V_SCROLL;
+
                 // Анимация рабивающегося мешка (три фазы, пропуская один такт счётчика)
                 if (bag->count++ < 6)
                 {
                     if (bag->count == 1)
                     {
-                        *v_scroll = 0327 | (1 << V_SCROLL_EXT_MEMORY);
+                        // Первый шаг анимации
+                        *v_scroll = 0327 | (1 << V_SCROLL_EXT_MEMORY); // Экран "проваливается"
                         break_bag_snd = 1; // Издать звук разбившегося мешка
                     }
                     else
                     {
-                        *v_scroll = 0330 | (1 << V_SCROLL_EXT_MEMORY);
+                        *v_scroll = 0330 | (1 << V_SCROLL_EXT_MEMORY); // Вотсстановить положение экрана
                     }
 
                     if (bag->count & 1)
@@ -1904,17 +1905,18 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
         }
     }
 
-    if (fall_snd)
+    if (fall_snd) // Если звук падения мешков включен
     {
-        if (!bags_fall)
+        if (!bags_fall) // Но, мешков падающих нет
         {
-            fall_snd = 0;
+            fall_snd = 0; // Выключить звук падения мешков
         }
     }
     else
     {
-        if (bags_fall)
+        if (bags_fall) // Если есть падающие мешки
         {
+            // Включить звук падения мешков
             fall_period = 1024;
             fall_snd_phase = 0;
             fall_snd = 1;
@@ -1923,7 +1925,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
 
     if (!bags_loose) // Если ни один мешок не качается
     {
-        loose_snd = 0;  // Остановить звук качающегося мешка
+        loose_snd = 0; // Выключить звук качающегося мешка
     }
 }
 
