@@ -1832,7 +1832,7 @@ const uint8_t image_missile[3][7][2] = {
                 0xF0,0x33
         }
 };
-
+/*
 const uint8_t outline_missile[7][2] = {
         0xFC,0x3F,
         0xFF,0xFF,
@@ -1842,7 +1842,7 @@ const uint8_t outline_missile[7][2] = {
         0xFF,0xFF,
         0xFC,0x3F
 };
-
+*/
 /*
 const uint8_t outline_missile[3][7][2] = {
         {
@@ -1873,7 +1873,7 @@ const uint8_t outline_missile[3][7][2] = {
                 0xFC,0x3F
         }
 };
-
+*/
 const uint8_t image_explode[3][7][2] = {
         {
                 0x00,0x00,
@@ -1903,7 +1903,7 @@ const uint8_t image_explode[3][7][2] = {
                 0x03,0xC0
         }
 };
-
+/*
 const uint8_t outline_explode[3][7][2] = {
         {
                 0x0F,0xF0,
