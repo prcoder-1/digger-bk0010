@@ -280,9 +280,9 @@ void print_lives()
 /**
  * @brief Добавление заданного количества очков и аечать очков в левом верхнем углу экрана
  */
-void add_score(uint16_t score)
+void add_score(uint16_t score_add)
 {
-    score += score;
+    score += score_add;
     print_dec(score, 0, MOVE_Y_STEP);
 
      // Если количество жизней не достигло максимального и клоичество очков досигло бонусного для получения жизни
