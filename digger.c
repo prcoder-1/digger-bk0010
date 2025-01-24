@@ -264,15 +264,18 @@ void print_lives()
     constexpr uint16_t man_x_offset = sizeof(ch_digits[0][0]) * 5 + 1; // Смещение шириной в пять символов '0' плюс один байт (4 пикселя)
     constexpr uint16_t man_y_offset = 2;
     constexpr uint16_t one_pos_width = sizeof(image_digger_right[1][0]) + 1;
-    constexpr uint16_t width = MAX_LIVES * one_pos_width;
     constexpr uint16_t height = sizeof(image_digger_right[1]) / sizeof(image_digger_right[1][0]);
-
-    sp_paint_brick(man_x_offset, man_y_offset, width, height, 0);
+    uint16_t width = MAX_LIVES * one_pos_width;
 
     uint16_t l = 1;
-    for (uint16_t i = man_x_offset; i < man_x_offset + width; i += one_pos_width)
+    for (uint16_t i = man_x_offset; i < man_x_offset + width; i += one_pos_width, width -= one_pos_width)
     {
-        if (++l > lives) break;
+        if (++l > lives)
+        {
+            sp_paint_brick(i, man_y_offset, width, height, 0);
+            break;
+        }
+
         sp_4_15_put(i, man_y_offset, (uint8_t *)image_digger_right[1]);
     }
 }
@@ -291,7 +294,6 @@ void add_score(uint16_t score_add)
         lives++; // Увеличичить количество жизней на единицу
         print_lives(); // Вывесли количество жизней
         bonus_life_score += BONUS_LIFE_SCORE; // Количество очков до следующего бонуса в виде жизни
-
         life_snd = 24; // Издать звук получения жизни
     }
 }
@@ -1614,7 +1616,6 @@ void process_bugs()
                 bug->count = 1;
                 bug->state = CREATURE_RIP; // Враг лежит дохлый
                 add_score(250); // 250 очков за убитого врага
-
                 break;
             }
 
