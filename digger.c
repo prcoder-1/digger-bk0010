@@ -1525,7 +1525,8 @@ void process_bugs()
             }
             else
             {
-                if ((bonus_state == BONUS_OFF) && (bugs_created == bugs_total)) // Если Бонус (вишенка) ещё не появлялся и создано максимальное количество врагов
+                // Если Бонус (вишенка) ещё не появлялся и создано максимальное количество врагов
+                if ((bonus_state == BONUS_OFF) && (bugs_created == bugs_total))
                 {
                     bonus_state = BONUS_READY; // Включить готовность к активации бонус-режима
                 }
@@ -1540,27 +1541,6 @@ void process_bugs()
 
         if (bug->state == CREATURE_INACTIVE) continue; // Пропустить, если враг не активен
 
-        if (bug->type == BUG_NOBBIN) // Если это Ноббин
-        {
-            for (uint16_t t = 0; t < bugs_max; ++t)
-            {
-                if (t == i) continue; // Пропустить самого себя
-
-                struct bug_info *another_bug = &bugs[t];
-                if (another_bug->state != CREATURE_ALIVE) continue; // Пропустить неживых врагов
-
-                // Если враг соприкоснулся с другим врагом, увеличить счётчик застревания
-                if (check_collision(bug->x_graph, bug->y_graph, another_bug->x_graph, another_bug->y_graph, 4, 15)) bug->count++;
-            }
-
-            //  Если Ноббин застрял или соприкоснулся с другим на определённое (зависящее от уровня сложности) время
-            if (bug->count > (20 - difficulty))
-            {
-                bug->count = 0;         // Сбросить счётчик застревания
-                bug->type = BUG_HOBBIN; // Переключить тип врага на Хоббина
-            }
-        }
-
         switch (bug->state)
         {
             case CREATURE_ALIVE: // Перемещение живого врага
@@ -1572,11 +1552,30 @@ void process_bugs()
                     break;
                 }
 
-                if (bug->type == BUG_NOBBIN) // Если враг Ноббин
+                if (bug->type == BUG_NOBBIN) // Если это Ноббин
                 {
-                    // Если выпало случайное число с вероятностью зависящей от уровня сложности
-                    if ((rand() & 0xF) < difficulty) move_bug(bug); // Переместить врага ещё раз для увеличения скорости
+                    for (uint16_t t = 0; t < bugs_max; ++t)
+                    {
+                        if (t == i) continue; // Пропустить самого себя
+
+                        struct bug_info *another_bug = &bugs[t];
+                        if (another_bug->state != CREATURE_ALIVE) continue; // Пропустить неживых врагов
+
+                        // Если враг соприкоснулся с другим врагом, увеличить счётчик застревания
+                        if (check_collision(bug->x_graph, bug->y_graph, another_bug->x_graph, another_bug->y_graph, 4, 15)) bug->count++;
+                    }
+
+                    //  Если Ноббин застрял или соприкоснулся с другим на определённое (зависящее от уровня сложности) время
+                    if (bug->count > (20 - difficulty))
+                    {
+                        bug->count = 0;         // Сбросить счётчик застревания
+                        bug->type = BUG_HOBBIN; // Переключить тип врага на Хоббина
+                    }
                 }
+
+                // Если выпало случайное число с вероятностью зависящей от уровня сложности
+                if ((rand() & 0xF) < difficulty) move_bug(bug); // Переместить врага ещё раз для увеличения скорости
+
                 // Здесь специально нету break для проваливания в следующую секцию
             }
 
@@ -1591,7 +1590,6 @@ void process_bugs()
                 uint8_t bag_y_pos = bug->dead_bag->y_graph; // Вертикальная позиция мешка от которого погиб враг
                 if (bag_y_pos + MOVE_Y_STEP > bug->y_graph)
                 {
-                    erase_4_15(bug->x_graph, bug->y_graph);
                     bug->y_graph = bag_y_pos; // Если мешок опустился ниже врага, враг перемещается за мешком
                 }
 
@@ -1602,10 +1600,12 @@ void process_bugs()
                         // Нарисовать погибшего Хоббина
                         if (bug->dir == DIR_RIGHT)
                         {
+                            // Смотрит вправо
                             sp_4_15_put(bug->x_graph, bug->y_graph, (uint8_t *)image_hobbin_right_dead);
                         }
                         else
                         {
+                            // Смотрит влево (отзеркаленный правый)
                             sp_4_15_h_mirror_put(bug->x_graph, bug->y_graph, (uint8_t *)image_hobbin_right_dead);
                         }
 
@@ -1634,10 +1634,9 @@ void process_bugs()
                     break;
                 }
 
-                // Стирание убитого врага
-                erase_4_15(bug->x_graph, bug->y_graph);
-                bug->state = CREATURE_INACTIVE; // Декативировать убитого врага
-                bugs_active--;   // Уменьшить количество активных врагов
+                erase_4_15(bug->x_graph, bug->y_graph); // Стереть убитого врага
+                bug->state = CREATURE_INACTIVE;         // Декативировать убитого врага
+                bugs_active--;                          // Уменьшить количество активных врагов
 
                 // Количество оставшихся врагов (сколько осталось создать плюс количество активных)
                 uint8_t creatures_left =  bugs_total - bugs_created + bugs_active;
