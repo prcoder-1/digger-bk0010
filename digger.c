@@ -1934,10 +1934,12 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
  */
 void process_missile()
 {
+    // Размеры и количество фаз анимации выстрела
     constexpr uint16_t missile_x_size = sizeof(image_missile[0][0]);
     constexpr uint16_t missile_y_size = sizeof(image_missile[0]) / missile_x_size;
     constexpr uint16_t missile_phases_no = sizeof(image_missile) / sizeof(image_missile[0]);
 
+    // Размеры и количество фаз анимации взрыва
     constexpr uint16_t explode_x_size = sizeof(image_explode[0][0]);
     constexpr uint16_t explode_y_size = sizeof(image_explode[0]) / explode_x_size;
     constexpr uint16_t explode_phases_no = sizeof(image_explode) / sizeof(image_explode[0]);
@@ -1946,17 +1948,17 @@ void process_missile()
     if (mis_explode)
     {
         // Обработка взрывающегося выстрела
-
-        // Вывести изображение взрыва
         if (mis_image_phase < explode_phases_no)
         {
+            // Вывести изображение взрыва
             sp_put(mis_x_graph, mis_y_graph, explode_x_size, explode_y_size, (uint8_t *)image_explode[mis_image_phase++], nullptr);
         }
         else
         {
+            // Стереть изображение взрыва
             sp_paint_brick(mis_x_graph, mis_y_graph, explode_x_size, explode_y_size, 0);
-            mis_flying = 0;
-            mis_explode = 0;
+            mis_flying = 0;  // Выстрел больше не летит
+            mis_explode = 0; // И не взрывается
         }
     }
     else
@@ -1968,6 +1970,7 @@ void process_missile()
             // sp_put(mis_x_graph, mis_y_graph, missile_x_size, missile_y_size, nullptr, (uint8_t *)outline_missile);
             sp_paint_brick(mis_x_graph, mis_y_graph, missile_x_size, missile_y_size, 0);
 
+            // Переместить выстрел на один шаг в заданном направлении
             switch (mis_dir)
             {
                 case DIR_LEFT:
@@ -1995,14 +1998,16 @@ void process_missile()
                 }
             }
 
+            // Проверить если координаты выходят за рамки игрового поля
             if (check_out_of_range(mis_dir, mis_x_graph, mis_y_graph))
             {
-                fire_snd = 0;
-                mis_explode = 1;
-                mis_image_phase = 0;
+                fire_snd = 0;        // Выключить звук летящего выстрела
+                mis_explode = 1;     // Включить взрыв выстрела
+                mis_image_phase = 0; // Начальная фаза взрыва
             }
             else
             {
+                // Циклически менять фазу анимации выстрела
                 if (++mis_image_phase >= missile_phases_no) mis_image_phase = 0;
 
                 // Вывести новое изображение выстрела
@@ -2017,7 +2022,7 @@ void process_missile()
                 if (mis_fire) // Если произведён выстрел
                 {
                     mis_fire = 0;
-                    mis_wait = 60 + difficulty * 3;
+                    mis_wait = 60 + difficulty * 3; // Начальное значение счётчика появления "башенки"
                     mis_image_phase = 0;
                     mis_flying = 1;
                     mis_dir = man_dir;
