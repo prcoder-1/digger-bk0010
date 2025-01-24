@@ -848,29 +848,28 @@ void erase_trail(enum direction dir, uint16_t x_graph, uint16_t y_graph)
 {
     switch (dir)
     {
-        case DIR_LEFT:
-        {
-            sp_paint_brick(x_graph + 4, y_graph, MOVE_X_STEP, 15, 0);
-            break;
-        }
+        case DIR_LEFT:  { sp_paint_brick(x_graph + 4, y_graph, MOVE_X_STEP, 15, 0);            break; }
+        case DIR_RIGHT: { sp_paint_brick(x_graph - MOVE_X_STEP, y_graph, MOVE_X_STEP, 15, 0);  break; }
+        case DIR_UP:    { sp_paint_brick(x_graph, y_graph + 15, 4, MOVE_Y_STEP, 0);            break; }
+        case DIR_DOWN:  { sp_paint_brick(x_graph, y_graph - MOVE_Y_STEP, 4, MOVE_Y_STEP, 0);   break; }
+    }
+}
 
-        case DIR_RIGHT:
-        {
-            sp_paint_brick(x_graph - MOVE_X_STEP, y_graph, MOVE_X_STEP, 15, 0);
-            break;
-        }
-
-        case DIR_UP:
-        {
-            sp_paint_brick(x_graph, y_graph + 15, 4, MOVE_Y_STEP, 0);
-            break;
-        }
-
-        case DIR_DOWN:
-        {
-            sp_paint_brick(x_graph, y_graph - MOVE_Y_STEP, 4, MOVE_Y_STEP, 0);
-            break;
-        }
+/**
+ * @brief Стерерь кусочек фона на экране в соответствии с направлением движения и текущим положением
+ *
+ * @param dir - направление движения
+ * @param x_graph - графическая координата по оси X
+ * @param y_graph - графическая координата по оси Y
+ */
+void era_dir(enum direction dir, uint16_t x_graph, uint16_t y_graph)
+{
+    switch (dir)
+    {
+        case DIR_RIGHT: { era_right(x_graph, y_graph); break; }
+        case DIR_LEFT:  { era_left (x_graph, y_graph); break; }
+        case DIR_DOWN:  { era_down (x_graph, y_graph); break; }
+        case DIR_UP:    { era_up   (x_graph, y_graph); break; }
     }
 }
 
@@ -1038,13 +1037,7 @@ void move_bug(struct bug_info *bug)
         erase_background(bug_x_graph, bug_y_graph, bug->dir);
 
         // Стерерь кусочек фона на экране в соответствии с направлением движения и текущим положением
-        switch (bug->dir)
-        {
-            case DIR_RIGHT: { era_right(bug_x_graph, bug_y_graph); break; }
-            case DIR_LEFT:  { era_left (bug_x_graph, bug_y_graph); break; }
-            case DIR_DOWN:  { era_down (bug_x_graph, bug_y_graph); break; }
-            case DIR_UP:    { era_up   (bug_x_graph, bug_y_graph); break; }
-        }
+        era_dir(bug->dir, bug_x_graph, bug_y_graph);
 
         uint8_t bug_x_log = bug_abs_x_pos / POS_X_STEP;
         uint8_t bug_y_log = bug_abs_y_pos / POS_Y_STEP;
@@ -2208,32 +2201,7 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
                     erase_trail(man_dir, man_x_graph, man_y_graph);
 
                     // Нарисовать "прогрыз" от движения Диггера
-                    switch (man_dir)
-                    {
-                        case DIR_RIGHT:
-                        {
-                            era_right(prev_man_x_graph, prev_man_y_graph);
-                            break;
-                        }
-
-                        case DIR_LEFT:
-                        {
-                            era_left (prev_man_x_graph, prev_man_y_graph);
-                            break;
-                        }
-
-                        case DIR_DOWN:
-                        {
-                            era_down (prev_man_x_graph, prev_man_y_graph + 2);
-                            break;
-                        }
-
-                        case DIR_UP:
-                        {
-                            era_up (prev_man_x_graph, prev_man_y_graph - 2);
-                            break;
-                        }
-                    }
+                    era_dir(man_dir, prev_man_x_graph, prev_man_y_graph);
                 }
             }
 
