@@ -1908,21 +1908,26 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
 }
 
 /**
- * @brief Обработка снаряда
+ * @brief Обработка выстрела
  */
 void process_missile()
 {
-    // Обработка снаряда
+    constexpr uint16_t sprite_x_size = sizeof(image_missile[0][0]);
+    constexpr uint16_t sprite_y_size = sizeof(image_missile[0]) / sprite_x_size;
+    constexpr uint16_t sprite_phases_no = sizeof(image_missile) / sizeof(image_missile[0]);
+
+    // Обработка выстрела
     if (mis_explode)
     {
-        // Обработка взрывающегося снаряда explode_missile()
+        // Обработка взрывающегося выстрела explode_missile()
     }
     else
     {
-         // Обработка летящего снаряда move_missile()
+        // Обработка летящего выстрела move_missile()
         if (mis_flying)
         {
-            sp_put(mis_x_graph, mis_y_graph, 2, 7, nullptr, (uint8_t *)outline_missile);
+            // Стереть предыдущее изображение выстрела
+            sp_put(mis_x_graph, mis_y_graph, sprite_x_size, sprite_y_size, nullptr, (uint8_t *)outline_missile);
 
             switch (mis_dir)
             {
@@ -1951,9 +1956,10 @@ void process_missile()
                 }
             }
 
-            if (++mis_image_phase > 2) mis_image_phase = 0;
+            if (++mis_image_phase >= sprite_phases_no) mis_image_phase = 0;
 
-            sp_put(mis_x_graph, mis_y_graph, 2, 7, (uint8_t *)image_missile[mis_image_phase], nullptr);
+            // Вывести новое изображение выстрела
+            sp_put(mis_x_graph, mis_y_graph, sprite_x_size, sprite_y_size, (uint8_t *)image_missile[mis_image_phase], nullptr);
         }
         else
         {
@@ -1999,7 +2005,8 @@ void process_missile()
                         }
                     }
 
-                    sp_put(mis_x_graph, mis_y_graph, 2, 7, (uint8_t *)image_missile[mis_image_phase], nullptr);
+                    // Вывести начальное положение спрайта выстрела
+                    sp_put(mis_x_graph, mis_y_graph, sprite_x_size, sprite_y_size, (uint8_t *)image_missile[mis_image_phase], nullptr);
 
                     fire_snd_freq = 10;
                     fire_snd = 1;
