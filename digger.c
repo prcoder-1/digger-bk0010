@@ -203,11 +203,11 @@ uint8_t  money_snd;       /// Флаг, означающий, что звук с
 uint8_t  coin_snd;        /// Флаг, означающий, что звук съедания монетки включен
 int8_t   coin_snd_note;   /// Номер ноты при съедании монетки (драгоценного камня)
 uint8_t  coin_time;       /// Таймер между последовательными съедениями драгоценных камней (монеток)
+uint8_t  fire_snd;        /// Флаг, означающий, что звук выстрела включен
+uint16_t fire_snd_period; /// Период звука выстрела
 uint8_t  done_snd;        /// Флаг, означающий, что звук завершения уровня включен
 uint8_t  bug_snd;         /// Флаг, означающий, что звук съедания врага в бонус-режиме включен
 uint8_t  life_snd;        /// Флаг, означающий, что звук получения дополнительной жизни включен
-uint8_t  fire_snd;        /// Флаг, означающий, что звук выстрела включен
-uint16_t fire_snd_freq;
 
 #if defined(DEBUG)
 /**
@@ -418,6 +418,7 @@ void init_level_state()
     coin_snd = 0;
     coin_snd_note = -1;
     coin_time = 0;
+    fire_snd = 0;
     loose_snd = 0;
     fall_snd = 0;
     money_snd = 0;
@@ -1288,11 +1289,11 @@ void sound_effect()
 
     if (fire_snd)
     {
-        fire_snd_freq += fire_snd_freq >> 2;
-        if (fire_snd_freq > 800) fire_snd = 0;
+        fire_snd_period += fire_snd_period >> 2;
+        if (fire_snd_period > 800) fire_snd = 0;
         else
         {
-            uint16_t period = fire_snd_freq + (rand() & (fire_snd_freq >> 2));
+            uint16_t period = fire_snd_period + (rand() & (fire_snd_period >> 2));
             sound(period, 10);
         }
     }
@@ -1986,6 +1987,7 @@ void process_missile()
 
             if (check_out_of_range(mis_dir, mis_x_graph, mis_y_graph))
             {
+                fire_snd = 0;
                 mis_explode = 1;
                 mis_image_phase = 0;
             }
@@ -2044,7 +2046,7 @@ void process_missile()
                     // Вывести начальное положение спрайта выстрела
                     sp_put(mis_x_graph, mis_y_graph, missile_x_size, missile_y_size, (uint8_t *)image_missile[mis_image_phase], nullptr);
 
-                    fire_snd_freq = 10;
+                    fire_snd_period = 10;
                     fire_snd = 1;
                 }
             }
