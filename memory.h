@@ -110,6 +110,14 @@ union KEY_STATE
 };
 
 /**
+ * @brief Номера битов регистра вертикального смещения изображения
+ */
+enum V_SCROLL_BITS
+{
+    V_SCROLL_EXT_MEMORY = 9
+};
+
+/**
  * @brief Регистр вертикального смещения изображения
  */
 union V_SCROLL

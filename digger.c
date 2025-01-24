@@ -1847,9 +1847,21 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
 
             case BAG_BREAKS: // Мешок разбивается
             {
+
+                uint16_t *v_scroll = (uint16_t *)REG_V_SCROLL;
                 // Анимация рабивающегося мешка (три фазы, пропуская один такт счётчика)
                 if (bag->count++ < 6)
                 {
+                    if (bag->count == 1)
+                    {
+                        *v_scroll = 0326 | (1 << V_SCROLL_EXT_MEMORY);
+                        break_bag_snd = 1; // Издать звук разбившегося мешка
+                    }
+                    else
+                    {
+                        *v_scroll = 0330 | (1 << V_SCROLL_EXT_MEMORY);
+                    }
+
                     if (bag->count & 1)
                     {
                         // Нарисовать анимацию рассыпающегося золота
@@ -1860,7 +1872,6 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                 {
                     bag->state = BAG_BROKEN; // Мешок разбился
                     bag->count = 0; // Сбросить счётчик существования разбившегося мешка
-                    break_bag_snd = 1; // Издать звук разбившегося мешка
                 }
 
                 break;
@@ -2384,7 +2395,7 @@ void main()
         process_game_state();
 #if defined(DEBUG)
         // Рспечатать оставшееся свободное время
-        print_dec(*((volatile uint16_t *)REG_TVE_COUNT), 0, SCREEN_PIX_HEIGHT - 1 - sizeof(ch_digits[0]) / sizeof(ch_digits[0][0]));
+        print_dec(*((volatile uint16_t *)REG_TVE_COUNT), 0, SCREEN_PIX_HEIGHT - 3 - sizeof(ch_digits[0]) / sizeof(ch_digits[0][0]));
 #endif
         while ((tve_csr->reg & (1 << TVE_CSR_FL)) == 0); // Ожидать срабатывания таймера.
     }
