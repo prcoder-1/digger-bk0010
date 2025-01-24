@@ -1750,7 +1750,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                         uint8_t *bag_image = bag_images[count_rem];     // Указатель на спрайт
                         uint8_t *bag_outline = bag_outlines[count_rem]; // Указатель на маску
 
-                        // Нарисовать спрайт раскачивающегося мешка
+                        // Нарисовать спрайт раскачивающегося мешка (используя маску)
                         sp_put(bag_x_graph, bag_y_graph, sizeof(image_bag_left[0]), sizeof(image_bag_left) / sizeof(image_bag_left[0]), bag_image, bag_outline);
                     }
                 }
@@ -1758,9 +1758,9 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                 {
                     // Если счётчик времени до падения мешка закончился
                     bag->state = BAG_FALLING; // Начать падение мешка
-                    bag->dir = DIR_DOWN; // Направление движения мешка - вниз
-                    bag->count = 0;
-                    fall_snd = 1; // Включить звук падения мешка
+                    bag->dir = DIR_DOWN;      // Направление движения мешка - вниз
+                    bag->count = 0;           // Сбросить счётчик этажей
+                    fall_snd = 1;             // Включить звук падения мешка
                 }
 
                 break;
@@ -1770,14 +1770,14 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
             {
                 bags_fall = 1; // Найден падающий мешок
 
-                // Стереть фон и сбросить биты матрицы фона
+                // Прогрызть фон и сбросить биты матрицы фона
                 gnaw_up(bag_x_graph, bag_y_graph + 9);
                 erase_background(bag_x_graph, bag_y_graph, DIR_DOWN); // Сбросить биты матрицы фона
 
                 // Стереть падающий мешок по старым координатам
                 if (bag->count) // Если номер этажа не нулевой
                 {
-                    // Если пролетел больше одного этажа, то стираем прямоушольниками
+                    // Если пролетел больше одного этажа, то стираем прямоушольником
                     erase_4_15(bag->x_graph, bag->y_graph);
                 }
                 else
@@ -1805,8 +1805,9 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                 // TODO: Удалить мешки встречающиеся на пути (dest_coin(x, y))
 
                 // Нарисовать падающий мешок
-                sp_put(bag_x_graph, bag_y_graph, sizeof(image_bag_fall[0]), sizeof(image_bag_fall) / sizeof(image_bag_fall[0]),
-                        (uint8_t *)image_bag_fall, (uint8_t *)outline_bag_fall);
+                sp_4_15_put(bag_x_graph, bag_y_graph, (uint8_t *)image_bag_fall);
+                // sp_put(bag_x_graph, bag_y_graph, sizeof(image_bag_fall[0]), sizeof(image_bag_fall) / sizeof(image_bag_fall[0]),
+                //         (uint8_t *)image_bag_fall, (uint8_t *)outline_bag_fall);
 
                 if (man_state == CREATURE_ALIVE) //  Если Диггер жив
                 {
