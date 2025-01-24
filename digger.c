@@ -8,7 +8,7 @@
 #include "digger_levels.h"
 #include "digger_music.h"
 
-#define DEBUG // Режим отладки включен
+// #define DEBUG // Режим отладки включен
 
 #define FIELD_X_OFFSET 2  // Смещение игрового поля по оси X
 #define FIELD_Y_OFFSET 32 // Смещение игрового поля по оси Y
@@ -1944,6 +1944,8 @@ void process_missile()
         else
         {
             sp_paint_brick(mis_x_graph, mis_y_graph, explode_x_size, explode_y_size, 0);
+            mis_flying = 0;
+            mis_explode = 0;
         }
     }
     else
