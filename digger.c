@@ -1150,6 +1150,7 @@ void move_bug(struct bug_info *bug)
 
     // Увеличить/уменьшить фазу на единицу
     bug->image_phase += bug->image_phase_inc;
+
     // Переключить направление изменения фазы, если фаза дошла до предельного значения
     if (!bug->image_phase || bug->image_phase >= 2) bug->image_phase_inc = -bug->image_phase_inc;
 
@@ -1164,10 +1165,12 @@ void move_bug(struct bug_info *bug)
         // Для Хоббина
         if (bug->dir == DIR_RIGHT)
         {
+            // Смотрит вправо
             sp_4_15_put(bug->x_graph, bug->y_graph, (uint8_t *)image_hobbin_right[bug->image_phase]);
         }
         else
         {
+            // Смотрит влево (отзеркаленный правый)
             sp_4_15_h_mirror_put(bug->x_graph, bug->y_graph, (uint8_t *)image_hobbin_right[bug->image_phase]);
         }
     }
@@ -1181,7 +1184,7 @@ void move_bug(struct bug_info *bug)
 void stop_bag(struct bag_info *bag)
 {
     // Если мешок пролетел больше одного этажа, то он будет разбит
-    bag->state = (bag->count > 1) ? BAG_BREAKS : BAG_STATIONARY; // То он будет разбиваться
+    bag->state = (bag->count > 1) ? BAG_BREAKS : BAG_STATIONARY;
     bag->dir = DIR_STOP; // Остановить мешок
     bag->count = 0;
 
@@ -1197,7 +1200,7 @@ void draw_man()
 
     man_image_phase += man_image_phase_inc; // Переключить фазу изображения
 
-    // При необходимости, сменить направление изменения фазы
+    // При необходимости, сменить направление изменения фазы спрайта
     if (!man_image_phase || man_image_phase >= 2) man_image_phase_inc =- man_image_phase_inc;
 
     const uint8_t *image = 0;
@@ -1210,10 +1213,12 @@ void draw_man()
             image = (uint8_t *)image_digger_right[man_image_phase + ((cab) ? 0 : 3)];
             if (man_dir == DIR_RIGHT)
             {
+                // Едет вправо
                 sp_4_15_put(man_x_graph, man_y_graph, image);
             }
             else
             {
+                // Едет влево (отзеркаленный правый)
                 sp_4_15_h_mirror_put(man_x_graph, man_y_graph, image);
             }
             break;
@@ -1225,10 +1230,12 @@ void draw_man()
             image = (uint8_t *)image_digger_up[man_image_phase + ((cab) ? 0 : 3)];
             if (man_dir == DIR_UP)
             {
+                // Едет вверх
                 sp_4_15_put(man_x_graph, man_y_graph, image);
             }
             else
             {
+                // Едет вниз (отзеркален горизонтально и вертикально)
                 sp_4_15_hv_mirror_put(man_x_graph, man_y_graph, image);
             }
             break;
@@ -1498,16 +1505,16 @@ void process_bugs()
                         if (bug->state != CREATURE_INACTIVE) continue; // Пропустить активных врагов
 
                         // Начальное состояние врага
-                        bug->state = CREATURE_STARTING;
-                        bug->count = 6; // Время до запуска врага
-                        bug->wait = 0;  // Враг не задержан
-                        bug->image_phase = 0;
-                        bug->image_phase_inc = 1;
-                        bug->x_graph = bug_start_x;
-                        bug->y_graph = bug_start_y;
-                        bug->dead_bag = 0;
-                        bug->type = BUG_NOBBIN;      // Враги рождаются в виде Ноббинов
-                        bug->dir = DIR_LEFT;
+                        bug->state = CREATURE_STARTING; // Враг стартует
+                        bug->count = 6;                 // Время до запуска врага
+                        bug->wait = 0;                  // Враг не задержан
+                        bug->image_phase = 0;           // Начальная фаза орисовки спрайта
+                        bug->image_phase_inc = 1;       // Начальное направление изменения фазы
+                        bug->x_graph = bug_start_x;     // Начальная графическая координата по оси X
+                        bug->y_graph = bug_start_y;     // Начальная графическая координата по оси Y
+                        bug->dead_bag = 0;              // Указатель на мешок, коттторый убил врага
+                        bug->type = BUG_NOBBIN;         // Враги рождаются в виде Ноббинов
+                        bug->dir = DIR_LEFT;            // Начальное направление движения
 
                         bugs_active++;  // Увеличить счётчик активных врагов
                         bugs_created++; // Увеличить общее количество созданных врагов
