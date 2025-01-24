@@ -2382,7 +2382,10 @@ void main()
         process_bonus();
         sound_effect();
         process_game_state();
-
+#if defined(DEBUG)
+        // Рспечатать оставшееся свободное время
+        print_dec(*((volatile uint16_t *)REG_TVE_COUNT), 0, SCREEN_PIX_HEIGHT - 1 - sizeof(ch_digits[0]) / sizeof(ch_digits[0][0]));
+#endif
         while ((tve_csr->reg & (1 << TVE_CSR_FL)) == 0); // Ожидать срабатывания таймера.
     }
 }
