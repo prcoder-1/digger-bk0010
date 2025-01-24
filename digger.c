@@ -318,35 +318,47 @@ int check_collision(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t dist
 }
 
 /**
- * @brief Стирание фона в правую сторону
+ * @brief Прогрызть фон в правую сторону
+ *
+ * @param x_graph - графическая координата по оси X
+ * @param y_graph - графическая координата по оси Y
  */
-void era_right(uint16_t x, uint16_t y)
+void gnaw_right(uint16_t x_graph, uint16_t y_graph)
 {
-    sp_put(x + 4, y - 1, sizeof(outline_blank_right[0]), sizeof(outline_blank_right)/sizeof(outline_blank_right[0]), nullptr, (uint8_t*)outline_blank_right);
+    sp_put(x_graph + 4, y_graph - 1, sizeof(outline_blank_right[0]), sizeof(outline_blank_right)/sizeof(outline_blank_right[0]), nullptr, (uint8_t*)outline_blank_right);
 }
 
 /**
- * @brief Стирание фона в левую сторону
+ * @brief Прогрызть фон в левую сторону
+ *
+ * @param x_graph - графическая координата по оси X
+ * @param y_graph - графическая координата по оси Y
  */
-void era_left(uint16_t x, uint16_t y)
+void gnaw_left(uint16_t x_graph, uint16_t y_graph)
 {
-    sp_put(x - 2, y - 1, sizeof(outline_blank_left[0]), sizeof(outline_blank_left)/sizeof(outline_blank_left[0]), nullptr, (uint8_t*)outline_blank_left);
+    sp_put(x_graph - 2, y_graph - 1, sizeof(outline_blank_left[0]), sizeof(outline_blank_left)/sizeof(outline_blank_left[0]), nullptr, (uint8_t*)outline_blank_left);
 }
 
 /**
- * @brief Стирание фона вверх
+ * @brief Прогрызть фон вверх
+ *
+ * @param x_graph - графическая координата по оси X
+ * @param y_graph - графическая координата по оси Y
  */
-void era_up(uint16_t x, uint16_t y)
+void gnaw_up(uint16_t x_graph, uint16_t y_graph)
 {
-    sp_put(x - 1, y - 7, sizeof(outline_blank_up[0]), sizeof(outline_blank_up)/sizeof(outline_blank_up[0]), nullptr, (uint8_t*)outline_blank_up);
+    sp_put(x_graph - 1, y_graph - 7, sizeof(outline_blank_up[0]), sizeof(outline_blank_up)/sizeof(outline_blank_up[0]), nullptr, (uint8_t*)outline_blank_up);
 }
 
 /**
- * @brief Стирание фона вниз
+ * @brief Прогрызть фон вниз
+ *
+ * @param x_graph - графическая координата по оси X
+ * @param y_graph - графическая координата по оси Y
  */
-void era_down(uint16_t x, uint16_t y)
+void gnaw_down(uint16_t x_graph, uint16_t y_graph)
 {
-    sp_put(x - 1, y + 15, sizeof(outline_blamk_down[0]), sizeof(outline_blamk_down)/sizeof(outline_blamk_down[0]), nullptr, (uint8_t*)outline_blamk_down);
+    sp_put(x_graph - 1, y_graph + 15, sizeof(outline_blamk_down[0]), sizeof(outline_blamk_down)/sizeof(outline_blamk_down[0]), nullptr, (uint8_t*)outline_blamk_down);
 }
 
 /**
@@ -505,9 +517,9 @@ void init_level()
                 *bg &= 0xF0;  // сбрасываем все биты h_bite фона для горизонтальных проходов
                 for (uint16_t i = 4; i > 0; --i)
                 {
-                    era_right(x_graph - i, y_graph);
+                    gnaw_right(x_graph - i, y_graph);
                 }
-                era_left (x_graph + 1, y_graph);
+                gnaw_left (x_graph + 1, y_graph);
             }
 
             if (ls == LEV_V || ls == LEV_S)
@@ -515,9 +527,9 @@ void init_level()
                 *bg &= 0x0F;  // сбрасываем все биты v_bite фона для вертикальных проходов
                 for (uint16_t i = 15; i > 0; i -= 3)
                 {
-                    era_down(x_graph, y_graph - i);
+                    gnaw_down(x_graph, y_graph - i);
                 }
-                era_up  (x_graph, y_graph + 3);
+                gnaw_up  (x_graph, y_graph + 3);
             }
 
             x_graph += POS_X_STEP;
@@ -856,20 +868,20 @@ void erase_trail(enum direction dir, uint16_t x_graph, uint16_t y_graph)
 }
 
 /**
- * @brief Стерерь кусочек фона на экране в соответствии с направлением движения и текущим положением
+ * @brief Прогрызть фон в соответствии с направлением движения и текущим положением
  *
  * @param dir - направление движения
  * @param x_graph - графическая координата по оси X
  * @param y_graph - графическая координата по оси Y
  */
-void era_dir(enum direction dir, uint16_t x_graph, uint16_t y_graph)
+void gnaw_dir(enum direction dir, uint16_t x_graph, uint16_t y_graph)
 {
     switch (dir)
     {
-        case DIR_RIGHT: { era_right(x_graph, y_graph); break; }
-        case DIR_LEFT:  { era_left (x_graph, y_graph); break; }
-        case DIR_DOWN:  { era_down (x_graph, y_graph); break; }
-        case DIR_UP:    { era_up   (x_graph, y_graph); break; }
+        case DIR_RIGHT: { gnaw_right(x_graph, y_graph); break; }
+        case DIR_LEFT:  { gnaw_left (x_graph, y_graph); break; }
+        case DIR_DOWN:  { gnaw_down (x_graph, y_graph); break; }
+        case DIR_UP:    { gnaw_up   (x_graph, y_graph); break; }
     }
 }
 
@@ -1037,7 +1049,7 @@ void move_bug(struct bug_info *bug)
         erase_background(bug_x_graph, bug_y_graph, bug->dir);
 
         // Стерерь кусочек фона на экране в соответствии с направлением движения и текущим положением
-        era_dir(bug->dir, bug_x_graph, bug_y_graph);
+        gnaw_dir(bug->dir, bug_x_graph, bug_y_graph);
 
         uint8_t bug_x_log = bug_abs_x_pos / POS_X_STEP;
         uint8_t bug_y_log = bug_abs_y_pos / POS_Y_STEP;
@@ -1346,7 +1358,7 @@ void sound_effect()
             sound(period, 2);
 
             uint16_t y_graph = man_y_graph - bounce[i >> 3];
-            era_up(man_x_graph, y_graph);
+            gnaw_up(man_x_graph, y_graph);
             // Анимация подпрыгивающего перевёрнутого Диггера
             sp_4_15_put(man_x_graph, y_graph, (uint8_t *)image_digger_turned_over);
 
@@ -1753,7 +1765,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                 bags_fall = 1; // Найден падающий мешок
 
                 // Стереть фон и сбросить биты матрицы фона
-                era_up(bag_x_graph, bag_y_graph + 9);
+                gnaw_up(bag_x_graph, bag_y_graph + 9);
                 erase_background(bag_x_graph, bag_y_graph, DIR_DOWN); // Сбросить биты матрицы фона
 
                 // Стереть падающий мешок по старым координатам
@@ -2201,7 +2213,7 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
                     erase_trail(man_dir, man_x_graph, man_y_graph);
 
                     // Нарисовать "прогрыз" от движения Диггера
-                    era_dir(man_dir, prev_man_x_graph, prev_man_y_graph);
+                    gnaw_dir(man_dir, prev_man_x_graph, prev_man_y_graph);
                 }
             }
 
