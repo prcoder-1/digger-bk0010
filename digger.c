@@ -460,8 +460,7 @@ void init_level()
     // Отрисовка фона
     for (uint16_t y_graph = 0; y_graph < y_size * bg_block_height; y_graph += bg_block_height)
     {
-        uint16_t x_graph;
-        for (x_graph = 0; x_graph < x_size * bg_block_width; x_graph += bg_block_width)
+        for (uint16_t x_graph = 0; x_graph < x_size * bg_block_width; x_graph += bg_block_width)
         {
             sp_put(x_graph - 1, y_graph + FIELD_Y_OFFSET - MOVE_Y_STEP * 3, bg_block_width, bg_block_height, back_image, nullptr);
         }
