@@ -850,28 +850,24 @@ void erase_trail(enum direction dir, uint16_t x_graph, uint16_t y_graph)
     {
         case DIR_LEFT:
         {
-            // sp_paint_brick(man_x_graph + 4, man_y_graph, MOVE_X_STEP, 15, 0);
             sp_paint_brick(x_graph + 4, y_graph, MOVE_X_STEP, 15, 0);
             break;
         }
 
         case DIR_RIGHT:
         {
-            // sp_paint_brick(man_x_graph - MOVE_X_STEP, man_y_graph, MOVE_X_STEP, 15, 0);
             sp_paint_brick(x_graph - MOVE_X_STEP, y_graph, MOVE_X_STEP, 15, 0);
             break;
         }
 
         case DIR_UP:
         {
-            // sp_paint_brick(man_x_graph, man_y_graph + 15, 4, MOVE_Y_STEP, 0);
             sp_paint_brick(x_graph, y_graph + 15, 4, MOVE_Y_STEP, 0);
             break;
         }
 
         case DIR_DOWN:
         {
-            // sp_paint_brick(man_x_graph, man_y_graph - MOVE_Y_STEP, 4, MOVE_Y_STEP, 0);
             sp_paint_brick(x_graph, y_graph - MOVE_Y_STEP, 4, MOVE_Y_STEP, 0);
             break;
         }
