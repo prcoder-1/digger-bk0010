@@ -1832,17 +1832,7 @@ const uint8_t image_missile[3][7][2] = {
                 0xF0,0x33
         }
 };
-/*
-const uint8_t outline_missile[7][2] = {
-        0xFC,0x3F,
-        0xFF,0xFF,
-        0xFF,0xFF,
-        0xFF,0xFF,
-        0xFF,0xFF,
-        0xFF,0xFF,
-        0xFC,0x3F
-};
-*/
+
 /*
 const uint8_t outline_missile[3][7][2] = {
         {
