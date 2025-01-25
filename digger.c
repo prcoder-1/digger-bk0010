@@ -484,7 +484,7 @@ void init_level()
         for (uint16_t x_log = 0; x_log < W_MAX; ++x_log)
         {
             uint8_t *bg = &background[y_log][x_log]; // Структура с информацией о клетке фона
-            *bg = 0; // сбрасываем все биты h_bite и v_bite (вся клетка фона цела)
+            *bg = 0; // Сбросить все биты состояния фона (вся клетка фона цела)
 
             enum level_symbols ls = getLevelSymbol(y_log, x_log);
 
@@ -680,21 +680,23 @@ void clear_background_bits(uint16_t x_graph, uint16_t y_graph, enum direction di
         }
     }
 
+    uint8_t *cell = &background[y_log][x_log]; // Указатель на текущую ячейку состояния фона
+
     switch (dir)
     {
         case DIR_LEFT:
         case DIR_RIGHT:
         {
             // Установить соответсвующий бит матрицы фона
-            background[y_log][x_log] |= 1 << x_rem;
+            *cell |= 1 << x_rem;
             break;
         }
 
         case DIR_UP:
         case DIR_DOWN:
         {
-            // Ecnfyjdbnm соответсвующий бит матрицы фона
-            background[y_log][x_log] |= 1 << (y_rem + 4);
+            // Установить соответсвующий бит матрицы фона
+            *cell |= 1 << (y_rem + 4);
             break;
         }
     }
