@@ -612,14 +612,13 @@ uint8_t check_path(enum direction dir, struct bug_info *bug)
 }
 
 /**
- * @brief Определяет возможность движения врага в заданном направлении
+ * @brief Очистить биты фона по заданным координатам в указанном направлении
  *
+ * @param x_graph - графическая координата по оси X
+ * @param y_graph - графическая координата по оси Y
  * @param dir - направлкние движения
- * @param bug - структура с информацией о враге
- *
- * @return - 1 - движение в заданном направлении возможно, 0 - движение в заданном направлении невозможно
  */
-void erase_background(uint16_t x_graph, uint16_t y_graph, enum direction dir)
+void clear_background_bits(uint16_t x_graph, uint16_t y_graph, enum direction dir)
 {
     const uint16_t abs_x_pos = x_graph - FIELD_X_OFFSET;
     const uint16_t abs_y_pos = y_graph - FIELD_Y_OFFSET;
@@ -1045,8 +1044,8 @@ void move_bug(struct bug_info *bug)
     // Для Хоббинов прокапывающих новый туннель
     if (bug->type == BUG_HOBBIN)
     {
-        // Сделать"прокус" в массиве бит фона
-        erase_background(bug_x_graph, bug_y_graph, bug->dir);
+        // Очистить биты фона прогрызенные Хоббином
+        clear_background_bits(bug_x_graph, bug_y_graph, bug->dir);
 
         // Стерерь кусочек фона на экране в соответствии с направлением движения и текущим положением
         gnaw_dir(bug->dir, bug_x_graph, bug_y_graph);
@@ -1590,6 +1589,7 @@ void process_bugs()
                 uint8_t bag_y_pos = bug->dead_bag->y_graph; // Вертикальная позиция мешка от которого погиб враг
                 if (bag_y_pos + MOVE_Y_STEP > bug->y_graph)
                 {
+                    erase_trail(DIR_DOWN, bug->x_graph, bug->y_graph);
                     bug->y_graph = bag_y_pos; // Если мешок опустился ниже врага, враг перемещается за мешком
                 }
 
@@ -1669,6 +1669,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
         uint8_t bag_y_log = bag_abs_y_pos / POS_Y_STEP;
         uint8_t bag_x_rem = bag_abs_x_pos % POS_X_STEP;
         uint8_t bag_y_rem = (bag_abs_y_pos % POS_Y_STEP) >> 2;
+        uint8_t floor_broken = background[bag_y_log + 1][bag_x_log] != 0xFF;
 
         switch (bag->state)
         {
@@ -1681,7 +1682,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
             {
                 if (bag_x_rem == 0) // Если мешок находится в серединге клетки игрового поля по-горизонтали
                 {
-                    if (background[bag_y_log + 1][bag_x_log] != 0xFF) // Если клетка ниже повреждена
+                    if (floor_broken) // Если клетка ниже повреждена
                     {
                         switch (bag->dir)
                         {
@@ -1772,7 +1773,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
 
                 // Прогрызть фон и сбросить биты матрицы фона
                 gnaw_up(bag_x_graph, bag_y_graph + 9);
-                erase_background(bag_x_graph, bag_y_graph, DIR_DOWN); // Сбросить биты матрицы фона
+                clear_background_bits(bag_x_graph, bag_y_graph, DIR_DOWN); // Сбросить биты матрицы фона
 
                 // Стереть падающий мешок по старым координатам
                 if (bag->count) // Если номер этажа не нулевой
@@ -1796,8 +1797,8 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                 {
                     bag->count++; // Увеличить количество этажей, которые пролетел мешок
 
-                    if (bag_y_log == H_MAX - 1) stop_bag(bag); // Остановить мешок, если он долетел до последнего этажа
-                    else if (background[bag_y_log + 1][bag_x_log] == 0xFF) stop_bag(bag); // Остановить мешок, если клетка под ним не повреждена
+                    // Остановить мешок, если клетка под ним не повреждена или он долетел до последнего этажа
+                    if (!floor_broken || (bag_y_log == H_MAX - 1)) stop_bag(bag);
                 }
 
                 remove_coin(bag_x_log, bag_y_log); // Удалить монету в клетке куда попал мешок
@@ -2027,6 +2028,8 @@ void process_missile()
                     mis_flying = 1;
                     mis_dir = man_dir;
 
+                    // Определить начальное положение выстрела в зависимости от
+                    // координат Диггера и его направления движения
                     switch (mis_dir)
                     {
                         case DIR_LEFT:
@@ -2061,6 +2064,7 @@ void process_missile()
                     // Вывести начальное положение спрайта выстрела
                     sp_put(mis_x_graph, mis_y_graph, missile_x_size, missile_y_size, (uint8_t *)image_missile[mis_image_phase], nullptr);
 
+                    // Включить звук выстрела
                     fire_snd_period = 10;
                     fire_snd = 1;
                 }
@@ -2128,10 +2132,10 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
                 // Проверить что Диггер соприкоснулся с вишенкой
                 if (check_collision(man_x_graph, man_y_graph, FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP, FIELD_Y_OFFSET, 4, 15))
                 {
-                    bonus_state = BONUS_ON;
-                    bonus_count = 1;
-                    bonus_time = 250 - difficulty * 20;
-                    bonus_flash = 19;
+                    bonus_state = BONUS_ON; // Включить Бонус-режим
+                    bonus_count = 1; // Начальное значение множителя очков в Бонус-режиме
+                    bonus_time = 250 - difficulty * 20; // Время действия Бонус-режима
+                    bonus_flash = 19; // Время мигания индикатора включения Бонус-режима
 
                     add_score(1000); // 1000 очков за вишенку
 
@@ -2145,11 +2149,13 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
                 }
             }
 
-            if (man_dir != DIR_STOP) erase_background(man_x_graph, man_y_graph, man_dir); /* update background matrix */
+            // Если Диггер движется, то очистить биты фона, который был "прогрызен"
+            if (man_dir != DIR_STOP) clear_background_bits(man_x_graph, man_y_graph, man_dir);
 
             uint8_t prev_man_x_graph = man_x_graph;
             uint8_t prev_man_y_graph = man_y_graph;
 
+            // Переместить Диггера на один шаг в заданном направлении
             switch (man_dir)
             {
                 case DIR_RIGHT: { man_x_graph += MOVE_X_STEP; break; }
@@ -2160,6 +2166,7 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
 
             if (man_dir == DIR_STOP) man_dir = man_prev_dir;
 
+            // Удалить монеты съеденные Диггером
             if (remove_coin(man_x_log, man_y_log))
             {
                 coin_snd = 7;  // Включить звук съедения монеты
@@ -2275,7 +2282,7 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
             uint8_t bag_y_pos = man_dead_bag->y_graph; // Вертикальная позиция мешка от которого погиб Диггер
             if (bag_y_pos > man_y_graph)
             {
-                erase_4_15(man_x_graph, man_y_graph);
+                erase_trail(DIR_DOWN, man_x_graph, man_y_graph);
                 man_y_graph = bag_y_pos; // Если мешок опустился ниже Диггера, Диггер перемещается за мешком
             }
 
