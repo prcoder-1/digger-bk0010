@@ -1932,7 +1932,6 @@ void process_missile()
     constexpr uint16_t explode_y_size = sizeof(image_explode[0]) / explode_x_size;
     constexpr uint16_t explode_phases_no = sizeof(image_explode) / sizeof(image_explode[0]);
 
-    // Обработка выстрела
     if (mis_explode)
     {
         // Обработка взрывающегося выстрела
@@ -1986,12 +1985,12 @@ void process_missile()
                 }
             }
 
+            uint8_t explode = 0;
+
             // Проверить если координаты выходят за рамки игрового поля
             if (check_out_of_range(mis_dir, mis_x_graph, mis_y_graph))
             {
-                fire_snd = 0;        // Выключить звук летящего выстрела
-                mis_explode = 1;     // Включить взрыв выстрела
-                mis_image_phase = 0; // Начальная фаза взрыва
+                explode = 1; // Взорвать выстрел
             }
             else
             {
@@ -2000,6 +1999,35 @@ void process_missile()
 
                 // Вывести новое изображение выстрела
                 sp_put(mis_x_graph, mis_y_graph, missile_x_size, missile_y_size, (uint8_t *)image_missile[mis_image_phase], nullptr);
+
+                // Проверить попал ли выстрел во врага
+                for (uint8_t i = 0; i < bugs_max; ++i)
+                {
+                    struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
+                    if (!bugs_active) continue; // Пропустить неактивных врагов
+                    if (bug->state != CREATURE_ALIVE) continue; //  Пропустить неживых врагов
+
+                    // Проверить, что выстрел попал во врага
+                    if (check_collision(mis_x_graph, mis_y_graph, bug->x_graph, bug->y_graph, 4, 15))
+                    {
+                        explode = 1; // Взорвать выстрел
+                        bug->state = CREATURE_RIP; // Враг был убит выстрелом
+
+                        // В бонус-режиме увеличить количество создаваемых врагов компенсируя убитых мешками
+                        if (bonus_state == BONUS_ON)
+                        {
+                            bugs_total++; // Увеличить количество создаваемых врагов
+                            bugs_active--; // Уменьшить количество активных врагов
+                        }
+                    }
+                }
+            }
+
+            if (explode)
+            {
+                fire_snd = 0;        // Выключить звук летящего выстрела
+                mis_explode = 1;     // Включить взрыв выстрела
+                mis_image_phase = 0; // Начальная фаза взрыва
             }
         }
         else
