@@ -398,9 +398,9 @@ void init_level_state()
         bug->state = CREATURE_INACTIVE; // Деактивировать врага
     }
 
-    if (difficulty >= 9) bugs_max = 5;      // На уровне сложности 9 и выше максимально 5 врагов одновременно
-    else if (difficulty >= 6) bugs_max = 4; // На уровне сложности с 6 до 8 *включительно) до 4 врагов одновременно
-    else bugs_max = 3;                      // На уровнях до шестого - максимально три варага одновременно
+    if (difficulty >= 8) bugs_max = 5;      // На уровне сложности 8 и выше максимально 5 врагов одновременно
+    else if (difficulty >= 2) bugs_max = 4; // На уровне сложности со 2 до 7 (включительно) до 4 врагов одновременно
+    else bugs_max = 3;                      // На первом уровне максимально три варага одновременно
 
     // Переменные относщиеся к созданию и управлению врагами
     bugs_total = difficulty + 5;         // Общее количество врагов на уровне - пять плюс уровень сложности
@@ -823,12 +823,7 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
         }
     }
 
-    if (rv)
-    {
-        // Мешок небыл перемещён
-        break_bag_snd = 1; // Издать звук разбившегося мешка
-    }
-    else
+    if (!rv)
     {
         uint8_t bag_abs_x_pos = bag_x_graph - FIELD_X_OFFSET;
         uint8_t bag_x_rem = bag_abs_x_pos % POS_X_STEP;
@@ -1681,7 +1676,8 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
             {
                 if (bag_x_rem == 0) // Если мешок находится в серединге клетки игрового поля по-горизонтали
                 {
-                    if (background[bag_y_log + 1][bag_x_log] != 0xFF) // Если клетка ниже повреждена
+                    // Если мешок не на самой нижней линии и клетка ниже повреждена
+                    if ((bag_y_log != H_MAX - 1) && (background[bag_y_log + 1][bag_x_log] != 0xFF))
                     {
                         switch (bag->dir)
                         {
