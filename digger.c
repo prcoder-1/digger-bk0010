@@ -8,7 +8,7 @@
 #include "digger_levels.h"
 #include "digger_music.h"
 
-#define DEBUG // Режим отладки включен
+// #define DEBUG // Режим отладки включен
 
 #define FIELD_X_OFFSET 2  // Смещение игрового поля по оси X
 #define FIELD_Y_OFFSET 32 // Смещение игрового поля по оси Y
@@ -687,16 +687,14 @@ void clear_background_bits(uint16_t x_graph, uint16_t y_graph, enum direction di
         case DIR_LEFT:
         case DIR_RIGHT:
         {
-            // Установить соответсвующий бит матрицы фона
-            *cell |= 1 << x_rem;
+            *cell |= 1 << x_rem; // Установить соответсвующий бит матрицы фона
             break;
         }
 
         case DIR_UP:
         case DIR_DOWN:
         {
-            // Установить соответсвующий бит матрицы фона
-            *cell |= 1 << (y_rem + 4);
+            *cell |= 1 << (y_rem + 4); // Установить соответсвующий бит матрицы фона
             break;
         }
     }
