@@ -8,7 +8,7 @@
 #include "digger_levels.h"
 #include "digger_music.h"
 
-// #define DEBUG // Режим отладки включен
+#define DEBUG // Режим отладки включен
 
 #define FIELD_X_OFFSET 2  // Смещение игрового поля по оси X
 #define FIELD_Y_OFFSET 32 // Смещение игрового поля по оси Y
@@ -484,7 +484,7 @@ void init_level()
         for (uint16_t x_log = 0; x_log < W_MAX; ++x_log)
         {
             uint8_t *bg = &background[y_log][x_log]; // Структура с информацией о клетке фона
-            *bg = 0xFF; // устанавливаем все биты h_bite и v_bite в единицу (вся клетка фона цела)
+            *bg = 0; // сбрасываем все биты h_bite и v_bite (вся клетка фона цела)
 
             enum level_symbols ls = getLevelSymbol(y_log, x_log);
 
@@ -509,7 +509,7 @@ void init_level()
             }
             else if (ls == LEV_H || ls == LEV_S)
             {
-                *bg &= 0xF0;  // сбрасываем все биты h_bite фона для горизонтальных проходов
+                *bg |= 0xF0;  // устанавливаем все биты h_bite фона для горизонтальных проходов
                 for (uint16_t i = 4; i > 0; --i)
                 {
                     gnaw(DIR_RIGHT, x_graph - i, y_graph);
@@ -519,7 +519,7 @@ void init_level()
 
             if (ls == LEV_V || ls == LEV_S)
             {
-                *bg &= 0x0F;  // сбрасываем все биты v_bite фона для вертикальных проходов
+                *bg |= 0x0F;  // устанавливаем все биты v_bite фона для вертикальных проходов
                 for (uint16_t i = 15; i > 0; i -= 3)
                 {
                     gnaw(DIR_DOWN,x_graph, y_graph - i);
@@ -548,7 +548,9 @@ void init_level()
  */
 uint16_t full_bite(uint8_t byte)
 {
-    if (!(byte & 0xF0) || !(byte & 0xF)) return 1;
+    byte = ~byte;
+    if (!(byte & 0xF0)) return 1;
+    if (!(byte & 0x0F)) return 1;
 
     return 0;
 }
@@ -578,7 +580,7 @@ uint8_t check_path(enum direction dir, struct bug_info *bug)
             const uint8_t cell_right = background[y_log][x_log + 1];
 
             // Если клетка правее полностью проедена, а также есть прокус слева в клетке правее или прокус справа в текущей клетке
-            if (full_bite(cell_right) && (((cell_right & 1) == 0) || ((cell_current & 8) == 0))) return 1;
+            if (full_bite(cell_right) && ((cell_right & 1) || (cell_current & 8))) return 1;
             break;
         }
 
@@ -589,7 +591,7 @@ uint8_t check_path(enum direction dir, struct bug_info *bug)
             const uint8_t cell_left = background[y_log][x_log - 1];
 
             // Если клетка левее полность проедена, и есть в ней прокус справа или прокус в текущей клетке слева клетки
-            if (full_bite(cell_left) && (((cell_left & 8) == 0) || ((cell_current & 1) == 0))) return 1;
+            if (full_bite(cell_left) && ((cell_left & 8) || (cell_current & 1))) return 1;
             break;
         }
 
@@ -600,7 +602,7 @@ uint8_t check_path(enum direction dir, struct bug_info *bug)
             const uint8_t cell_down = background[y_log + 1][x_log];
 
             // Если клетка ниже полность проедена, и есть в ней прокус сверху или снизу текущей клетки
-            if (full_bite(cell_down) && (((cell_down & 0x10) == 0) || ((cell_current & 0x80) == 0))) return 1;
+            if (full_bite(cell_down) && ((cell_down & 0x10) || (cell_current & 0x80))) return 1;
             break;
         }
 
@@ -610,8 +612,8 @@ uint8_t check_path(enum direction dir, struct bug_info *bug)
 
             const uint8_t cell_up = background[y_log - 1][x_log];
 
-            // Если клетка выше полность проедена, и есть в ней прокус снизу или сверху текущеёклетки
-            if (full_bite(cell_up) && (((cell_up & 0x80) == 0) || ((cell_current & 0x10) == 0))) return 1;
+            // Если клетка выше полность проедена, и есть в ней прокус снизу или сверху текущей клетки
+            if (full_bite(cell_up) && ((cell_up & 0x80) || (cell_current & 0x10))) return 1;
             break;
         }
     }
@@ -620,7 +622,7 @@ uint8_t check_path(enum direction dir, struct bug_info *bug)
 }
 
 /**
- * @brief Очистить биты фона по заданным координатам в указанном направлении
+ * @brief Очистить биты состоянияфона по заданным координатам в указанном направлении
  *
  * @param x_graph - графическая координата по оси X
  * @param y_graph - графическая координата по оси Y
@@ -683,16 +685,16 @@ void clear_background_bits(uint16_t x_graph, uint16_t y_graph, enum direction di
         case DIR_LEFT:
         case DIR_RIGHT:
         {
-            // Стереть соответсвующий бит матрицы фона
-            background[y_log][x_log] &= ~(1 << x_rem);
+            // Установить соответсвующий бит матрицы фона
+            background[y_log][x_log] |= 1 << x_rem;
             break;
         }
 
         case DIR_UP:
         case DIR_DOWN:
         {
-            // Стереть соответсвующий бит матрицы фона
-            background[y_log][x_log] &= ~(1 << (y_rem + 4));
+            // Ecnfyjdbnm соответсвующий бит матрицы фона
+            background[y_log][x_log] |= 1 << (y_rem + 4);
             break;
         }
     }
@@ -1667,7 +1669,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                 if (bag_x_rem == 0) // Если мешок находится в серединге клетки игрового поля по-горизонтали
                 {
                     // Если мешок не на самой нижней линии и клетка ниже повреждена
-                    if ((bag_y_log != H_MAX - 1) && (background[bag_y_log + 1][bag_x_log] != 0xFF))
+                    if ((bag_y_log != H_MAX - 1) && background[bag_y_log + 1][bag_x_log])
                     {
                         switch (bag->dir)
                         {
@@ -1783,7 +1785,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                     bag->count++; // Увеличить количество этажей, которые пролетел мешок
 
                     // Остановить мешок, если клетка под ним не повреждена или он долетел до последнего этажа
-                    if ((bag_y_log == H_MAX - 1) || (background[bag_y_log + 1][bag_x_log] == 0xFF)) stop_bag(bag);
+                    if ((bag_y_log == H_MAX - 1) || !background[bag_y_log + 1][bag_x_log]) stop_bag(bag);
                 }
 
                 remove_coin(bag_x_log, bag_y_log); // Удалить монету в клетке куда попал мешок
