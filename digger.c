@@ -2067,14 +2067,16 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
                     case 25: man_new_dir = DIR_RIGHT; break; // Стрелка вправо
                     case 26: man_new_dir = DIR_UP;    break; // Стрелка вверх
                     case 27: man_new_dir = DIR_DOWN;  break; // Стрелка вниз
-                    case '1': mis_fire = 1;           break; // Клавиша выстрела '1'
+                    case 32: mis_fire = 1;            break; // Клавиша выстрела (пробел)
+                    case 12: while (!(((union KEY_STATE *)REG_KEY_STATE)->reg & (1 << KEY_STATE_STATE))); break; // Пауза
 #if defined(DEBUG)
-                    case 'D': difficulty++;            break; // Добавление уровня сложности
-                    case 'L': lives++; print_lives();  break; // Добавление жизни
-                    case 'N': done_snd = 1;            break; // Переход на следующий уровень
-#endif
-                    case ' ': while (!(((union KEY_STATE *)REG_KEY_STATE)->reg & (1 << KEY_STATE_STATE))); break; // Пауза
+                    case 'D': difficulty++;           break; // Добавление уровня сложности
+                    case 'L': lives++; print_lives(); break; // Добавление жизни
+                    case 'N': done_snd = 1;           break; // Переход на следующий уровень
+                    default: print_dec(code, 16, MAX_Y_POS + 2 * POS_Y_STEP); // Печать кода клавиши
+#else
                     default: man_new_dir = DIR_STOP;
+#endif
                 }
             }
 
@@ -2391,7 +2393,7 @@ void main()
         process_game_state();
 #if defined(DEBUG)
         // Рспечатать оставшееся свободное время
-        print_dec(*((volatile uint16_t *)REG_TVE_COUNT), 0, SCREEN_PIX_HEIGHT - 3 - sizeof(ch_digits[0]) / sizeof(ch_digits[0][0]));
+        print_dec(*((volatile uint16_t *)REG_TVE_COUNT), 0, MAX_Y_POS + 2 * POS_Y_STEP);
 #endif
         while ((tve_csr->reg & (1 << TVE_CSR_FL)) == 0); // Ожидать срабатывания таймера.
     }
