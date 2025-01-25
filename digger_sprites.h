@@ -156,7 +156,7 @@ extern const uint8_t outline_blank_up[6][6];
  * @brief Маска для стирания фона вниз
  */
 // extern const uint8_t image_blamk_down[6][6];
-extern const uint8_t outline_blamk_down[6][6];
+extern const uint8_t outline_blank_down[6][6];
 
 /**
  * @brief Маска для стирания в начале полёта мешка

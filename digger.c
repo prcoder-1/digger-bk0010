@@ -427,7 +427,7 @@ void gnaw(enum direction dir, uint16_t x_graph, uint16_t y_graph)
 
         case DIR_DOWN:
         {
-            sp_put(x_graph - 1, y_graph + 15, sizeof(outline_blamk_down[0]), sizeof(outline_blamk_down)/sizeof(outline_blamk_down[0]), nullptr, (uint8_t*)outline_blamk_down);
+            sp_put(x_graph - 1, y_graph + 15, sizeof(outline_blank_down[0]), sizeof(outline_blank_down)/sizeof(outline_blank_down[0]), nullptr, (uint8_t*)outline_blank_down);
             break;
         }
 
