@@ -556,17 +556,18 @@ uint16_t full_bite(uint8_t byte)
 }
 
 /**
- * @brief Определяет возможность движения врага в заданном направлении
+ * @brief Определяет возможность движения в заданном направлении
  *
  * @param dir - направлкние движения
- * @param bug - структура с информацией о враге
+ * @param x_graph - графическая координата по оси X
+ * @param y_graph - графическая координата по оси Y
  *
  * @return - 1 - движение в заданном направлении возможно, 0 - движение в заданном направлении невозможно
  */
-uint8_t check_path(enum direction dir, struct bug_info *bug)
+uint8_t check_path(enum direction dir, uint8_t x_graph, uint8_t y_graph)
 {
-    const uint8_t abs_x_pos = bug->x_graph - FIELD_X_OFFSET;
-    const uint8_t abs_y_pos = bug->y_graph - FIELD_Y_OFFSET;
+    const uint8_t abs_x_pos = x_graph - FIELD_X_OFFSET;
+    const uint8_t abs_y_pos = y_graph - FIELD_Y_OFFSET;
     const uint8_t x_log = abs_x_pos / POS_X_STEP;
     const uint8_t y_log = abs_y_pos / POS_Y_STEP;
     const uint8_t cell_current = background[y_log][x_log];
@@ -1005,10 +1006,10 @@ void move_bug(struct bug_info *bug)
         if (bug->type == BUG_NOBBIN)
         {
             // Для Ноббинов нужно выбрать наилучшее направление по которому свободен путь
-                 if (check_path(dir_1, bug)) { dir = dir_1; }
-            else if (check_path(dir_2, bug)) { dir = dir_2; }
-            else if (check_path(dir_3, bug)) { dir = dir_3; }
-            else if (check_path(dir_4, bug)) { dir = dir_4; }
+                 if (check_path(dir_1, bug_x_graph, bug_y_graph)) { dir = dir_1; }
+            else if (check_path(dir_2, bug_x_graph, bug_y_graph)) { dir = dir_2; }
+            else if (check_path(dir_3, bug_x_graph, bug_y_graph)) { dir = dir_3; }
+            else if (check_path(dir_4, bug_x_graph, bug_y_graph)) { dir = dir_4; }
         }
         else
         {
@@ -1988,7 +1989,7 @@ void process_missile()
             uint8_t explode = 0;
 
             // Проверить если координаты выходят за рамки игрового поля
-            if (check_out_of_range(mis_dir, mis_x_graph, mis_y_graph))
+            if (check_out_of_range(mis_dir, mis_x_graph, mis_y_graph) || !check_path(mis_dir, mis_x_graph, mis_y_graph))
             {
                 explode = 1; // Взорвать выстрел
             }
