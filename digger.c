@@ -318,50 +318,6 @@ int check_collision(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t dist
 }
 
 /**
- * @brief Прогрызть фон в правую сторону
- *
- * @param x_graph - графическая координата по оси X
- * @param y_graph - графическая координата по оси Y
- */
-void gnaw_right(uint16_t x_graph, uint16_t y_graph)
-{
-    sp_put(x_graph + 4, y_graph - 1, sizeof(outline_blank_right[0]), sizeof(outline_blank_right)/sizeof(outline_blank_right[0]), nullptr, (uint8_t*)outline_blank_right);
-}
-
-/**
- * @brief Прогрызть фон в левую сторону
- *
- * @param x_graph - графическая координата по оси X
- * @param y_graph - графическая координата по оси Y
- */
-void gnaw_left(uint16_t x_graph, uint16_t y_graph)
-{
-    sp_put(x_graph - 2, y_graph - 1, sizeof(outline_blank_left[0]), sizeof(outline_blank_left)/sizeof(outline_blank_left[0]), nullptr, (uint8_t*)outline_blank_left);
-}
-
-/**
- * @brief Прогрызть фон вверх
- *
- * @param x_graph - графическая координата по оси X
- * @param y_graph - графическая координата по оси Y
- */
-void gnaw_up(uint16_t x_graph, uint16_t y_graph)
-{
-    sp_put(x_graph - 1, y_graph - 7, sizeof(outline_blank_up[0]), sizeof(outline_blank_up)/sizeof(outline_blank_up[0]), nullptr, (uint8_t*)outline_blank_up);
-}
-
-/**
- * @brief Прогрызть фон вниз
- *
- * @param x_graph - графическая координата по оси X
- * @param y_graph - графическая координата по оси Y
- */
-void gnaw_down(uint16_t x_graph, uint16_t y_graph)
-{
-    sp_put(x_graph - 1, y_graph + 15, sizeof(outline_blamk_down[0]), sizeof(outline_blamk_down)/sizeof(outline_blamk_down[0]), nullptr, (uint8_t*)outline_blamk_down);
-}
-
-/**
  * @brief Получение ячейки уровня по заданным координатам
  */
 enum level_symbols getLevelSymbol(uint8_t y_log, uint8_t x_log)
@@ -398,7 +354,7 @@ void init_level_state()
         bug->state = CREATURE_INACTIVE; // Деактивировать врага
     }
 
-    print_dec(difficulty, 0, MAX_Y_POS + 2 * POS_Y_STEP);
+    // print_dec(difficulty, 0, MAX_Y_POS + 2 * POS_Y_STEP);
 
     if (difficulty > 6) bugs_max = 5;      // На уровне сложности 7 и выше максимально 5 врагов одновременно
     else if (difficulty > 0) bugs_max = 4; // На уровне сложности со 1 до 6 (включительно) до 4 врагов одновременно
@@ -444,6 +400,43 @@ void init_level_state()
     done_snd = 0;
     bug_snd = 0;
     life_snd = 0;
+}
+
+/**
+ * @brief Прогрызть фон в соответствии с направлением движения и текущим положением
+ *
+ * @param dir - направление движения
+ * @param x_graph - графическая координата по оси X
+ * @param y_graph - графическая координата по оси Y
+ */
+void gnaw(enum direction dir, uint16_t x_graph, uint16_t y_graph)
+{
+    switch (dir)
+    {
+        case DIR_RIGHT:
+        {
+            sp_put(x_graph + 4, y_graph - 1, sizeof(outline_blank_right[0]), sizeof(outline_blank_right)/sizeof(outline_blank_right[0]), nullptr, (uint8_t*)outline_blank_right);
+            break;
+        }
+
+        case DIR_LEFT:
+        {
+            sp_put(x_graph - 2, y_graph - 1, sizeof(outline_blank_left[0]), sizeof(outline_blank_left)/sizeof(outline_blank_left[0]), nullptr, (uint8_t*)outline_blank_left);
+            break;
+        }
+
+        case DIR_DOWN:
+        {
+            sp_put(x_graph - 1, y_graph + 15, sizeof(outline_blamk_down[0]), sizeof(outline_blamk_down)/sizeof(outline_blamk_down[0]), nullptr, (uint8_t*)outline_blamk_down);
+            break;
+        }
+
+        case DIR_UP:
+        {
+            sp_put(x_graph - 1, y_graph - 7, sizeof(outline_blank_up[0]), sizeof(outline_blank_up)/sizeof(outline_blank_up[0]), nullptr, (uint8_t*)outline_blank_up);
+            break;
+        }
+    }
 }
 
 /**
@@ -519,9 +512,9 @@ void init_level()
                 *bg &= 0xF0;  // сбрасываем все биты h_bite фона для горизонтальных проходов
                 for (uint16_t i = 4; i > 0; --i)
                 {
-                    gnaw_right(x_graph - i, y_graph);
+                    gnaw(DIR_RIGHT, x_graph - i, y_graph);
                 }
-                gnaw_left (x_graph + 1, y_graph);
+                gnaw(DIR_LEFT, x_graph + 1, y_graph);
             }
 
             if (ls == LEV_V || ls == LEV_S)
@@ -529,9 +522,9 @@ void init_level()
                 *bg &= 0x0F;  // сбрасываем все биты v_bite фона для вертикальных проходов
                 for (uint16_t i = 15; i > 0; i -= 3)
                 {
-                    gnaw_down(x_graph, y_graph - i);
+                    gnaw(DIR_DOWN,x_graph, y_graph - i);
                 }
-                gnaw_up  (x_graph, y_graph + 3);
+                gnaw(DIR_UP, x_graph, y_graph + 3);
             }
 
             x_graph += POS_X_STEP;
@@ -864,24 +857,6 @@ void erase_trail(enum direction dir, uint16_t x_graph, uint16_t y_graph)
 }
 
 /**
- * @brief Прогрызть фон в соответствии с направлением движения и текущим положением
- *
- * @param dir - направление движения
- * @param x_graph - графическая координата по оси X
- * @param y_graph - графическая координата по оси Y
- */
-void gnaw_dir(enum direction dir, uint16_t x_graph, uint16_t y_graph)
-{
-    switch (dir)
-    {
-        case DIR_RIGHT: { gnaw_right(x_graph, y_graph); break; }
-        case DIR_LEFT:  { gnaw_left (x_graph, y_graph); break; }
-        case DIR_DOWN:  { gnaw_down (x_graph, y_graph); break; }
-        case DIR_UP:    { gnaw_up   (x_graph, y_graph); break; }
-    }
-}
-
-/**
  * @brief Обработка перемещения Ноббина/Хоббина
  *
  * @param bug - указатель на структуру с информацией о враге
@@ -1045,7 +1020,7 @@ void move_bug(struct bug_info *bug)
         clear_background_bits(bug_x_graph, bug_y_graph, bug->dir);
 
         // Стерерь кусочек фона на экране в соответствии с направлением движения и текущим положением
-        gnaw_dir(bug->dir, bug_x_graph, bug_y_graph);
+        gnaw(bug->dir, bug_x_graph, bug_y_graph);
 
         uint8_t bug_x_log = bug_abs_x_pos / POS_X_STEP;
         uint8_t bug_y_log = bug_abs_y_pos / POS_Y_STEP;
@@ -1361,7 +1336,7 @@ void sound_effect()
             sound(period, 2);
 
             uint16_t y_graph = man_y_graph - bounce[i >> 3];
-            gnaw_up(man_x_graph, y_graph);
+            gnaw(DIR_UP, man_x_graph, y_graph);
             // Анимация подпрыгивающего перевёрнутого Диггера
             sp_4_15_put(man_x_graph, y_graph, (uint8_t *)image_digger_turned_over);
 
@@ -1379,12 +1354,12 @@ void sound_effect()
 
         // Траурный марш
         #define NV 4
-        static const uint16_t music_dead_periods[]   = { C4 / NV, C4 / NV, C4 / NV, C4 / NV, DS4 / NV, D4 / NV, D4 / NV, C4 / NV, C4 / NV, B3 / NV, C4 / NV  };
-        static const uint16_t music_dead_durations[] = { N6, NQ, NE, N6, NQ,  NE, NQ, NE, NQ, NE, N12 };
+        static const uint8_t music_dead_periods[]   = { C4 / NV, C4 / NV, C4 / NV, C4 / NV, DS4 / NV, D4 / NV, D4 / NV, C4 / NV, C4 / NV, B3 / NV, C4 / NV  };
+        static const uint16_t music_dead_durations[] = { N6, NQ, NE, N6, NQ, NE, NQ, NE, NQ, NE, N12 };
 
         for (uint16_t i = 0; i < sizeof(music_dead_periods)/ sizeof(music_dead_periods[0]); ++i)
         {
-            uint16_t period = music_dead_periods[i];
+            uint8_t period = music_dead_periods[i];
             uint16_t duration = music_dead_durations[i];
             sound_vibrato(period, duration);
 
@@ -1410,11 +1385,11 @@ void sound_effect()
 
     if (done_snd) // Звук завершения уровня
     {
-        static const uint16_t done_periods[] = { C5 / NV, E5 / NV, G5 / NV, D5 / NV, F5 / NV, A5 / NV, E5 / NV, G5 / NV, B5 / NV, C5 / 2 / NV};
+        static const uint8_t done_periods[] = { C5 / NV, E5 / NV, G5 / NV, D5 / NV, F5 / NV, A5 / NV, E5 / NV, G5 / NV, B5 / NV, C5 / 2 / NV};
 
         for (uint16_t i = 0; i < sizeof(done_periods) / sizeof(done_periods[0]); ++i)
         {
-            uint16_t period = done_periods[i];
+            uint8_t period = done_periods[i];
             uint16_t durance = (i == 9) ? 800 : 300;
             sound_vibrato(period, durance);
             delay_ms(2);
@@ -1769,7 +1744,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                 bags_fall = 1; // Найден падающий мешок
 
                 // Прогрызть фон и сбросить биты матрицы фона
-                gnaw_up(bag_x_graph, bag_y_graph + 9);
+                gnaw(DIR_UP, bag_x_graph, bag_y_graph + 9);
                 clear_background_bits(bag_x_graph, bag_y_graph, DIR_DOWN); // Сбросить биты матрицы фона
 
                 // Стереть падающий мешок по старым координатам
@@ -2231,7 +2206,7 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
                     erase_trail(man_dir, man_x_graph, man_y_graph);
 
                     // Нарисовать "прогрыз" от движения Диггера
-                    gnaw_dir(man_dir, prev_man_x_graph, prev_man_y_graph);
+                    gnaw(man_dir, prev_man_x_graph, prev_man_y_graph);
                 }
             }
 
