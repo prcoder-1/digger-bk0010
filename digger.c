@@ -281,7 +281,7 @@ void print_lives()
 }
 
 /**
- * @brief Добавление заданного количества очков и аечать очков в левом верхнем углу экрана
+ * @brief Добавление заданного количества очков и вывод очков в левом верхнем углу экрана
  */
 void add_score(uint16_t score_add)
 {
@@ -567,38 +567,51 @@ uint8_t check_path(enum direction dir, struct bug_info *bug)
     const uint8_t abs_y_pos = bug->y_graph - FIELD_Y_OFFSET;
     const uint8_t x_log = abs_x_pos / POS_X_STEP;
     const uint8_t y_log = abs_y_pos / POS_Y_STEP;
+    const uint8_t cell_current = background[y_log][x_log];
 
     switch (dir)
     {
         case DIR_RIGHT:
         {
             if (x_log >= (W_MAX - 1)) return 0; // Если находимся у правого края
+
+            const uint8_t cell_right = background[y_log][x_log + 1];
+
             // Если клетка правее полностью проедена, а также есть прокус слева в клетке правее или прокус справа в текущей клетке
-            if (full_bite(background[y_log][x_log + 1]) && (((background[y_log][x_log + 1] & 1) == 0) || ((background[y_log][x_log] & 8) == 0))) return 1;
+            if (full_bite(cell_right) && (((cell_right & 1) == 0) || ((cell_current & 8) == 0))) return 1;
             break;
         }
 
         case DIR_LEFT:
         {
             if (!x_log) return 0; // Если находимся у левого края
+
+            const uint8_t cell_left = background[y_log][x_log - 1];
+
             // Если клетка левее полность проедена, и есть в ней прокус справа или прокус в текущей клетке слева клетки
-            if (full_bite(background[y_log][x_log - 1]) && (((background[y_log][x_log - 1] & 8) == 0) || ((background[y_log][x_log] & 1) == 0))) return 1;
+            if (full_bite(cell_left) && (((cell_left & 8) == 0) || ((cell_current & 1) == 0))) return 1;
             break;
         }
 
         case DIR_DOWN:
         {
             if (y_log >= (H_MAX - 1)) return 0; // Если находимся у нижнего края
+
+            const uint8_t cell_down = background[y_log + 1][x_log];
+
             // Если клетка ниже полность проедена, и есть в ней прокус сверху или снизу текущей клетки
-            if (full_bite(background[y_log + 1][x_log]) && (((background[y_log + 1][x_log] & 0x10) == 0) || ((background[y_log][x_log] & 0x80) == 0))) return 1;
+            if (full_bite(cell_down) && (((cell_down & 0x10) == 0) || ((cell_current & 0x80) == 0))) return 1;
             break;
         }
 
         case DIR_UP:
         {
             if (!y_log) return 0; // Если находимся у верхнего края
+
+            const uint8_t cell_up = background[y_log - 1][x_log];
+
             // Если клетка выше полность проедена, и есть в ней прокус снизу или сверху текущеёклетки
-            if (full_bite(background[y_log - 1][x_log]) && (((background[y_log - 1][x_log] & 0x80) == 0) || ((background[y_log][x_log] & 0x10) == 0))) return 1;
+            if (full_bite(cell_up) && (((cell_up & 0x80) == 0) || ((cell_current & 0x10) == 0))) return 1;
             break;
         }
     }
