@@ -1669,7 +1669,6 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
         uint8_t bag_y_log = bag_abs_y_pos / POS_Y_STEP;
         uint8_t bag_x_rem = bag_abs_x_pos % POS_X_STEP;
         uint8_t bag_y_rem = (bag_abs_y_pos % POS_Y_STEP) >> 2;
-        uint8_t floor_broken = background[bag_y_log + 1][bag_x_log] != 0xFF;
 
         switch (bag->state)
         {
@@ -1682,7 +1681,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
             {
                 if (bag_x_rem == 0) // Если мешок находится в серединге клетки игрового поля по-горизонтали
                 {
-                    if (floor_broken) // Если клетка ниже повреждена
+                    if (background[bag_y_log + 1][bag_x_log] != 0xFF) // Если клетка ниже повреждена
                     {
                         switch (bag->dir)
                         {
@@ -1798,7 +1797,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                     bag->count++; // Увеличить количество этажей, которые пролетел мешок
 
                     // Остановить мешок, если клетка под ним не повреждена или он долетел до последнего этажа
-                    if (!floor_broken || (bag_y_log == H_MAX - 1)) stop_bag(bag);
+                    if ((bag_y_log == H_MAX - 1) || (background[bag_y_log + 1][bag_x_log] == 0xFF)) stop_bag(bag);
                 }
 
                 remove_coin(bag_x_log, bag_y_log); // Удалить монету в клетке куда попал мешок
