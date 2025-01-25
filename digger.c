@@ -509,7 +509,7 @@ void init_level()
             }
             else if (ls == LEV_H || ls == LEV_S)
             {
-                *bg |= 0xF0;  // устанавливаем все биты h_bite фона для горизонтальных проходов
+                *bg |= 0x0F;  // устанавливаем все биты состояния фона для горизонтальных проходов
                 for (uint16_t i = 4; i > 0; --i)
                 {
                     gnaw(DIR_RIGHT, x_graph - i, y_graph);
@@ -519,7 +519,7 @@ void init_level()
 
             if (ls == LEV_V || ls == LEV_S)
             {
-                *bg |= 0x0F;  // устанавливаем все биты v_bite фона для вертикальных проходов
+                *bg |= 0xF0;  // устанавливаем все биты состояния фона для вертикальных проходов
                 for (uint16_t i = 15; i > 0; i -= 3)
                 {
                     gnaw(DIR_DOWN,x_graph, y_graph - i);
