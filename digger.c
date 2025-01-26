@@ -878,41 +878,24 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
  */
 void erase_trail(enum direction dir, uint16_t x_graph, uint16_t y_graph)
 {
-    uint8_t x_size, y_size;
-
     switch (dir)
     {
-        case DIR_LEFT:
-        {
-            x_graph += 4;
-            x_size = MOVE_X_STEP;
-            y_size = 15;
-            break;
-        }
+        case DIR_LEFT:  { x_graph += 4;           break; }
+        case DIR_RIGHT: { x_graph -= MOVE_X_STEP; break; }
+        case DIR_UP:    { y_graph += 15;          break; }
+        case DIR_DOWN:  { y_graph -= MOVE_Y_STEP; break; }
+    }
 
-        case DIR_RIGHT:
-        {
-            x_graph -= MOVE_X_STEP;
-            x_size = MOVE_X_STEP;
-            y_size = 15;
-            break;
-        }
-
-        case DIR_UP:
-        {
-            y_graph += 15;
-            x_size = 4;
-            y_size = MOVE_Y_STEP;
-            break;
-        }
-
-        case DIR_DOWN:
-        {
-            y_graph -= MOVE_Y_STEP;
-            x_size = 4;
-            y_size = MOVE_Y_STEP;
-            break;
-        }
+    uint8_t x_size, y_size;
+    if (dir == DIR_LEFT || dir == DIR_RIGHT)
+    {
+        x_size = MOVE_X_STEP;
+        y_size = 15;
+    }
+    else
+    {
+        x_size = 4;
+        y_size = MOVE_Y_STEP;
     }
 
     sp_paint_brick(x_graph, y_graph, x_size, y_size, 0);
