@@ -2174,12 +2174,19 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
             else
             {
                 // Обработка управления с джойстика
-                volatile uint16_t par_port = ~*((uint16_t *)REG_PAR_INTERF); // Состояние регистра параллельного порта
-                if (par_port & (1 << PAR_INTERF_UP)) man_new_dir = DIR_UP;
-                else if (par_port & (1 << PAR_INTERF_DOWN)) man_new_dir = DIR_DOWN;
-                if (par_port & (1 << PAR_INTERF_RIGHT)) man_new_dir = DIR_RIGHT;
-                else if (par_port & (1 << PAR_INTERF_LEFT)) man_new_dir = DIR_LEFT;
-                if (!mis_wait && (par_port & ((1 << PAR_INTERF_BUTTON_1) | (1 << PAR_INTERF_BUTTON_2)))) mis_fire = 1;
+                static uint16_t old_port_state = 0; // Предыдущее состояние параллельного порта
+                volatile uint16_t new_port_state = *((uint16_t *)REG_PAR_INTERF); // Состояние регистра параллельного порта
+                uint16_t port_state = new_port_state & ~old_port_state; // Оставить только те биты, которые появились в этот раз
+                old_port_state = new_port_state;
+
+                // print_dec(port_state, 0, MAX_Y_POS + 2 * POS_Y_STEP);
+
+                     if (port_state & (1 << PAR_INTERF_UP))    man_new_dir = DIR_UP;
+                else if (port_state & (1 << PAR_INTERF_DOWN))  man_new_dir = DIR_DOWN;
+                     if (port_state & (1 << PAR_INTERF_RIGHT)) man_new_dir = DIR_RIGHT;
+                else if (port_state & (1 << PAR_INTERF_LEFT))  man_new_dir = DIR_LEFT;
+
+                if (!mis_wait && (port_state & ((1 << PAR_INTERF_BUTTON_1) | (1 << PAR_INTERF_BUTTON_2)))) mis_fire = 1;
             }
 
             // Если новое желаемое направление движения вверх-вниз, то применить его в середине клетки по-горизонтали
@@ -2195,7 +2202,7 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
             }
 
             // Если клавишу перестали удерживать, то остановиться
-            if ((((union EXT_DEV *)REG_EXT_DEV)->bits.MAG_KEY) && (!~*((uint16_t *)REG_PAR_INTERF))) man_dir = DIR_STOP;
+            if ((((union EXT_DEV *)REG_EXT_DEV)->bits.MAG_KEY) && (!*((uint16_t *)REG_PAR_INTERF))) man_dir = DIR_STOP;
 
             // Остановиться при попытке выхода за игровое поле
             if (check_out_of_range(man_dir, man_x_graph, man_y_graph))
