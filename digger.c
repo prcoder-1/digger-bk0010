@@ -1372,6 +1372,10 @@ void sound_effect()
 
     if (man_rip_snd) // Звук гибели Диггера плюс анимация подпрыгивания, надгробный камень и траурный марш
     {
+        man_rip_snd = 0;
+        man_state = CREATURE_AFTER_RIP;
+        mis_fire = 0;
+
         // Звук убиения Диггера
 
         // Последовательность высоты на которую подпрыгивает перевёрнутый Диггер
@@ -1418,9 +1422,6 @@ void sound_effect()
 
             delay_ms(30);
         }
-
-        man_state = CREATURE_AFTER_RIP;
-        man_rip_snd = 0;
     }
 
     if (chase_snd) // Звук включения бонус-режима
