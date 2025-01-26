@@ -299,6 +299,14 @@ void add_score(uint16_t score_add)
 }
 
 /**
+ * @brief Добавление очков за убитого врага
+ */
+void add_score_250()
+{
+    add_score(250); // 250 очков за убитого врага
+}
+
+/**
  * @brief Стирает блок 16x15 пикселей (4x15 байт)
  *
  * @param x_graph - координата X блока
@@ -1614,7 +1622,7 @@ void process_bugs()
 
                 bug->count = 1;
                 bug->state = CREATURE_RIP; // Враг лежит дохлый
-                add_score(250); // 250 очков за убитого врага
+                add_score_250(); // Добавить 250 очков за убитого врага
                 break;
             }
 
@@ -2017,7 +2025,7 @@ void process_missile()
                     {
                         explode = 1; // Взорвать выстрел
                         bug->state = CREATURE_RIP; // Враг был убит выстрелом
-                        add_score(250); // 250 очков за убитого врага
+                        add_score_250(); // Добавить 250 очков за убитого врага
 
                         // В бонус-режиме увеличить количество создаваемых врагов компенсируя убитых мешками
                         if (bonus_state == BONUS_ON)
@@ -2198,7 +2206,7 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
                 if (++coin_snd_note == 7) // Перейти к следующей ноте
                 {
                     coin_snd_note = -1;
-                    add_score(250); // 250 очков за съедение восьми последовательных монет
+                    add_score_250(); // Добавить 250 очков за съедение восьми последовательных монет
                 }
             }
 
