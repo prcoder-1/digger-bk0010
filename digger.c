@@ -847,13 +847,18 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
     if (!rv)
     {
         uint8_t bag_abs_x_pos = bag_x_graph - FIELD_X_OFFSET;
-        uint8_t bag_x_rem = bag_abs_x_pos % POS_X_STEP;
+        uint8_t bag_abs_y_pos = bag_y_graph - FIELD_Y_OFFSET;
+        uint8_t bag_x_log = bag_abs_x_pos / POS_X_STEP;
+        uint8_t bag_y_log = bag_abs_y_pos / POS_Y_STEP;
 
         // Стирание мешка по старым координатам
         sp_put(bag->x_graph, bag->y_graph, 4, 15, nullptr, (uint8_t *)outline_bag);
 
         // Отрисовка спрайта передвигаемого мешка
         sp_put(bag_x_graph, bag_y_graph, 4, 15, (uint8_t *)image_bag, (uint8_t *)outline_bag);
+
+        clear_background_bits(bag_x_graph, bag_y_graph, dir); // Сбросить биты матрицы фона
+        remove_coin(bag_x_log, bag_y_log); // Удалить монеты уничтоженные мешком
 
         // Установить новые координаты мешка
         bag->dir = dir;
