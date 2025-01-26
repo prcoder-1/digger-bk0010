@@ -2145,7 +2145,7 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
                     case 25: man_new_dir = DIR_RIGHT; break; // Стрелка вправо
                     case 26: man_new_dir = DIR_UP;    break; // Стрелка вверх
                     case 27: man_new_dir = DIR_DOWN;  break; // Стрелка вниз
-                    case 32: mis_fire = 1;            break; // Клавиша выстрела (пробел)
+                    case 32: if (!mis_wait) mis_fire = 1;  break; // Клавиша выстрела (пробел)
                     case 12: while (!(((union KEY_STATE *)REG_KEY_STATE)->reg & (1 << KEY_STATE_STATE))); break; // Пауза
 #if defined(DEBUG)
                     case 'D': difficulty++;           break; // Добавление уровня сложности
