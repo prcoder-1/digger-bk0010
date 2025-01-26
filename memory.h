@@ -186,6 +186,20 @@ union TVE_CSR
 };
 
 /**
+ * @brief Номера битов регистра параллельного интерфейса (порта ввода-вывода)
+ *        (Для использования совместно с манипулятором игровым "Электроника")
+ */
+enum PAR_INTERF_BITS
+{
+    PAR_INTERF_UP = 0,
+    PAR_INTERF_RIGHT,
+    PAR_INTERF_DOWN,
+    PAR_INTERF_LEFT,
+    PAR_INTERF_BUTTON_1,
+    PAR_INTERF_BUTTON_2
+};
+
+/**
  * @brief Номера битов регистра управления системными внешними устройствами
  */
 enum EXT_DEV_BITS
