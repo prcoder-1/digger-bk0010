@@ -1132,8 +1132,12 @@ void move_bug(struct bug_info *bug)
         }
     }
 
-    // Подтереть след врага с нужной стороны
-    erase_trail(bug->dir, bug->x_graph, bug->y_graph);
+    // Если враг сдвинулся
+    if ((bug->x_graph != bug_x_graph) || (bug->y_graph != bug_y_graph))
+    {
+        // Подтереть след врага с нужной стороны
+        erase_trail(bug->dir, bug->x_graph, bug->y_graph);
+    }
 
     // Увеличить/уменьшить фазу на единицу
     bug->image_phase += bug->image_phase_inc;
@@ -1501,7 +1505,7 @@ void process_bugs()
                         bug->y_graph = bug_start_y;     // Начальная графическая координата по оси Y
                         bug->dead_bag = 0;              // Указатель на мешок, коттторый убил врага
                         bug->type = BUG_NOBBIN;         // Враги рождаются в виде Ноббинов
-                        bug->dir = DIR_LEFT;            // Начальное направление движения
+                        bug->dir = DIR_STOP;            // Начальное направление движения
 
                         bugs_active++;  // Увеличить счётчик активных врагов
                         bugs_created++; // Увеличить общее количество созданных врагов
@@ -2013,6 +2017,7 @@ void process_missile()
                     {
                         explode = 1; // Взорвать выстрел
                         bug->state = CREATURE_RIP; // Враг был убит выстрелом
+                        add_score(250); // 250 очков за убитого врага
 
                         // В бонус-режиме увеличить количество создаваемых врагов компенсируя убитых мешками
                         if (bonus_state == BONUS_ON)
