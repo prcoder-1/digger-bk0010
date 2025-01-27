@@ -150,7 +150,6 @@ uint16_t man_wait;             /// Задержка перед следующи�
 uint16_t man_x_graph;          /// Положение Диггера по оси X в графических координатах
 uint16_t man_y_graph;          /// Положение Диггера по оси Y в графических координатах
 enum direction man_dir;        /// Направление движения Диггера
-enum direction man_new_dir;    /// Желаемое направление движение Диггера (команда с клавиатуры)
 enum direction man_prev_dir;   /// Предыдущее направление движения Диггера
 enum creature_state man_state; /// Состояние Диггера (жив, убит, лежит дохлый)
 struct bag_info *man_dead_bag; /// Указатель на мешок от котрого погиб Диггер
@@ -380,7 +379,6 @@ void init_level_state()
 
     // Инициализация переменных Диггера
     man_dir = DIR_RIGHT;
-    man_new_dir = DIR_RIGHT;
     man_prev_dir = DIR_RIGHT;
     man_x_graph = FIELD_X_OFFSET + MAN_START_X * POS_X_STEP; // Исходная координата Диггера на экране по оси X
     man_y_graph = FIELD_Y_OFFSET + MAN_START_Y * POS_Y_STEP; // Исходная координата Диггера на экране по оси Y
@@ -2148,10 +2146,12 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
         if (man_wait) man_wait--; // Если Диггер в режиме задержки (при толкании мешков)
         else
         {
+            enum direction man_new_dir = DIR_STOP;
+
             // Обработка управления с клавиатуры
-            if (((union KEY_STATE *)REG_KEY_STATE)->reg & (1 << KEY_STATE_STATE)) // Если поступил новый скан-код клавиши
+            if (!(((union EXT_DEV *)REG_EXT_DEV)->bits.MAG_KEY)) // Если удерживают клавишу на клавиатуре
             {
-                // Сохранить новое направление соответствующее полученному скан-коду
+                // Сохранить новое направление соответствующее скан-коду клавиши
                 uint8_t code = *((uint8_t *)REG_KEY_DATA);
                 switch (code)
                 {
@@ -2166,28 +2166,23 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
                     case 'L': lives++; print_lives(); break; // Добавление жизни
                     case 'N': done_snd = 1;           break; // Переход на следующий уровень
                     default: print_dec(code, 16, MAX_Y_POS + 2 * POS_Y_STEP); // Печать кода клавиши
-#else
-                    default: man_new_dir = DIR_STOP;
 #endif
                 }
             }
-            else
+
+            // Обработка управления с джойстика
+            volatile uint16_t port_state = *((uint16_t *)REG_PAR_INTERF); // Состояние регистра параллельного порта
+            // print_dec(port_state, 0, MAX_Y_POS + 2 * POS_Y_STEP);
+
+            // Раскладка направлений манипулятора "Электроника"
+            static const enum direction directions[] = { DIR_UP, DIR_RIGHT, DIR_DOWN, DIR_LEFT };
+            for (uint16_t i = 0; i < sizeof(directions); ++i)
             {
-                // Обработка управления с джойстика
-                static uint16_t old_port_state = 0; // Предыдущее состояние параллельного порта
-                volatile uint16_t new_port_state = *((uint16_t *)REG_PAR_INTERF); // Состояние регистра параллельного порта
-                uint16_t port_state = new_port_state & ~old_port_state; // Оставить только те биты, которые появились в этот раз
-                old_port_state = new_port_state;
-
-                // print_dec(port_state, 0, MAX_Y_POS + 2 * POS_Y_STEP);
-
-                     if (port_state & (1 << PAR_INTERF_UP))    man_new_dir = DIR_UP;
-                else if (port_state & (1 << PAR_INTERF_DOWN))  man_new_dir = DIR_DOWN;
-                     if (port_state & (1 << PAR_INTERF_RIGHT)) man_new_dir = DIR_RIGHT;
-                else if (port_state & (1 << PAR_INTERF_LEFT))  man_new_dir = DIR_LEFT;
-
-                if (!mis_wait && (port_state & ((1 << PAR_INTERF_BUTTON_1) | (1 << PAR_INTERF_BUTTON_2)))) mis_fire = 1;
+                if (port_state & (1 << i)) man_new_dir = directions[i];
             }
+
+            // Проверка на левую и правую кнопку манипулятора "Электроника"
+            if (!mis_wait && (port_state & ((1 << PAR_INTERF_LEFT_BUTTON) | (1 << PAR_INTERF_RIGHT_BUTTON)))) mis_fire = 1;
 
             // Если новое желаемое направление движения вверх-вниз, то применить его в середине клетки по-горизонтали
             if (man_x_rem == 0 && (man_new_dir == DIR_UP || man_new_dir == DIR_DOWN))
@@ -2201,11 +2196,8 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
                 man_dir = man_new_dir;
             }
 
-            // Если клавишу перестали удерживать, то остановиться
-            if ((((union EXT_DEV *)REG_EXT_DEV)->bits.MAG_KEY) && (!*((uint16_t *)REG_PAR_INTERF))) man_dir = DIR_STOP;
-
             // Остановиться при попытке выхода за игровое поле
-            if (check_out_of_range(man_dir, man_x_graph, man_y_graph))
+            if ((man_new_dir == DIR_STOP) || check_out_of_range(man_dir, man_x_graph, man_y_graph))
             {
                 man_dir = DIR_STOP;
             }
