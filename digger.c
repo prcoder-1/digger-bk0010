@@ -36,6 +36,8 @@
 #define BONUS_IND_START (MAX_Y_POS + 28)
 #define MAX_LIVES 4 // Максимальное количество жизней
 
+#define NV 4 // Делитель для звуковой процедуры "вибрато"
+
 /**
  * @brief Перечисление типов врагов
  */
@@ -67,8 +69,7 @@ enum creature_state : uint8_t
     CREATURE_ALIVE,          /**< Жив */
     CREATURE_STARTING,       /**< Стратует */
     CREATURE_DEAD_MONEY_BAG, /**< Убит мешком с деньгами */
-    CREATURE_RIP,            /**< Лежит дохлый */
-    CREATURE_AFTER_RIP       /**< После того, как появился RIP */
+    CREATURE_RIP             /**< Лежит дохлый */
 };
 
 enum bag_state : uint8_t
@@ -190,7 +191,6 @@ uint32_t score;      /// Количество очков
 
 // Переменные отвечающие за вывод звуков
 uint16_t snd_effects;        /// Флаг, показывающий, что звуковые эффекты включены
-uint8_t  man_rip_snd;        /// Флаг, означающий, что звук и анимация RIP включены
 uint8_t  chase_snd;          /// Флаг, означающий, что звук включения бонус-режима активн
 uint8_t  chase_snd_flip;     /// Флаг переключающий тональность звука при включении/выключении бонус-режима
 uint8_t  loose_snd;          /// Флаг, означающий, что звук качающегося мешка включен
@@ -404,7 +404,6 @@ void init_level_state()
     loose_snd = 0;
     fall_snd = 0;
     money_snd = 0;
-    man_rip_snd = 0;
     chase_snd = 0;
     chase_snd_flip = 0;
     done_snd = 0;
@@ -1384,59 +1383,6 @@ void sound_effect()
         money_snd = 0;
     }
 
-    if (man_rip_snd) // Звук гибели Диггера плюс анимация подпрыгивания, надгробный камень и траурный марш
-    {
-        man_rip_snd = 0;
-        man_state = CREATURE_AFTER_RIP;
-
-        // Звук убиения Диггера
-
-        // Последовательность высоты на которую подпрыгивает перевёрнутый Диггер
-        static uint8_t bounce[8] = { 3, 5, 6, 6, 5, 4, 3, 0 };
-
-        uint16_t period = 19000 / N;
-        uint16_t i = 0;
-        while (period < 36000 / N)
-        {
-            sound(period, 2);
-
-            uint16_t y_graph = man_y_graph - bounce[i >> 3];
-            gnaw(DIR_UP, man_x_graph, y_graph);
-            // Анимация подпрыгивающего перевёрнутого Диггера
-            sp_4_15_put(man_x_graph, y_graph, (uint8_t *)image_digger_turned_over);
-
-            if (i++ < 10)
-            {
-                period -= 1000 / N;
-            }
-            else
-            {
-                period += 500 / N;
-            }
-        }
-
-        delay_ms(500);
-
-        // Траурный марш
-        #define NV 4
-        static const uint8_t music_dead_periods[]   = { C4 / NV, C4 / NV, C4 / NV, C4 / NV, DS4 / NV, D4 / NV, D4 / NV, C4 / NV, C4 / NV, B3 / NV, C4 / NV  };
-        static const uint16_t music_dead_durations[] = { N6, NQ, NE, N6, NQ, NE, NQ, NE, NQ, NE, N12 };
-
-        for (uint16_t i = 0; i < sizeof(music_dead_periods)/ sizeof(music_dead_periods[0]); ++i)
-        {
-            uint8_t period = music_dead_periods[i];
-            uint16_t duration = music_dead_durations[i];
-            sound_vibrato(period, duration);
-
-            if (i < sizeof(image_rip) / sizeof(image_rip[0]))
-            {
-                sp_4_15_put(man_x_graph, man_y_graph, (uint8_t *)image_rip[i]);
-            }
-
-            delay_ms(30);
-        }
-    }
-
     if (chase_snd) // Звук включения бонус-режима
     {
         uint16_t durance = 100;
@@ -2137,6 +2083,8 @@ void process_missile()
     }
 }
 
+void man_rip();
+
 /**
  * @brief Обработка Диггера
  */
@@ -2342,11 +2290,7 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
                     bugs_active--; // Уменьшить количество активных врагов
                     bugs_total++;  // Увеличить количество создаваемых врагов компенсируя съеденных
                 }
-                else
-                {
-                    man_state = CREATURE_RIP;
-                    man_rip_snd = 1;
-                }
+                else man_rip();
             }
 
             man_prev_dir = man_dir;
@@ -2369,12 +2313,62 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
 
             if (man_dead_bag->dir == DIR_STOP)
             {
-                man_state = CREATURE_RIP;
                 man_y_graph -= MOVE_Y_STEP;
-                man_rip_snd = 1;
+                man_rip();
             }
         }
     }
+}
+
+void man_rip()
+{
+    // Звук убиения Диггера
+
+    // Последовательность высоты на которую подпрыгивает перевёрнутый Диггер
+    static uint8_t bounce[8] = { 3, 5, 6, 6, 5, 4, 3, 0 };
+
+    uint16_t period = 19000 / N;
+    uint16_t i = 0;
+    while (period < 36000 / N)
+    {
+        if (snd_effects) sound(period, 2);
+
+        uint16_t y_graph = man_y_graph - bounce[i >> 3];
+        gnaw(DIR_UP, man_x_graph, y_graph);
+        // Анимация подпрыгивающего перевёрнутого Диггера
+        sp_4_15_put(man_x_graph, y_graph, (uint8_t *)image_digger_turned_over);
+
+        if (i++ < 10)
+        {
+            period -= 1000 / N;
+        }
+        else
+        {
+            period += 500 / N;
+        }
+    }
+
+    delay_ms(500);
+
+    // Траурный марш
+    static const uint8_t music_dead_periods[]   = { C4 / NV, C4 / NV, C4 / NV, C4 / NV, DS4 / NV, D4 / NV, D4 / NV, C4 / NV, C4 / NV, B3 / NV, C4 / NV  };
+    static const uint16_t music_dead_durations[] = { N6, NQ, NE, N6, NQ, NE, NQ, NE, NQ, NE, N12 };
+
+    for (uint16_t i = 0; i < sizeof(music_dead_periods)/ sizeof(music_dead_periods[0]); ++i)
+    {
+        uint8_t period = music_dead_periods[i];
+        uint16_t duration = music_dead_durations[i];
+        if (snd_effects) sound_vibrato(period, duration);
+
+        if (i < sizeof(image_rip) / sizeof(image_rip[0]))
+        {
+            sp_4_15_put(man_x_graph, man_y_graph, (uint8_t *)image_rip[i]);
+        }
+
+        delay_ms(30);
+    }
+
+    man_state = CREATURE_RIP;
 }
 
 /**
@@ -2421,7 +2415,7 @@ void process_game_state()
     if (coin_time > 0) coin_time--;
     else coin_snd_note = -1;
 
-    if (man_state == CREATURE_AFTER_RIP)
+    if (man_state == CREATURE_RIP)
     {
         lives--;                    // Уменьшить количество жизней
         print_lives();              // Вывести количество жизней
