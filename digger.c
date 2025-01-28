@@ -2451,9 +2451,12 @@ void process_game_state()
  */
 void main()
 {
-    // EMT_14();
+    EMT_14();
     // EMT_16(0233);
     // EMT_16(0236);
+
+    typedef void (*vector)();
+    *((volatile vector *)VEC_STOP) = main; // Установить вектор клавиши "СТОП" на main()
 
     set_PSW(1 << PSW_I); // Замаскировать прерывания IRQ
     ((union KEY_STATE *)REG_KEY_STATE)->bits.INT_MASK = 1; // Отключить прерывание от клавиатуры
