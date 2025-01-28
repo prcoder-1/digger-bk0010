@@ -395,7 +395,7 @@ void init_level_state()
     mis_explode = 0;
 
     // Инициализация переменных используемых для звуковых эффектов
-    snd_effects = 0; // Звуковые эффекты включены
+    snd_effects = 1; // Звуковые эффекты включены
     coin_snd = 0;
     coin_snd_note = -1;
     coin_time = 0;
