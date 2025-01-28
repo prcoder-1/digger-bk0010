@@ -2148,11 +2148,30 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
         {
             enum direction man_new_dir = DIR_STOP;
 
-            // Обработка управления с клавиатуры
-            if (!(((union EXT_DEV *)REG_EXT_DEV)->bits.MAG_KEY)) // Если удерживают клавишу на клавиатуре
+            // Обработка управления с клавиатуры и джойстика
+            volatile uint16_t port_state = *((uint16_t *)REG_PAR_INTERF); // Состояние регистра параллельного порта
+            // print_dec(port_state, 0, MAX_Y_POS + 2 * POS_Y_STEP);
+            uint8_t key_pressed = !(((union EXT_DEV *)REG_EXT_DEV)->bits.MAG_KEY);
+            if (key_pressed || port_state) // Если удерживают клавишу на клавиатуре или направление на джойстике
             {
-                // Сохранить новое направление соответствующее скан-коду клавиши
-                uint8_t code = *((uint8_t *)REG_KEY_DATA);
+                uint8_t code = *((uint8_t *)REG_KEY_DATA); // Скан-код нажатой клавиши
+
+                static const enum direction joy_dirs[] = { DIR_UP, DIR_RIGHT, DIR_DOWN, DIR_LEFT };
+                static const uint8_t key_codes[] = { 26, 25, 27, 8 };
+
+                // Раскладка направлений манипулятора "Электроника"
+                for (uint16_t i = 0; i < sizeof(joy_dirs); ++i)
+                {
+                    if ((key_pressed && (code == key_codes[i])) || (port_state & (1 << i)))
+                    {
+                        man_new_dir = joy_dirs[i];
+                        break;
+                    }
+                }
+
+                if (!mis_wait && ((code == 32) || (port_state & ((1 << PAR_INTERF_LEFT_BUTTON) | (1 << PAR_INTERF_RIGHT_BUTTON))))) mis_fire = 1;
+            }
+/*
                 switch (code)
                 {
                     case 8:  man_new_dir = DIR_LEFT;  break; // Стрелка влево
@@ -2168,21 +2187,7 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
                     default: print_dec(code, 16, MAX_Y_POS + 2 * POS_Y_STEP); // Печать кода клавиши
 #endif
                 }
-            }
-
-            // Обработка управления с джойстика
-            volatile uint16_t port_state = *((uint16_t *)REG_PAR_INTERF); // Состояние регистра параллельного порта
-            // print_dec(port_state, 0, MAX_Y_POS + 2 * POS_Y_STEP);
-
-            // Раскладка направлений манипулятора "Электроника"
-            static const enum direction directions[] = { DIR_UP, DIR_RIGHT, DIR_DOWN, DIR_LEFT };
-            for (uint16_t i = 0; i < sizeof(directions); ++i)
-            {
-                if (port_state & (1 << i)) man_new_dir = directions[i];
-            }
-
-            // Проверка на левую и правую кнопку манипулятора "Электроника"
-            if (!mis_wait && (port_state & ((1 << PAR_INTERF_LEFT_BUTTON) | (1 << PAR_INTERF_RIGHT_BUTTON)))) mis_fire = 1;
+*/
 
             // Если новое желаемое направление движения вверх-вниз, то применить его в середине клетки по-горизонтали
             if (man_x_rem == 0 && (man_new_dir == DIR_UP || man_new_dir == DIR_DOWN))
@@ -2224,9 +2229,6 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
                 }
             }
 
-            // Если Диггер движется, то очистить биты фона, который был "прогрызен"
-            if (man_dir != DIR_STOP) clear_background_bits(man_x_graph, man_y_graph, man_dir);
-
             uint8_t prev_man_x_graph = man_x_graph;
             uint8_t prev_man_y_graph = man_y_graph;
 
@@ -2240,6 +2242,7 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
             }
 
             if (man_dir == DIR_STOP) man_dir = man_prev_dir;
+            else clear_background_bits(man_x_graph, man_y_graph, man_dir); // Если Диггер движется, то очистить биты фона, который был "прогрызен"
 
             // Удалить монеты съеденные Диггером
             if (remove_coin(man_x_log, man_y_log))
