@@ -189,6 +189,7 @@ int16_t  lives;      /// Количество жизней
 uint32_t score;      /// Количество очков
 
 // Переменные отвечающие за вывод звуков
+uint16_t snd_effects;        /// Флаг, показывающий, что звуковые эффекты включены
 uint8_t  man_rip_snd;        /// Флаг, означающий, что звук и анимация RIP включены
 uint8_t  chase_snd;          /// Флаг, означающий, что звук включения бонус-режима активн
 uint8_t  chase_snd_flip;     /// Флаг переключающий тональность звука при включении/выключении бонус-режима
@@ -394,6 +395,7 @@ void init_level_state()
     mis_explode = 0;
 
     // Инициализация переменных используемых для звуковых эффектов
+    snd_effects = 0; // Звуковые эффекты включены
     coin_snd = 0;
     coin_snd_note = -1;
     coin_time = 0;
@@ -2151,11 +2153,11 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
             // Обработка управления с клавиатуры и джойстика
             volatile uint16_t port_state = *((uint16_t *)REG_PAR_INTERF); // Состояние регистра параллельного порта
             // print_dec(port_state, 0, MAX_Y_POS + 2 * POS_Y_STEP);
-            uint8_t key_pressed = !(((union EXT_DEV *)REG_EXT_DEV)->bits.MAG_KEY);
+            volatile uint8_t key_pressed = !(((union EXT_DEV *)REG_EXT_DEV)->bits.MAG_KEY);
+            volatile uint8_t new_code = (*(uint8_t *)REG_KEY_STATE) & (1 << KEY_STATE_STATE);
+            volatile uint8_t code = *((uint8_t *)REG_KEY_DATA); // Скан-код нажатой клавиши
             if (key_pressed || port_state) // Если удерживают клавишу на клавиатуре или направление на джойстике
             {
-                uint8_t code = *((uint8_t *)REG_KEY_DATA); // Скан-код нажатой клавиши
-
                 static const enum direction joy_dirs[] = { DIR_UP, DIR_RIGHT, DIR_DOWN, DIR_LEFT };
                 static const uint8_t key_codes[] = { 26, 25, 27, 8 };
 
@@ -2168,26 +2170,24 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
                         break;
                     }
                 }
-
-                if (!mis_wait && ((code == 32) || (port_state & ((1 << PAR_INTERF_LEFT_BUTTON) | (1 << PAR_INTERF_RIGHT_BUTTON))))) mis_fire = 1;
             }
-/*
+
+            if (!mis_wait && ((code == 32) || (port_state & ((1 << PAR_INTERF_LEFT_BUTTON) | (1 << PAR_INTERF_RIGHT_BUTTON))))) mis_fire = 1;
+
+            if (new_code) // Если поступил новый скан-код
+            {
                 switch (code)
                 {
-                    case 8:  man_new_dir = DIR_LEFT;  break; // Стрелка влево
-                    case 25: man_new_dir = DIR_RIGHT; break; // Стрелка вправо
-                    case 26: man_new_dir = DIR_UP;    break; // Стрелка вверх
-                    case 27: man_new_dir = DIR_DOWN;  break; // Стрелка вниз
-                    case 32: if (!mis_wait) mis_fire = 1;  break; // Клавиша выстрела (пробел)
-                    case 12: while (!(((union KEY_STATE *)REG_KEY_STATE)->reg & (1 << KEY_STATE_STATE))); break; // Пауза
+                    case 12: while (!((*(volatile uint8_t *)REG_KEY_STATE) & (1 << KEY_STATE_STATE))); break; // СБР - Пауза
+                    case 'S': snd_effects = !snd_effects; break; // Переключить состояние звуковых эффектов
 #if defined(DEBUG)
-                    case 'D': difficulty++;           break; // Добавление уровня сложности
-                    case 'L': lives++; print_lives(); break; // Добавление жизни
-                    case 'N': done_snd = 1;           break; // Переход на следующий уровень
-                    default: print_dec(code, 16, MAX_Y_POS + 2 * POS_Y_STEP); // Печать кода клавиши
+                    case 'D': difficulty++;               break; // Добавление уровня сложности
+                    case 'L': lives++; print_lives();     break; // Добавление жизни
+                    case 'N': done_snd = 1;               break; // Переход на следующий уровень
+                    default:  print_dec(code, 16, MAX_Y_POS + 2 * POS_Y_STEP); // Печать кода необработанной клавиши
 #endif
                 }
-*/
+            }
 
             // Если новое желаемое направление движения вверх-вниз, то применить его в середине клетки по-горизонтали
             if (man_x_rem == 0 && (man_new_dir == DIR_UP || man_new_dir == DIR_DOWN))
@@ -2493,7 +2493,7 @@ void main()
         process_missile();
         process_man(man_x_log, man_y_log, man_x_rem, man_y_rem);
         process_bonus();
-        sound_effect();
+        if (snd_effects) sound_effect();
         process_game_state();
 #if defined(DEBUG)
         // Рспечатать оставшееся свободное время
