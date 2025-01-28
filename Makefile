@@ -5,6 +5,8 @@ XGCC=/home/prcoder/xgcc
 GCC_FLAGS=-std=gnu23 -fomit-frame-pointer -msoft-float -fcprop-registers -fPIC -nostartfiles -nodefaultlibs -nostdlib -m10 $(OPT_FLAG) -I$(XGCC)/include
 GCC_ASM_FLAGS=-S -fverbose-asm
 AS_FLAGS=-mno-fpu -mlimited-eis -pic
+GMPI_API_URL=http://10.0.0.55/api
+GMPI_UPLOAD_DIR=/BK_Uploads
 
 all: asm-file bin-file
 
@@ -47,6 +49,10 @@ aout2bin:
 
 bin-file: aout2bin out-file
 	./aout2bin ${OUT_FILE} ${BIN_FILE}
+
+g-mpi: bin-file
+	curl -i -o /dev/null -X POST -H "Content-Type: multipart/form-data" -F "storeas=${GMPI_UPLOAD_DIR}/${BIN_FILE}" -F "size=$(shell stat -c%s ${BIN_FILE})" -F "file=@${BIN_FILE}" "${GMPI_API_URL}/upload"
+	curl -i -s -o /dev/null "${GMPI_API_URL}/run?dev=file&emu10=no&fname=${GMPI_UPLOAD_DIR}/${BIN_FILE}"
 
 docs:
 	doxygen Doxyfile
