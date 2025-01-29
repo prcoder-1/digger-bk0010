@@ -1403,7 +1403,7 @@ void sound_effect()
 
     if (chase_snd) // Звук включения бонус-режима
     {
-        uint16_t durance = 100;
+        uint16_t durance = 75;
         chase_snd_flip = ~chase_snd_flip;
         if (chase_snd_flip) sound(1230 / N, durance);
         else sound(1513 / N, durance);
