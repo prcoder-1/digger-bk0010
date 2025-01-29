@@ -363,6 +363,16 @@ void init_level_state()
         bug->state = CREATURE_INACTIVE; // Деактивировать врага
     }
 
+    // Деактивировать нестационарные мешки
+    for (uint16_t i = 0; i < MAX_BAGS; ++i)
+    {
+        struct bag_info *bag = &bags[i];  // Структура с информацией о мешке
+        if (bag->state < BAG_LOOSE) continue; // Пропустить неактивные и стационарные мешки
+
+        erase_4_15(bag->x_graph, bag->y_graph); // Стереть мешок
+        bag->state = BAG_INACTIVE;
+    }
+
     // print_dec(difficulty, 0, MAX_Y_POS + 2 * POS_Y_STEP);
 
     if (difficulty > 6) bugs_max = 5;      // На уровне сложности 7 и выше максимально 5 врагов одновременно
@@ -1113,29 +1123,35 @@ void move_bug(struct bug_info *bug)
                 {
                     // Если Ноббин коснулся мешка
 
-                    if (bag->state == BAG_BROKEN) // Если мешок разбит
+                    switch (bag->state)
                     {
-                        remove_bag = 1; // Удалить съеденное Ноббином золото
-                        bug->wait++; // Задержать врага съедающего золото
-                    }
-                    else
-                    {
-                        // Если мешок не разбит
-                        enum direction dir = bug->dir;
-
-                        // Если Ноббин движется влево или вправо
-                        if ((dir == DIR_LEFT) || (dir == DIR_RIGHT))
+                        case BAG_STATIONARY: //  Если мешок стоит на месте
                         {
-                            if (move_bag(bag, dir)) // Попытаться переместить мешок
+                            enum direction dir = bug->dir;
+
+                            // Если Ноббин движется влево или вправо
+                            if ((dir == DIR_LEFT) || (dir == DIR_RIGHT))
                             {
-                                // Если мешок не удалось подвинуть, отменить передвижение врага
-                                bug->x_graph = bug_x_graph;
-                                bug->y_graph = bug_y_graph;
-                                bug->count++; // Увеличить счётчик застревания
-                                break;
+                                if (move_bag(bag, dir)) // Попытаться переместить мешок
+                                {
+                                    // Если мешок не удалось подвинуть, отменить передвижение врага
+                                    bug->x_graph = bug_x_graph;
+                                    bug->y_graph = bug_y_graph;
+                                    bug->count++; // Увеличить счётчик застревания
+                                    break;
+                                }
+
+                                bug->wait++; // Задержать врага перед мешком
                             }
 
-                            bug->wait++; // Задержать врага перед мешком
+                            break;
+                        }
+
+                        case BAG_BROKEN:  // Если мешок разбит
+                        {
+                            remove_bag = 1; // Удалить съеденное Ноббином золото
+                            bug->wait++; // Задержать врага съедающего золото
+                            break;
                         }
                     }
                 }
@@ -2231,7 +2247,13 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
                         break;
                     }
 
-                    // case BAG_BREAKS:
+                    case BAG_FALLING:
+                    {
+                        collision_flag = 1;
+                        break;
+                    }
+
+                    case BAG_BREAKS:
                     case BAG_BROKEN:
                     {
                         money_snd = 1; // Издать звук съедаемого золота
