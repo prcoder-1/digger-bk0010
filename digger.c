@@ -10,8 +10,10 @@
 
 // #define DEBUG // Режим отладки включен
 
+#define SCREEN_Y_OFFSET 25
+
 #define FIELD_X_OFFSET 2  // Смещение игрового поля по оси X
-#define FIELD_Y_OFFSET 32 // Смещение игрового поля по оси Y
+#define FIELD_Y_OFFSET (SCREEN_Y_OFFSET + 32) // Смещение игрового поля по оси Y
 #define POS_X_STEP 4      // Шаг клеток по оси X (в байтах)
 #define POS_Y_STEP 16     // Шаг клеток по оси Y (в строках)
 #define MOVE_X_STEP 1     // Шаг перемещения по оси X (в байтах)
@@ -33,7 +35,6 @@
 #define LOOSE_WAIT 15 // Время с момента начала покачивания до момента падения мешка
 
 #define BONUS_LIFE_SCORE 20000 // Количество очков для дополнительной жизни
-#define BONUS_IND_START (MAX_Y_POS + 28)
 #define MAX_LIVES 4 // Максимальное количество жизней
 
 #define NV 4 // Делитель для звуковой процедуры "вибрато"
@@ -263,7 +264,7 @@ void print_dec(uint16_t number, uint16_t x_graph, uint16_t y_graph)
 void print_lives()
 {
     constexpr uint16_t man_x_offset = sizeof(ch_digits[0][0]) * 5 + 1; // Смещение шириной в пять символов '0' плюс один байт (4 пикселя)
-    constexpr uint16_t man_y_offset = 2;
+    constexpr uint16_t man_y_offset = SCREEN_Y_OFFSET + 2;
     constexpr uint16_t one_pos_width = sizeof(image_digger_right[1][0]) + 1;
     constexpr uint16_t height = sizeof(image_digger_right[1]) / sizeof(image_digger_right[1][0]);
     uint16_t width = MAX_LIVES * one_pos_width;
@@ -287,7 +288,7 @@ void print_lives()
 void add_score(uint16_t score_add)
 {
     score += score_add;
-    print_dec(score, 0, MOVE_Y_STEP);
+    print_dec(score, 0, SCREEN_Y_OFFSET + MOVE_Y_STEP);
 
      // Если количество жизней не достигло максимального и клоичество очков досигло бонусного для получения жизни
     if (lives < MAX_LIVES && (score >= bonus_life_score))
@@ -343,6 +344,8 @@ enum level_symbols getLevelSymbol(uint8_t y_log, uint8_t x_log)
     return (level[level_no][y_log][byte_no] >> (rem * 3)) & 7;
 }
 
+void bonus_indicator(uint8_t color);
+
 /**
  * @brief Инициализация переменных состояния перед старом уровня
  */
@@ -351,7 +354,7 @@ void init_level_state()
     bonus_state = BONUS_OFF;
 
     // Отключение индикации бонус-режима
-    sp_paint_brick(0, BONUS_IND_START, SCREEN_BYTE_WIDTH, SCREEN_PIX_HEIGHT - BONUS_IND_START, 0);
+    bonus_indicator(0);
 
     // Деактивировать всех врагов
     for (uint8_t i = 0; i < MAX_BUGS; ++i)
@@ -2396,6 +2399,12 @@ void man_rip()
     man_state = CREATURE_RIP;
 }
 
+void bonus_indicator(uint8_t color)
+{
+    sp_paint_brick(0, 0, SCREEN_BYTE_WIDTH, SCREEN_Y_OFFSET, color);
+    sp_paint_brick(0, 255 - SCREEN_Y_OFFSET, SCREEN_BYTE_WIDTH, SCREEN_Y_OFFSET, color);
+}
+
 /**
  * @brief Обработка бонуса
  */
@@ -2415,7 +2424,7 @@ void process_bonus()
                 chase_snd = bonus_flash;
 
                 // Мигание при включении бонус-режима
-                sp_paint_brick(0, BONUS_IND_START, SCREEN_BYTE_WIDTH, SCREEN_PIX_HEIGHT - BONUS_IND_START, (bonus_time & 1) ? 0xFF : 0x00);
+                bonus_indicator((bonus_time & 1) ? 0xFF : 0x00);
 
                 // TODO: Включить музыку бонус-режима
             }
