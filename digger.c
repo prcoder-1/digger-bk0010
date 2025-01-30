@@ -2490,13 +2490,13 @@ void main()
     // EMT_16(0233);
     // EMT_16(0236);
 
-    typedef void (*vector)();
-    *((volatile vector *)VEC_STOP) = main; // Установить вектор клавиши "СТОП" на main()
-
     set_PSW(1 << PSW_I); // Замаскировать прерывания IRQ
     ((union KEY_STATE *)REG_KEY_STATE)->bits.INT_MASK = 1; // Отключить прерывание от клавиатуры
 
-    sp_paint_brick(0, 0, 64, FIELD_Y_OFFSET, 0); // Очистить экран с верха до начала игрового поля
+    typedef void (*vector)();
+    *((volatile vector *)VEC_STOP) = main; // Установить вектор клавиши "СТОП" на main()
+
+    sp_paint_brick(0, 0, SCREEN_BYTE_WIDTH, FIELD_Y_OFFSET, 0); // Очистить экран с верха до начала игрового поля
 
     volatile uint16_t *t_limit = (volatile uint16_t *)REG_TVE_LIMIT;
     volatile union TVE_CSR *tve_csr = (volatile union TVE_CSR *)REG_TVE_CSR;
