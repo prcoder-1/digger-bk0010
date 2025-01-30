@@ -1314,18 +1314,14 @@ int remove_coin(uint8_t x_log, uint8_t y_log)
 
         draw_coin_minimap();
 
-        // Убитым Диггер не может пройти уровень
-        if (man_state == CREATURE_ALIVE) // Проверить, что Диггер жив
+        // Проверить, что все монетки (камешки) съедены
+        uint16_t level_done = 1;
+        for (uint16_t i = 0; i < sizeof(coins) / sizeof(coins[0]); ++i)
         {
-            // Проверить, что все монетки (камешки) съедены
-            uint16_t level_done = 1;
-            for (uint16_t i = 0; i < sizeof(coins) / sizeof(coins[0]); ++i)
-            {
-                if (coins[i]) { level_done = 0; break; }
-            }
-
-            if (level_done) done_snd = 1; // Если все камешки съедены, то включить звук окончания уровня
+            if (coins[i]) { level_done = 0; break; }
         }
+
+        if (level_done) done_snd = 1; // Если все камешки съедены, то включить звук окончания уровня
 
         return 1;
     }
@@ -1482,9 +1478,9 @@ void init_game()
     score = 0;      // Начальное количество очков
     bonus_life_score = BONUS_LIFE_SCORE;
 
-    init_level();  // Начальная инициализация уровня
     add_score(0);  // Печать начального количества очков (нули)
     print_lives(); // Вывод начального количества жизней
+    init_level();  // Начальная инициализация уровня
 }
 
 /**
@@ -2493,19 +2489,22 @@ void process_game_state()
             init_game(); // Установить игру в начальное состояние
         }
     }
+    // else
+    // {
+        if (done_snd)
+        {
+            done_snd = 0;
 
-    if (done_snd)
-    {
-        done_snd = 0;
+            // Циклическое увеличение номера уровня
+            level_no++;
+            level_no &= LEVELS_NUM - 1;
 
-        // Циклическое увеличение номера уровня
-        level_no++;
-        level_no &= LEVELS_NUM - 1;
+            // Увеличение сложности после прохождения очередного уровня (максимальный уровень 9)
+            if (difficulty < 10) difficulty++;
 
-        if (difficulty < 10) difficulty++; // Увеличение сложности после прохождения очередного уровня
-
-        init_level(); // Инициализация нового уровня
-    }
+            init_level(); // Инициализация нового уровня
+        }
+    // }
 }
 
 extern void start();
@@ -2526,7 +2525,7 @@ void main()
     set_PSW(1 << PSW_I); // Замаскировать прерывания IRQ
     ((union KEY_STATE *)REG_KEY_STATE)->bits.INT_MASK = 1; // Отключить прерывание от клавиатуры
 
-    sp_paint_brick(0, 0, SCREEN_BYTE_WIDTH, FIELD_Y_OFFSET, 0); // Очистить экран с верха до начала игрового поля
+    sp_paint_brick(0, 0, SCREEN_BYTE_WIDTH, FIELD_Y_OFFSET - MOVE_Y_STEP * 3, 0); // Очистить экран с верха до начала игрового поля
 
     volatile uint16_t *t_limit = (volatile uint16_t *)REG_TVE_LIMIT;
     volatile union TVE_CSR *tve_csr = (volatile union TVE_CSR *)REG_TVE_CSR;
