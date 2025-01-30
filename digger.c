@@ -328,6 +328,14 @@ int check_collision(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t dist
 }
 
 /**
+ * @brief Проверка соприкосновения (по расстояниям) по оси X и по оси Y
+ */
+int check_collision_4_15(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
+{
+    return (ABS(x2 - x1) < 4) && (ABS(y2 - y1) < 15);
+}
+
+/**
  * @brief Получение ячейки уровня по заданным координатам
  */
 enum level_symbols getLevelSymbol(uint8_t y_log, uint8_t x_log)
@@ -800,7 +808,7 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
         }
 
         // Проверить перемещается ли мешок на Диггера
-        if (check_collision(bag_x_graph, bag_y_graph, man_x_graph, man_y_graph, 4, 15))
+        if (check_collision_4_15(bag_x_graph, bag_y_graph, man_x_graph, man_y_graph))
         {
             if (move_to_object(dir, bag_x_graph, man_x_graph))
             {
@@ -816,7 +824,7 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
             if (bug->state != CREATURE_ALIVE) continue; //  Пропустить неживых врагов
 
             // Проверить, что мешок перемещается на врага
-            if (check_collision(bag_x_graph, bag_y_graph, bug->x_graph, bug->y_graph, 4, 15))
+            if (check_collision_4_15(bag_x_graph, bag_y_graph, bug->x_graph, bug->y_graph))
             {
                 if (move_to_object(dir, bag_x_graph, bug->x_graph))
                 {
@@ -837,7 +845,7 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
             if ((another_bag->state != BAG_STATIONARY) && (another_bag->state != BAG_LOOSE)) continue;
 
             // Проверить, что мешок соприкоснулся с другим мешком
-            if (check_collision(bag_x_graph, bag_y_graph, another_bag->x_graph, another_bag->y_graph, 4, 15))
+            if (check_collision_4_15(bag_x_graph, bag_y_graph, another_bag->x_graph, another_bag->y_graph))
             {
                 // Если направление перемещения вправо и другой мешок находится правее обрабатываемого мешка
                 // или направление перемещения влево и другой мешок находтся левее обрабатываемого мешка
@@ -1114,7 +1122,7 @@ void move_bug(struct bug_info *bug)
 
             if (bag->state == BAG_INACTIVE) continue; // Пропустить неактивные мешки
 
-            if (check_collision(bag->x_graph, bag->y_graph, bug_x_graph, bug_y_graph, 4, 15))
+            if (check_collision_4_15(bag->x_graph, bag->y_graph, bug_x_graph, bug_y_graph))
             {
                 uint16_t remove_bag = 0;
                 if (bug->type == BUG_HOBBIN)
@@ -1306,13 +1314,16 @@ int remove_coin(uint8_t x_log, uint8_t y_log)
 
         draw_coin_minimap();
 
-        uint16_t level_done = 1;
-        for (uint16_t i = 0; i < sizeof(coins) / sizeof(coins[0]); ++i)
+        if (man_state == CREATURE_ALIVE)
         {
-            if (coins[i]) { level_done = 0; break; }
-        }
+            uint16_t level_done = 1;
+            for (uint16_t i = 0; i < sizeof(coins) / sizeof(coins[0]); ++i)
+            {
+                if (coins[i]) { level_done = 0; break; }
+            }
 
-        if (level_done) done_snd = 1;
+            if (level_done) done_snd = 1;
+        }
 
         return 1;
     }
@@ -1559,7 +1570,7 @@ void process_bugs()
                         if (another_bug->state != CREATURE_ALIVE) continue; // Пропустить неживых врагов
 
                         // Если враг соприкоснулся с другим врагом, увеличить счётчик застревания
-                        if (check_collision(bug->x_graph, bug->y_graph, another_bug->x_graph, another_bug->y_graph, 4, 15)) bug->count++;
+                        if (check_collision_4_15(bug->x_graph, bug->y_graph, another_bug->x_graph, another_bug->y_graph)) bug->count++;
                     }
 
                     //  Если Ноббин застрял или соприкоснулся с другим на определённое (зависящее от уровня сложности) время
@@ -1834,7 +1845,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                     if (bug_x_log == bag_x_log && bug->dir == DIR_UP) bug->dir = DIR_DOWN;
 
                     // Проверить, что враг попал под падающий мешок
-                    if (check_collision(bug->x_graph, bug->y_graph, bag_x_graph, bag_y_graph, 4, 15))
+                    if (check_collision_4_15(bug->x_graph, bug->y_graph, bag_x_graph, bag_y_graph))
                     {
                         bug->state = CREATURE_DEAD_MONEY_BAG; // Враг был убит мешком с деньгами
                         bug->dead_bag = bag; // Указатель на мешок которым был убит враг
@@ -1868,7 +1879,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                     }
                     else
                     {
-                        *v_scroll = 0330 | (1 << V_SCROLL_EXT_MEMORY); // Вотсстановить положение экрана
+                        *v_scroll = 0330 | (1 << V_SCROLL_EXT_MEMORY); // Восстановить положение экрана
                     }
 
                     if (bag->count & 1)
@@ -2019,7 +2030,7 @@ void process_missile()
                     if (bug->state != CREATURE_ALIVE) continue; //  Пропустить неживых врагов
 
                     // Проверить, что выстрел попал во врага
-                    if (check_collision(mis_x_graph, mis_y_graph, bug->x_graph, bug->y_graph, 4, 15))
+                    if (check_collision_4_15(mis_x_graph, mis_y_graph, bug->x_graph, bug->y_graph))
                     {
                         explode = 1; // Взорвать выстрел
                         bug->state = CREATURE_RIP; // Враг был убит выстрелом
@@ -2176,7 +2187,7 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
             if (bonus_state == BONUS_READY)
             {
                 // Проверить что Диггер соприкоснулся с вишенкой
-                if (check_collision(man_x_graph, man_y_graph, FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP, FIELD_Y_OFFSET, 4, 15))
+                if (check_collision_4_15(man_x_graph, man_y_graph, FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP, FIELD_Y_OFFSET))
                 {
                     bonus_state = BONUS_ON; // Включить Бонус-режим
                     bonus_count = 1; // Начальное значение множителя очков в Бонус-режиме
@@ -2232,7 +2243,7 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
                 if (bag->state == BAG_INACTIVE) continue; // Пропустить неактивные мешки
 
                 // Если Диггер не соприкоснулся с мешком, проверить следующий мешок
-                if (!check_collision(bag->x_graph, bag->y_graph, man_x_graph, man_y_graph, 4, 15)) continue;
+                if (!check_collision_4_15(bag->x_graph, bag->y_graph, man_x_graph, man_y_graph)) continue;
 
                 man_wait++; // Задержать Диггера перед мешком или золотом
 
@@ -2298,7 +2309,7 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
                 if (bug->state != CREATURE_ALIVE) continue; // Пропустить дохлых врагов
 
                 // Если Диггер не касается врага
-                if (!check_collision(bug->x_graph, bug->y_graph, man_x_graph, man_y_graph, 4, 15)) continue;
+                if (!check_collision_4_15(bug->x_graph, bug->y_graph, man_x_graph, man_y_graph)) continue;
 
                 if (bonus_state == BONUS_ON)
                 {
@@ -2377,6 +2388,20 @@ void man_rip()
     }
 
     delay_ms(500);
+
+    // TODO: Удалить врагов с которыми коллизия
+    // for (uint8_t i = 0; i < bugs_max; ++i)
+    // {
+    //     struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
+    //     if (!bugs_active) continue; // Пропустить неактивных врагов
+    //
+    //     // Проверить, что враг оказался рядом с могилкой
+    //     if (check_collision_4_15(man_x_graph, man_y_graph, bug->x_graph, bug->y_graph))
+    //     {
+    //         bug->count = 1;
+    //         bug->state = CREATURE_RIP; // Враг был убит выстрелом
+    //     }
+    // }
 
     // Траурный марш
     static const uint8_t music_dead_periods[]   = { C4 / NV, C4 / NV, C4 / NV, C4 / NV, DS4 / NV, D4 / NV, D4 / NV, C4 / NV, C4 / NV, B3 / NV, C4 / NV  };
@@ -2481,20 +2506,23 @@ void process_game_state()
     }
 }
 
+extern void start();
+
 /**
  * @brief Основная программа
  */
 void main()
 {
-    EMT_14();
+    // EMT_14();
+    //
+    typedef void (*vector)();
+    *((volatile vector *)VEC_STOP) = start; // Установить вектор клавиши "СТОП" на _start
+
     // EMT_16(0233);
     // EMT_16(0236);
 
     set_PSW(1 << PSW_I); // Замаскировать прерывания IRQ
     ((union KEY_STATE *)REG_KEY_STATE)->bits.INT_MASK = 1; // Отключить прерывание от клавиатуры
-
-    typedef void (*vector)();
-    *((volatile vector *)VEC_STOP) = main; // Установить вектор клавиши "СТОП" на main()
 
     sp_paint_brick(0, 0, SCREEN_BYTE_WIDTH, FIELD_Y_OFFSET, 0); // Очистить экран с верха до начала игрового поля
 
