@@ -1314,15 +1314,17 @@ int remove_coin(uint8_t x_log, uint8_t y_log)
 
         draw_coin_minimap();
 
-        if (man_state == CREATURE_ALIVE)
+        // Убитым Диггер не может пройти уровень
+        if (man_state == CREATURE_ALIVE) // Проверить, что Диггер жив
         {
+            // Проверить, что все монетки (камешки) съедены
             uint16_t level_done = 1;
             for (uint16_t i = 0; i < sizeof(coins) / sizeof(coins[0]); ++i)
             {
                 if (coins[i]) { level_done = 0; break; }
             }
 
-            if (level_done) done_snd = 1;
+            if (level_done) done_snd = 1; // Если все камешки съедены, то включить звук окончания уровня
         }
 
         return 1;
