@@ -243,9 +243,7 @@ int remove_coin(uint8_t x_log, uint8_t y_log);
  */
 void print_dec(uint16_t number, uint16_t x_graph, uint16_t y_graph)
 {
-    char buf[5]; // Буфер для 5 десятичных знаков
-
-    for (int i = 0; i < sizeof(buf); ++i) buf[i] = '0';
+    char buf[5] = { '0','0','0','0','0' }; // Буфер для 5 десятичных знаков
 
     char *ptr = &buf[sizeof(buf)];
     uint_to_str(number, &ptr);
@@ -440,32 +438,21 @@ void init_level_state()
  */
 void gnaw(enum direction dir, uint16_t x_graph, uint16_t y_graph)
 {
-    switch (dir)
+    static struct
     {
-        case DIR_RIGHT:
-        {
-            sp_put(x_graph + 4, y_graph - 1, sizeof(outline_blank_right[0]), sizeof(outline_blank_right)/sizeof(outline_blank_right[0]), nullptr, (uint8_t*)outline_blank_right);
-            break;
-        }
+        int8_t x;
+        int8_t y;
+        uint8_t x_size;
+        uint8_t y_size;
+        uint8_t *sprite;
+    } gnaw_dirs[4] = {
+        {  4, -1, sizeof(outline_blank_right[0]), sizeof(outline_blank_right) / sizeof(outline_blank_right[0]), (uint8_t*)outline_blank_right },
+        { -2, -1, sizeof(outline_blank_left[0]),  sizeof(outline_blank_left)  / sizeof(outline_blank_left[0]),  (uint8_t*)outline_blank_left  },
+        { -1, 15, sizeof(outline_blank_down[0]),  sizeof(outline_blank_down)  / sizeof(outline_blank_down[0]),  (uint8_t*)outline_blank_down  },
+        { -1, -7, sizeof(outline_blank_up[0]),    sizeof(outline_blank_up)    / sizeof(outline_blank_up[0]),    (uint8_t*)outline_blank_up    }
+    };
 
-        case DIR_LEFT:
-        {
-            sp_put(x_graph - 2, y_graph - 1, sizeof(outline_blank_left[0]), sizeof(outline_blank_left)/sizeof(outline_blank_left[0]), nullptr, (uint8_t*)outline_blank_left);
-            break;
-        }
-
-        case DIR_DOWN:
-        {
-            sp_put(x_graph - 1, y_graph + 15, sizeof(outline_blank_down[0]), sizeof(outline_blank_down)/sizeof(outline_blank_down[0]), nullptr, (uint8_t*)outline_blank_down);
-            break;
-        }
-
-        case DIR_UP:
-        {
-            sp_put(x_graph - 1, y_graph - 7, sizeof(outline_blank_up[0]), sizeof(outline_blank_up)/sizeof(outline_blank_up[0]), nullptr, (uint8_t*)outline_blank_up);
-            break;
-        }
-    }
+    sp_put(gnaw_dirs[dir].x, gnaw_dirs[dir].y, gnaw_dirs[dir].x_size, gnaw_dirs[dir].y_size, nullptr, (uint8_t*)gnaw_dirs[dir].sprite);
 }
 
 /**
@@ -563,8 +550,6 @@ void init_level()
         y_graph += POS_Y_STEP;
     }
 
-    draw_coin_minimap(); // Нарисовать мини-карту монеток
-    draw_bg_minimap();   // Нарисовать мини-карту ячеек фона
     init_level_state();  // Инициализировать состояние уровня
 }
 
@@ -710,6 +695,9 @@ void clear_background_bits(uint16_t x_graph, uint16_t y_graph, enum direction di
         }
     }
 
+     // Проверка на выход за пределы игрового поля
+    if (x_log >= H_MAX || y_log >= W_MAX) return;
+
     uint8_t *cell = &background[y_log][x_log]; // Указатель на текущую ячейку состояния фона
 
     switch (dir)
@@ -728,8 +716,6 @@ void clear_background_bits(uint16_t x_graph, uint16_t y_graph, enum direction di
             break;
         }
     }
-
-    draw_bg_minimap();
 }
 
 /**
@@ -1311,8 +1297,6 @@ int remove_coin(uint8_t x_log, uint8_t y_log)
         // Стереть съеденную монету (драгоценный камешек)
         sp_put(FIELD_X_OFFSET + x_log * POS_X_STEP, FIELD_Y_OFFSET + y_log * POS_Y_STEP + COIN_Y_OFFSET,
                sizeof(outline_no_coin[0]), sizeof(outline_no_coin) / sizeof(outline_no_coin[0]), nullptr, (uint8_t *)outline_no_coin);
-
-        draw_coin_minimap();
 
         // Проверить, что все монетки (камешки) съедены
         uint16_t level_done = 1;
@@ -2555,7 +2539,10 @@ void main()
         process_bonus();
         if (snd_effects) sound_effect();
         process_game_state();
+
 #if defined(DEBUG)
+        draw_coin_minimap(); // Нарисовать мини-карту монеток
+        draw_bg_minimap();   // Нарисовать мини-карту ячеек фона
         // Рспечатать оставшееся свободное время
         print_dec(*((volatile uint16_t *)REG_TVE_COUNT), 0, MAX_Y_POS + 2 * POS_Y_STEP);
 #endif
