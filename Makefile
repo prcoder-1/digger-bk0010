@@ -42,7 +42,7 @@ libs: memory.s divmulmod.s sprites.c sound.c tools.c
 	pdp11-aout-ar rcs libs.a memory.o sprites.o sound.o tools.o  # divmulmod.o
 
 out-file: crt0 main-file sprites-file font-file levels-file libs
-	pdp11-aout-ld -T a.out.ld -Map digger.map -o ${OUT_FILE} crt0.o digger.o libs.a digger_levels.o digger_font.o digger_sprites.o # digger_music.o
+	pdp11-aout-ld -T a.out.ld -Map digger.map -o ${OUT_FILE} crt0.o digger.o libs.a digger_sprites.o digger_font.o digger_levels.o # digger_music.o
 
 aout2bin:
 	gcc aout2bin.c -o aout2bin

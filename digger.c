@@ -440,19 +440,19 @@ void gnaw(enum direction dir, uint16_t x_graph, uint16_t y_graph)
 {
     static struct
     {
-        int8_t x;
-        int8_t y;
-        uint8_t x_size;
-        uint8_t y_size;
+        int16_t x;
+        int16_t y;
+        uint16_t x_size;
+        uint16_t y_size;
         uint8_t *sprite;
-    } gnaw_dirs[4] = {
-        {  4, -1, sizeof(outline_blank_right[0]), sizeof(outline_blank_right) / sizeof(outline_blank_right[0]), (uint8_t*)outline_blank_right },
+    } gnaw_mtx[4] = {
         { -2, -1, sizeof(outline_blank_left[0]),  sizeof(outline_blank_left)  / sizeof(outline_blank_left[0]),  (uint8_t*)outline_blank_left  },
-        { -1, 15, sizeof(outline_blank_down[0]),  sizeof(outline_blank_down)  / sizeof(outline_blank_down[0]),  (uint8_t*)outline_blank_down  },
-        { -1, -7, sizeof(outline_blank_up[0]),    sizeof(outline_blank_up)    / sizeof(outline_blank_up[0]),    (uint8_t*)outline_blank_up    }
+        {  4, -1, sizeof(outline_blank_right[0]), sizeof(outline_blank_right) / sizeof(outline_blank_right[0]), (uint8_t*)outline_blank_right },
+        { -1, -7, sizeof(outline_blank_up[0]),    sizeof(outline_blank_up)    / sizeof(outline_blank_up[0]),    (uint8_t*)outline_blank_up    },
+        { -1, 15, sizeof(outline_blank_down[0]),  sizeof(outline_blank_down)  / sizeof(outline_blank_down[0]),  (uint8_t*)outline_blank_down  }
     };
 
-    sp_put(gnaw_dirs[dir].x, gnaw_dirs[dir].y, gnaw_dirs[dir].x_size, gnaw_dirs[dir].y_size, nullptr, (uint8_t*)gnaw_dirs[dir].sprite);
+    sp_put(x_graph + gnaw_mtx[dir].x, y_graph + gnaw_mtx[dir].y, gnaw_mtx[dir].x_size, gnaw_mtx[dir].y_size, nullptr, gnaw_mtx[dir].sprite);
 }
 
 /**
@@ -582,56 +582,30 @@ uint8_t check_path(enum direction dir, uint8_t x_graph, uint8_t y_graph)
 {
     const uint8_t abs_x_pos = x_graph - FIELD_X_OFFSET;
     const uint8_t abs_y_pos = y_graph - FIELD_Y_OFFSET;
-    const uint8_t x_log = abs_x_pos / POS_X_STEP;
-    const uint8_t y_log = abs_y_pos / POS_Y_STEP;
-    const uint8_t cell_current = background[y_log][x_log];
+    uint8_t x_log = abs_x_pos / POS_X_STEP;
+    uint8_t y_log = abs_y_pos / POS_Y_STEP;
+    const uint8_t current_cell = background[y_log][x_log];
 
-    switch (dir)
+    static struct
     {
-        case DIR_RIGHT:
-        {
-            if (x_log >= (W_MAX - 1)) return 0; // Если находимся у правого края
+        int8_t  x;
+        int8_t  y;
+        uint8_t mask;
+        uint8_t cur_mask;
+    } dir_matrix[4] = {
+        { -1,  0, 0x08, 0x01 },
+        {  1,  0, 0x01, 0x08 },
+        {  0, -1, 0x80, 0x10 },
+        {  0,  1, 0x10, 0x80 }
+    } ;
 
-            const uint8_t cell_right = background[y_log][x_log + 1];
+    x_log += dir_matrix[dir].x;
+    y_log += dir_matrix[dir].y;
 
-            // Если клетка правее полностью проедена, а также есть прокус слева в клетке правее или прокус справа в текущей клетке
-            if (full_bite(cell_right) && ((cell_right & 1) || (cell_current & 8))) return 1;
-            break;
-        }
+    if ((x_log >= W_MAX) || (y_log >= H_MAX)) return 0;
 
-        case DIR_LEFT:
-        {
-            if (!x_log) return 0; // Если находимся у левого края
-
-            const uint8_t cell_left = background[y_log][x_log - 1];
-
-            // Если клетка левее полность проедена, и есть в ней прокус справа или прокус в текущей клетке слева клетки
-            if (full_bite(cell_left) && ((cell_left & 8) || (cell_current & 1))) return 1;
-            break;
-        }
-
-        case DIR_DOWN:
-        {
-            if (y_log >= (H_MAX - 1)) return 0; // Если находимся у нижнего края
-
-            const uint8_t cell_down = background[y_log + 1][x_log];
-
-            // Если клетка ниже полность проедена, и есть в ней прокус сверху или снизу текущей клетки
-            if (full_bite(cell_down) && ((cell_down & 0x10) || (cell_current & 0x80))) return 1;
-            break;
-        }
-
-        case DIR_UP:
-        {
-            if (!y_log) return 0; // Если находимся у верхнего края
-
-            const uint8_t cell_up = background[y_log - 1][x_log];
-
-            // Если клетка выше полность проедена, и есть в ней прокус снизу или сверху текущей клетки
-            if (full_bite(cell_up) && ((cell_up & 0x80) || (cell_current & 0x10))) return 1;
-            break;
-        }
-    }
+    const uint8_t neighbor_cell = background[y_log][x_log];
+    if (full_bite(neighbor_cell) && ((neighbor_cell & dir_matrix[dir].mask) || (current_cell & dir_matrix[dir].cur_mask))) return 1;
 
     return 0;
 }
@@ -1289,6 +1263,8 @@ void draw_man()
  */
 int remove_coin(uint8_t x_log, uint8_t y_log)
 {
+    if ((x_log >= W_MAX) || (y_log >= H_MAX)) return 0;
+
     uint16_t coin_mask = 1 << x_log;
     if (coins[y_log] & coin_mask)
     {
