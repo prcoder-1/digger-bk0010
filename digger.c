@@ -630,9 +630,7 @@ void clear_background_bits(uint16_t x_graph, uint16_t y_graph, enum direction di
     {
         case DIR_LEFT:
         {
-            x_rem--;
-
-            if (x_rem < 0)
+            if (--x_rem < 0)
             {
                 x_rem += 4;
                 x_log--;
@@ -650,9 +648,7 @@ void clear_background_bits(uint16_t x_graph, uint16_t y_graph, enum direction di
 
         case DIR_UP:
         {
-            y_rem--;
-
-            if (y_rem < 0)
+            if (--y_rem < 0)
             {
                 y_rem += 4;
                 y_log--;
