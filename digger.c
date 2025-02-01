@@ -643,13 +643,7 @@ void clear_background_bits(uint16_t x_graph, uint16_t y_graph, enum direction di
 
         case DIR_RIGHT:
         {
-            x_rem++;
-
-            if (x_rem > 4)
-            {
-                x_rem -= 4;
-                x_log++;
-            }
+            x_log++; // Следующая позиция матрицы по X
 
             break;
         }
@@ -669,13 +663,7 @@ void clear_background_bits(uint16_t x_graph, uint16_t y_graph, enum direction di
 
         case DIR_DOWN:
         {
-            y_rem++;
-
-            if (y_rem > 4)
-            {
-                y_rem -= 4;
-                y_log++;
-            }
+            y_log++; // Следущая позиция матрицы по Y
 
             break;
         }
