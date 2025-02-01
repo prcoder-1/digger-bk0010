@@ -1059,13 +1059,19 @@ void move_bug(struct bug_info *bug)
         else
         {
             // Переместить врага на шаг в выбранном направлении
-            switch (bug->dir)
+            static struct
             {
-                case DIR_RIGHT: { bug->x_graph += MOVE_X_STEP; break; }
-                case DIR_LEFT:  { bug->x_graph -= MOVE_X_STEP; break; }
-                case DIR_DOWN:  { bug->y_graph += MOVE_Y_STEP; break; }
-                case DIR_UP:    { bug->y_graph -= MOVE_Y_STEP; break; }
-            }
+                int8_t  x;
+                int8_t  y;
+            } dir_matrix[4] = {
+                { -MOVE_X_STEP, 0 },
+                {  MOVE_X_STEP, 0 },
+                { 0, -MOVE_Y_STEP },
+                { 0,  MOVE_Y_STEP }
+            } ;
+
+            bug->x_graph += dir_matrix[bug->dir].x;
+            bug->y_graph += dir_matrix[bug->dir].y;
         }
     }
 
@@ -1204,48 +1210,23 @@ void draw_man()
     // При необходимости, сменить направление изменения фазы спрайта
     if (!man_image_phase || man_image_phase >= 2) man_image_phase_inc =- man_image_phase_inc;
 
-    const uint8_t *image = 0;
+    uint16_t image_phase = man_image_phase + ((cab) ? 0 : 3);
+    const uint8_t *image = (man_dir < DIR_UP) ? (uint8_t *)image_digger_right[image_phase] : (uint8_t *)image_digger_up[image_phase];
 
-    switch (man_dir)
+    if (man_dir == DIR_LEFT)
     {
-        case DIR_RIGHT:
-        case DIR_LEFT:
-        {
-            image = (uint8_t *)image_digger_right[man_image_phase + ((cab) ? 0 : 3)];
-            if (man_dir == DIR_RIGHT)
-            {
-                // Едет вправо
-                sp_4_15_put(man_x_graph, man_y_graph, image);
-            }
-            else
-            {
-                // Едет влево (отзеркаленный правый)
-                sp_4_15_h_mirror_put(man_x_graph, man_y_graph, image);
-            }
-            break;
-        }
-
-        case DIR_UP:
-        case DIR_DOWN:
-        {
-            image = (uint8_t *)image_digger_up[man_image_phase + ((cab) ? 0 : 3)];
-            if (man_dir == DIR_UP)
-            {
-                // Едет вверх
-                sp_4_15_put(man_x_graph, man_y_graph, image);
-            }
-            else
-            {
-                // Едет вниз (отзеркален горизонтально и вертикально)
-                sp_4_15_hv_mirror_put(man_x_graph, man_y_graph, image);
-            }
-            break;
-        }
-
-        case DIR_STOP:
-        {
-            break;
-        }
+        // Едет влево (отзеркаленный правый)
+        sp_4_15_h_mirror_put(man_x_graph, man_y_graph, image);
+    }
+    else if (man_dir == DIR_RIGHT || man_dir == DIR_UP)
+    {
+        // Едет вправо или вверх
+        sp_4_15_put(man_x_graph, man_y_graph, image);
+    }
+    else
+    {
+        // Едет вниз (отзеркален горизонтально и вертикально)
+        sp_4_15_hv_mirror_put(man_x_graph, man_y_graph, image);
     }
 }
 
