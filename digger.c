@@ -8,7 +8,7 @@
 #include "digger_levels.h"
 #include "digger_music.h"
 
-// #define DEBUG // Режим отладки включен
+#define DEBUG // Режим отладки включен
 
 #define SCREEN_Y_OFFSET 25
 
@@ -438,7 +438,7 @@ void init_level_state()
  */
 void gnaw(enum direction dir, uint16_t x_graph, uint16_t y_graph)
 {
-    static struct
+    static const struct
     {
         int16_t x;
         int16_t y;
@@ -586,7 +586,7 @@ uint8_t check_path(enum direction dir, uint8_t x_graph, uint8_t y_graph)
     uint8_t y_log = abs_y_pos / POS_Y_STEP;
     const uint8_t current_cell = background[y_log][x_log];
 
-    static struct
+    static const struct
     {
         int8_t  x;
         int8_t  y;
@@ -857,7 +857,7 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
  */
 void erase_trail(enum direction dir, uint16_t x_graph, uint16_t y_graph)
 {
-    static struct
+    static const struct
     {
         int16_t x;
         int16_t y;
@@ -1059,7 +1059,7 @@ void move_bug(struct bug_info *bug)
         else
         {
             // Переместить врага на шаг в выбранном направлении
-            static struct
+            static const struct
             {
                 int8_t  x;
                 int8_t  y;
@@ -1915,7 +1915,7 @@ void process_missile()
             sp_paint_brick(mis_x_graph, mis_y_graph, missile_x_size, missile_y_size, 0);
 
             // Переместить выстрел на один шаг в заданном направлении
-            static struct
+            static const struct
             {
                 int8_t  x;
                 int8_t  y;
@@ -2077,13 +2077,42 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
             {
                 switch (code)
                 {
-                    case 12: while (!((*(volatile uint8_t *)REG_KEY_STATE) & (1 << KEY_STATE_STATE))); break; // СБР - Пауза
-                    case 'S': snd_effects = !snd_effects; break; // Переключить состояние звуковых эффектов
+                    case 12:  // СБР - Пауза
+                    {
+                        while (!((*(volatile uint8_t *)REG_KEY_STATE) & (1 << KEY_STATE_STATE)));
+                        break;
+                    }
+
+                    case 'S':  // Переключить состояние звуковых эффектов
+                    {
+                        snd_effects = !snd_effects;
+                        break;
+                    }
 #if defined(DEBUG)
-                    case 'D': difficulty++;               break; // Добавление уровня сложности
-                    case 'L': lives++; print_lives();     break; // Добавление жизни
-                    case 'N': done_snd = 1;               break; // Переход на следующий уровень
-                    default:  print_dec(code, 16, MAX_Y_POS + 2 * POS_Y_STEP); // Печать кода необработанной клавиши
+                    case 'D': // Увеличение уровня сложности
+                    {
+                        if (++difficulty >= 10) difficulty = 0;
+                        break;
+                    }
+
+                    case 'L':  // Добавление жизни
+                    {
+                        lives++;
+                        print_lives();
+                        life_snd = 24;
+                        break;
+                    }
+
+                    case 'N':  // Переход на следующий уровень
+                    {
+                        done_snd = 1;
+                        break;
+                    }
+
+                    default: // Печать кода необработанной клавиши
+                    {
+                        print_dec(code, 16, MAX_Y_POS + 2 * POS_Y_STEP);
+                    }
 #endif
                 }
             }
