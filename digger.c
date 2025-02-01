@@ -2143,17 +2143,26 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
             uint8_t prev_man_x_graph = man_x_graph;
             uint8_t prev_man_y_graph = man_y_graph;
 
-            // Переместить Диггера на один шаг в заданном направлении
-            switch (man_dir)
+            if (man_dir != DIR_STOP)
             {
-                case DIR_RIGHT: { man_x_graph += MOVE_X_STEP; break; }
-                case DIR_LEFT:  { man_x_graph -= MOVE_X_STEP; break; }
-                case DIR_DOWN:  { man_y_graph += MOVE_Y_STEP; break; }
-                case DIR_UP:    { man_y_graph -= MOVE_Y_STEP; break; }
-            }
+                // Переместить Диггера на один шаг в заданном направлении
+                static const struct
+                {
+                    int16_t  x;
+                    int16_t  y;
+                } dir_matrix[4] = {
+                    { -MOVE_X_STEP, 0 },
+                    {  MOVE_X_STEP, 0 },
+                    { 0, -MOVE_Y_STEP },
+                    { 0,  MOVE_Y_STEP }
+                } ;
 
-            if (man_dir == DIR_STOP) man_dir = man_prev_dir;
-            else clear_background_bits(man_x_graph, man_y_graph, man_dir); // Если Диггер движется, то очистить биты фона, который был "прогрызен"
+                man_x_graph += dir_matrix[man_dir].x;
+                man_y_graph += dir_matrix[man_dir].y;
+
+                clear_background_bits(man_x_graph, man_y_graph, man_dir); // Если Диггер движется, то очистить биты фона, который был "прогрызен"
+            }
+            else man_dir = man_prev_dir;
 
             // Удалить монеты съеденные Диггером
             if (remove_coin(man_x_log, man_y_log))
