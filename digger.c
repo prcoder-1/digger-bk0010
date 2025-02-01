@@ -1220,7 +1220,7 @@ void draw_man()
     }
     else if (man_dir == DIR_RIGHT || man_dir == DIR_UP)
     {
-        // Едет вправо или вверх
+        // Едет вправо или вверх (обычный спрайт)
         sp_4_15_put(man_x_graph, man_y_graph, image);
     }
     else
@@ -1915,32 +1915,19 @@ void process_missile()
             sp_paint_brick(mis_x_graph, mis_y_graph, missile_x_size, missile_y_size, 0);
 
             // Переместить выстрел на один шаг в заданном направлении
-            switch (mis_dir)
+            static struct
             {
-                case DIR_LEFT:
-                {
-                    mis_x_graph -= 2 * MOVE_X_STEP;
-                    break;
-                }
+                int8_t  x;
+                int8_t  y;
+            } dir_matrix[4] = {
+                { -2 * MOVE_X_STEP, 0  },
+                {  2 * MOVE_X_STEP, 0  },
+                {  0, -2 * MOVE_Y_STEP },
+                {  0,  2 * MOVE_Y_STEP }
+            } ;
 
-                case DIR_RIGHT:
-                {
-                    mis_x_graph += 2 * MOVE_X_STEP;
-                    break;
-                }
-
-                case DIR_UP:
-                {
-                    mis_y_graph -= 2 * MOVE_Y_STEP;
-                    break;
-                }
-
-                case DIR_DOWN:
-                {
-                    mis_y_graph += 2 * MOVE_Y_STEP;
-                    break;
-                }
-            }
+            mis_x_graph += dir_matrix[mis_dir].x;
+            mis_y_graph += dir_matrix[mis_dir].y;
 
             uint8_t explode = 0;
 
