@@ -1991,36 +1991,19 @@ void process_missile()
 
                     // Определить начальное положение выстрела в зависимости от
                     // координат Диггера и его направления движения
-                    switch (mis_dir)
+                    static const struct
                     {
-                        case DIR_LEFT:
-                        {
-                            mis_x_graph = man_x_graph - MOVE_X_STEP;
-                            mis_y_graph = man_y_graph + MOVE_Y_STEP;
-                            break;
-                        }
+                        int16_t  x;
+                        int16_t  y;
+                    } dir_matrix[4] = {
+                        { -MOVE_X_STEP, MOVE_Y_STEP },
+                        {  4,  MOVE_Y_STEP },
+                        {  1, -MOVE_Y_STEP },
+                        {  1,  15 + MOVE_Y_STEP }
+                    } ;
 
-                        case DIR_RIGHT:
-                        {
-                            mis_x_graph = man_x_graph + 4;
-                            mis_y_graph = man_y_graph + MOVE_Y_STEP;
-                            break;
-                        }
-
-                        case DIR_UP:
-                        {
-                            mis_x_graph = man_x_graph + 1;
-                            mis_y_graph = man_y_graph - MOVE_Y_STEP;
-                            break;
-                        }
-
-                        case DIR_DOWN:
-                        {
-                            mis_x_graph = man_x_graph + 1;
-                            mis_y_graph = man_y_graph + 15 + MOVE_Y_STEP;
-                            break;
-                        }
-                    }
+                    mis_x_graph = man_x_graph + dir_matrix[mis_dir].x;
+                    mis_y_graph = man_y_graph + dir_matrix[mis_dir].y;
 
                     // Вывести начальное положение спрайта выстрела
                     sp_put(mis_x_graph, mis_y_graph, missile_x_size, missile_y_size, (uint8_t *)image_missile[mis_image_phase], nullptr);
