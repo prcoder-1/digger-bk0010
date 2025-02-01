@@ -1031,15 +1031,15 @@ void move_bug(struct bug_info *bug)
         bug->dir = dir; // Задать новое направление движения врага
     }
 
-    // Остановить врага при попытке выхода за пределы экрана
-    if (check_out_of_range(bug->dir, bug_x_graph, bug_y_graph))
-    {
-        bug->dir = DIR_STOP;
-    }
-
     // Для Хоббинов прокапывающих новый туннель
     if (bug->type == BUG_HOBBIN)
     {
+        // Развернуть врага при попытке выхода за пределы экрана
+        if (check_out_of_range(bug->dir, bug_x_graph, bug_y_graph))
+        {
+            bug->dir ^= 1; // Инвертировать направление движения
+        }
+
         // Очистить биты фона прогрызенные Хоббином
         clear_background_bits(bug_x_graph, bug_y_graph, bug->dir);
 
