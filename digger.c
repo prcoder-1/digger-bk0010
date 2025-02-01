@@ -217,7 +217,7 @@ uint8_t  life_snd;           /// Флаг, означающий, что звук
  */
 void draw_bg_minimap()
 {
-    sp_put(48, MOVE_Y_STEP + 2, sizeof(background[0]), sizeof(background) / sizeof(background[0]), (uint8_t*)background, 0);
+    sp_put(48, SCREEN_Y_OFFSET + MOVE_Y_STEP + 2, sizeof(background[0]), sizeof(background) / sizeof(background[0]), (uint8_t*)background, 0);
 }
 
 /**
@@ -225,7 +225,7 @@ void draw_bg_minimap()
  */
 void draw_coin_minimap()
 {
-    sp_put(45, MOVE_Y_STEP + 2, sizeof(coins[0]), sizeof(coins) / sizeof(coins[0]), (uint8_t*)coins, 0);
+    sp_put(45, SCREEN_Y_OFFSET + MOVE_Y_STEP + 2, sizeof(coins[0]), sizeof(coins) / sizeof(coins[0]), (uint8_t*)coins, 0);
 }
 #else
 #define draw_bg_minimap() ;
@@ -643,7 +643,13 @@ void clear_background_bits(uint16_t x_graph, uint16_t y_graph, enum direction di
 
         case DIR_RIGHT:
         {
-            x_log++; // Следующая позиция матрицы по X
+            x_rem++;
+
+            if (x_rem > 4)
+            {
+                x_rem -= 4;
+                x_log++;
+            }
 
             break;
         }
@@ -663,14 +669,20 @@ void clear_background_bits(uint16_t x_graph, uint16_t y_graph, enum direction di
 
         case DIR_DOWN:
         {
-            y_log++; // Следущая позиция матрицы по Y
+            y_rem++;
+
+            if (y_rem > 4)
+            {
+                y_rem -= 4;
+                y_log++;
+            }
 
             break;
         }
     }
 
      // Проверка на выход за пределы игрового поля
-    if (x_log >= H_MAX || y_log >= W_MAX) return;
+    if (x_log >= W_MAX || y_log >= H_MAX) return;
 
     uint8_t *cell = &background[y_log][x_log]; // Указатель на текущую ячейку состояния фона
 
@@ -1504,8 +1516,13 @@ void process_bugs()
                         struct bug_info *another_bug = &bugs[t];
                         if (another_bug->state != CREATURE_ALIVE) continue; // Пропустить неживых врагов
 
-                        // Если враг соприкоснулся с другим врагом, увеличить счётчик застревания
-                        if (check_collision_4_15(bug->x_graph, bug->y_graph, another_bug->x_graph, another_bug->y_graph)) bug->count++;
+                        // Если враг соприкоснулся с другим врагом
+                        if (check_collision_4_15(bug->x_graph, bug->y_graph, another_bug->x_graph, another_bug->y_graph))
+                        {
+                            bug->count++;  // Увеличить счётчик застревания
+                            bug->wait++;   // Увеличить счётчик ожидания
+                            bug->dir ^= 1; // Инвертировать направление
+                        }
                     }
 
                     //  Если Ноббин застрял или соприкоснулся с другим на определённое (зависящее от уровня сложности) время
@@ -2020,9 +2037,24 @@ void process_missile()
 void man_rip();
 
 /**
+ * @brief Съесть монету (драгоценный камень)
+ */
+inline void eat_coin()
+{
+    coin_snd = 7;  // Включить звук съедения монеты
+    coin_time = 9; // Взвести таймер до последующего съедения монеты
+    add_score(25); // 25 очков за съеденную монету (камешек)
+    if (++coin_snd_note == 7) // Перейти к следующей ноте
+    {
+        coin_snd_note = -1;
+        add_score_250(); // Добавить 250 очков за съедение восьми последовательных монет
+    }
+}
+
+/**
  * @brief Обработка Диггера
  */
-void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t man_x_rem, const uint8_t man_y_rem)
+void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
 {
     // Обработка перемещения Диггера
     if (man_state == CREATURE_ALIVE) // Если Диггер жив
@@ -2161,21 +2193,19 @@ void process_man(const uint8_t man_x_log, const uint8_t man_y_log, const uint8_t
                 man_y_graph += dir_matrix[man_dir].y;
 
                 clear_background_bits(man_x_graph, man_y_graph, man_dir); // Если Диггер движется, то очистить биты фона, который был "прогрызен"
-            }
-            else man_dir = man_prev_dir;
 
-            // Удалить монеты съеденные Диггером
-            if (remove_coin(man_x_log, man_y_log))
-            {
-                coin_snd = 7;  // Включить звук съедения монеты
-                coin_time = 9; // Взвести таймер до последующего съедения монеты
-                add_score(25); // 25 очков за съеденную монету (камешек)
-                if (++coin_snd_note == 7) // Перейти к следующей ноте
+                // Удалить монеты съеденные Диггером
+                const uint8_t man_abs_x_pos = man_x_graph - FIELD_X_OFFSET;
+                const uint8_t man_abs_y_pos = man_y_graph - FIELD_Y_OFFSET;
+                const uint8_t man_x_log = man_abs_x_pos / POS_X_STEP;
+                const uint8_t man_y_log = man_abs_y_pos / POS_Y_STEP;
+
+                if (remove_coin(man_x_log, man_y_log))
                 {
-                    coin_snd_note = -1;
-                    add_score_250(); // Добавить 250 очков за съедение восьми последовательных монет
+                    eat_coin();
                 }
             }
+            else man_dir = man_prev_dir;
 
             uint16_t collision_flag = 0;
 
@@ -2496,7 +2526,7 @@ void main()
         process_bugs();
         process_bags(man_x_log, man_y_log);
         process_missile();
-        process_man(man_x_log, man_y_log, man_x_rem, man_y_rem);
+        process_man(man_x_rem, man_y_rem);
         process_bonus();
         if (snd_effects) sound_effect();
         process_game_state();
