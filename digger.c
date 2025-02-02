@@ -8,7 +8,7 @@
 #include "digger_levels.h"
 #include "digger_music.h"
 
-// #define DEBUG // Режим отладки включен
+#define DEBUG // Режим отладки включен
 
 #define SCREEN_Y_OFFSET 25
 
@@ -187,7 +187,7 @@ enum direction mis_dir;   /// Направление полёта выстрел
 // Переменные отвечающие за состояние игры
 uint16_t difficulty; /// Уровень сложности
 uint16_t level_no;   /// Текущий номер уровня
-int16_t  lives;      /// Количество жизней
+int16_t  lives;      /// Текущее количество жизней
 uint32_t score;      /// Количество очков
 
 // Переменные отвечающие за вывод звуков
@@ -261,22 +261,22 @@ void print_dec(uint16_t number, uint16_t x_graph, uint16_t y_graph)
  */
 void print_lives()
 {
-    constexpr uint16_t man_x_offset = sizeof(ch_digits[0][0]) * 5 + 1; // Смещение шириной в пять символов '0' плюс один байт (4 пикселя)
-    constexpr uint16_t man_y_offset = SCREEN_Y_OFFSET + 2;
-    constexpr uint16_t one_pos_width = sizeof(image_digger_right[1][0]) + 1;
-    constexpr uint16_t height = sizeof(image_digger_right[1]) / sizeof(image_digger_right[1][0]);
-    uint16_t width = MAX_LIVES * one_pos_width;
+    uint16_t man_x_offset = sizeof(ch_digits[0][0]) * 5 + 1; // Смещение шириной в пять символов '0' плюс один байт (4 пикселя)
+    constexpr uint16_t man_y_offset = SCREEN_Y_OFFSET + 2; // Смещение спрайта Диггера по оси Y
+    constexpr uint16_t one_pos_width = sizeof(image_digger_right[1][0]) + 1; // Ширина спрайта Диггера плюс один байт
+    constexpr uint16_t height = sizeof(image_digger_right[1]) / sizeof(image_digger_right[1][0]); // Высота спрайта Диггера
+    int16_t width = MAX_LIVES * one_pos_width; //  Общий размер места занимаемый спрайтами Диггера
+    uint8_t *sprite = (uint8_t *)image_digger_right[1];
 
-    uint16_t l = 1;
-    for (uint16_t i = man_x_offset; i < man_x_offset + width; i += one_pos_width, width -= one_pos_width)
+    for (uint16_t l = 1; width > 0; man_x_offset += one_pos_width, width -= one_pos_width)
     {
         if (++l > lives)
         {
-            sp_paint_brick(i, man_y_offset, width, height, 0);
+            sp_paint_brick(man_x_offset, man_y_offset, width, height, 0);
             break;
         }
 
-        sp_4_15_put(i, man_y_offset, (uint8_t *)image_digger_right[1]);
+        sp_4_15_put(man_x_offset, man_y_offset, sprite);
     }
 }
 
@@ -288,7 +288,7 @@ void add_score(uint16_t score_add)
     score += score_add;
     print_dec(score, 0, SCREEN_Y_OFFSET + MOVE_Y_STEP);
 
-     // Если количество жизней не достигло максимального и клоичество очков досигло бонусного для получения жизни
+     // Если количество жизней не достигло максимального и количество очков досигло бонусного для получения жизни
     if (lives < MAX_LIVES && (score >= bonus_life_score))
     {
         lives++; // Увеличичить количество жизней на единицу
@@ -1200,6 +1200,19 @@ void stop_bag(struct bag_info *bag)
     bag->count = 0;
 
     // TODO: Унчтожить все мешки под тем, который остановился
+    for (uint16_t i = 0; i < MAX_BAGS; ++i)
+    {
+        struct bag_info *another_bag = &bags[i];  // Структура с информацией о мешке
+        if (another_bag == bag) continue; // Пропустить мешок обработка которого производится
+        if (another_bag->state == BAG_INACTIVE) continue; // Пропустить неактивные мешки
+
+        if (check_collision_4_15(bag->x_graph, bag->y_graph, another_bag->x_graph, another_bag->y_graph))
+        {
+            // erase_4_15(another_bagbag->x_graph, another_bag->y_graph); // Стереть мешок
+            another_bag->state = BAG_INACTIVE;
+            break_bag_snd = 1;
+        }
+    }
 }
 
 /**
