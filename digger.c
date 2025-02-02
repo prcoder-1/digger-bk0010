@@ -8,7 +8,7 @@
 #include "digger_levels.h"
 #include "digger_music.h"
 
-// #define DEBUG // Режим отладки включен
+#define DEBUG // Режим отладки включен
 
 #define SCREEN_Y_OFFSET 25
 
@@ -2344,6 +2344,7 @@ void man_rip()
         uint16_t y_graph = man_y_graph - bounce[i >> 3];
         gnaw(DIR_UP, man_x_graph, y_graph + 1);
         // Анимация подпрыгивающего перевёрнутого Диггера
+        sp_paint_brick(man_x_graph, y_graph + 15, 4, 1, 0);
         sp_4_15_put(man_x_graph, y_graph, (uint8_t *)image_digger_turned_over);
 
         if (i++ < 10)
