@@ -67,8 +67,8 @@ enum direction : uint8_t
 enum creature_state : uint8_t
 {
     CREATURE_INACTIVE = 0,   /**< Не активен */
-    CREATURE_ALIVE,          /**< Жив */
     CREATURE_STARTING,       /**< Стратует */
+    CREATURE_ALIVE,          /**< Жив */
     CREATURE_DEAD_MONEY_BAG, /**< Убит мешком с деньгами */
     CREATURE_RIP             /**< Лежит дохлый */
 };
@@ -641,7 +641,11 @@ void clear_background_bits(uint16_t x_graph, uint16_t y_graph, enum direction di
 
         case DIR_RIGHT:
         {
-            x_log++; // Следующая позиция матрицы по X
+            if (++x_rem >= 4)
+            {
+                x_rem -= 4;
+                x_log++;
+            }
 
             break;
         }
@@ -659,7 +663,11 @@ void clear_background_bits(uint16_t x_graph, uint16_t y_graph, enum direction di
 
         case DIR_DOWN:
         {
-            y_log++; // Следущая позиция матрицы по Y
+            if (++y_rem >= 4)
+            {
+                y_rem -= 4;
+                y_log++;
+            }
 
             break;
         }
@@ -1505,7 +1513,7 @@ void process_bugs()
                         {
                             bug->count++;  // Увеличить счётчик застревания
                             bug->wait++;   // Увеличить счётчик ожидания
-                            bug->dir ^= 1; // Инвертировать направление
+                            bug->dir ^= 1; // Инвертировать направление движения
                         }
                     }
 
