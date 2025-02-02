@@ -388,8 +388,6 @@ void init_level_state()
     else if (difficulty > 0) bugs_max = 4; // На уровне сложности со 1 до 6 (включительно) до 4 врагов одновременно
     else bugs_max = 3;                      // На первом уровне максимально три варага одновременно
 
-    bugs_max = 1; // DEBUG
-
     // Переменные относщиеся к созданию и управлению врагами
     bugs_total = difficulty + 6;         // Общее количество врагов на уровне - шесть плюс уровень сложности
     bugs_delay = 45 - (difficulty << 1); // Задержка появления врагов (с ростом сложности убывает)
@@ -2134,11 +2132,6 @@ void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
                     {
                         done_snd = 1;
                         break;
-                    }
-
-                    default: // Печать кода необработанной клавиши
-                    {
-                        print_dec(code, 16, MAX_Y_POS + 2 * POS_Y_STEP);
                     }
 #endif
                 }
