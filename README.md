@@ -152,10 +152,15 @@ doxygen
 ```
 curl -i -o /dev/null -X POST -H "Content-Type: multipart/form-data" -F "storeas=${GMPI_UPLOAD_DIR}/${BIN_FILE}" -F "size=$(shell stat -c%s ${BIN_FILE})" -F "file=@${BIN_FILE}" "${GMPI_API_URL}/upload"
 ```
-и
+Где в переменной **GMPI_UPLOAD_DIR** содержится путь в файловой системе *Gryphon-MPI* по которому будет размещён файл, а **BIN_FILE** - имя двоичного файла.
+В переменной **GMPI_API_URL** содержится путь на API *Gryphon-MPI*. Для определения размера передаваемого файла используется утилита *stat*.
+
+Команда передаёт HTTP запрос POST с указанием имени передваемого файла и места в файловой системе *Gryphon-MPI* в котором будет размещён бинарный файл.
+
+
+Вторая команда:
 ```
 curl -i -s -o /dev/null "${GMPI_API_URL}/run?dev=file&emu10=no&fname=${GMPI_UPLOAD_DIR}/${BIN_FILE}"
 ```
 
-Первая команда передаёт HTTP запрос POST с указанием имени передваемого файла и места в файловой системе *Gryphon-MPI* в ктором будети размещён бинарный файл.
-Вторая команда осуществляет запуск переданного файла с использованием API *Gryphon-MPI*.
+Осуществляет запуск переданного файла с использованием API *Gryphon-MPI*.
