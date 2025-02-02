@@ -388,6 +388,8 @@ void init_level_state()
     else if (difficulty > 0) bugs_max = 4; // На уровне сложности со 1 до 6 (включительно) до 4 врагов одновременно
     else bugs_max = 3;                      // На первом уровне максимально три варага одновременно
 
+    bugs_max = 1; // DEBUG
+
     // Переменные относщиеся к созданию и управлению врагами
     bugs_total = difficulty + 6;         // Общее количество врагов на уровне - шесть плюс уровень сложности
     bugs_delay = 45 - (difficulty << 1); // Задержка появления врагов (с ростом сложности убывает)
@@ -1744,6 +1746,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                 // Прогрызть фон и сбросить биты матрицы фона
                 gnaw(DIR_UP, bag_x_graph, bag_y_graph + 9);
                 clear_background_bits(bag_x_graph, bag_y_graph, DIR_DOWN); // Сбросить биты матрицы фона
+                clear_background_bits(bag_x_graph, bag_y_graph - 1, DIR_DOWN); // Сбросить биты матрицы фона
 
                 // Стереть падающий мешок по старым координатам
                 if (bag->count) // Если номер этажа не нулевой
