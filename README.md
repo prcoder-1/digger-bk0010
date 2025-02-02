@@ -142,3 +142,16 @@ make
 doxygen
 ```
 
+## Запуск для отладки на БК-0010 при помощи *Gryphon-MPI*
+
+Для удобства отладки в проекте предусмотрен запуск скомпилированного файла на компьютере БК-0010 при помощи [*Gryphon-MPI*](https://night-gryphon.ru/Gryphon-MPI/).
+Запуск осуществляется при помощи сборки цели проекта **g-mpi**.
+Цель использует утилиту ***curl** для связи с Gryphon-MPI, передачи и запуска скомпилированного файла.
+
+Цель состоит из двух команд:
+```curl -i -o /dev/null -X POST -H "Content-Type: multipart/form-data" -F "storeas=${GMPI_UPLOAD_DIR}/${BIN_FILE}" -F "size=$(shell stat -c%s ${BIN_FILE})" -F "file=@${BIN_FILE}" "${GMPI_API_URL}/upload"```
+и
+```curl -i -s -o /dev/null "${GMPI_API_URL}/run?dev=file&emu10=no&fname=${GMPI_UPLOAD_DIR}/${BIN_FILE}"```
+
+Первая команда передаёт HTTP запрос POST с указанием имени передваемого файла и места в файловой системе *Gryphon-MPI* в ктором будети размещён бинарный файл.
+Вторая команда осуществляет запуск переданного файла с использованием API *Gryphon-MPI*.

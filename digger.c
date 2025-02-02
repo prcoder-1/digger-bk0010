@@ -8,7 +8,7 @@
 #include "digger_levels.h"
 #include "digger_music.h"
 
-#define DEBUG // Режим отладки включен
+// #define DEBUG // Режим отладки включен
 
 #define SCREEN_Y_OFFSET 25
 
@@ -2317,7 +2317,6 @@ void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
 
             if (man_dead_bag->dir == DIR_STOP)
             {
-                man_y_graph -= MOVE_Y_STEP;
                 man_rip();
             }
         }
@@ -2330,7 +2329,7 @@ void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
  */
 void man_rip()
 {
-    erase_4_15(man_x_graph, man_y_graph); // Стереть Диггера
+//    erase_4_15(man_x_graph, man_y_graph); // Стереть Диггера
 
     // Последовательность высоты на которую подпрыгивает перевёрнутый Диггер
     static uint8_t bounce[8] = { 3, 5, 6, 6, 5, 4, 3, 0 };
@@ -2341,11 +2340,14 @@ void man_rip()
     {
         if (snd_effects) sound(period, 2);
 
-        uint16_t y_graph = man_y_graph - bounce[i >> 3];
-        gnaw(DIR_UP, man_x_graph, y_graph + 1);
-        // Анимация подпрыгивающего перевёрнутого Диггера
-        sp_paint_brick(man_x_graph, y_graph + 15, 4, 1, 0);
-        sp_4_15_put(man_x_graph, y_graph, (uint8_t *)image_digger_turned_over);
+        if (man_state != CREATURE_DEAD_MONEY_BAG)
+        {
+            uint16_t y_graph = man_y_graph - bounce[i >> 3];
+            gnaw(DIR_UP, man_x_graph, y_graph + 1);
+            // Анимация подпрыгивающего перевёрнутого Диггера
+            sp_paint_brick(man_x_graph, y_graph + 15, 4, 1, 0);
+            sp_4_15_put(man_x_graph, y_graph, (uint8_t *)image_digger_turned_over);
+        }
 
         if (i++ < 10)
         {
