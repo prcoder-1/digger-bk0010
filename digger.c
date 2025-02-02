@@ -8,7 +8,7 @@
 #include "digger_levels.h"
 #include "digger_music.h"
 
-#define DEBUG // Режим отладки включен
+// #define DEBUG // Режим отладки включен
 
 #define SCREEN_Y_OFFSET 25
 
@@ -1512,8 +1512,12 @@ void process_bugs()
                         if (check_collision_4_15(bug->x_graph, bug->y_graph, another_bug->x_graph, another_bug->y_graph))
                         {
                             bug->count++;  // Увеличить счётчик застревания
-                            bug->wait++;   // Увеличить счётчик ожидания
-                            bug->dir ^= 1; // Инвертировать направление движения
+
+                            if (bug->dir == another_bug->dir) // Если враги движутся в одном направлении
+                            {
+                                bug->wait++;   // Увеличить счётчик ожидания
+                                bug->dir ^= 1; // Инвертировать направление движения
+                            }
                         }
                     }
 
@@ -2326,19 +2330,19 @@ void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
  */
 void man_rip()
 {
-    // Звук убиения Диггера
+    erase_4_15(man_x_graph, man_y_graph); // Стереть Диггера
 
     // Последовательность высоты на которую подпрыгивает перевёрнутый Диггер
     static uint8_t bounce[8] = { 3, 5, 6, 6, 5, 4, 3, 0 };
 
     uint16_t period = 19000 / N;
     uint16_t i = 0;
-    while (period < 36000 / N)
+    while (period < 36000 / N) // Звук убиения Диггера
     {
         if (snd_effects) sound(period, 2);
 
         uint16_t y_graph = man_y_graph - bounce[i >> 3];
-        gnaw(DIR_UP, man_x_graph, y_graph);
+        gnaw(DIR_UP, man_x_graph, y_graph + 1);
         // Анимация подпрыгивающего перевёрнутого Диггера
         sp_4_15_put(man_x_graph, y_graph, (uint8_t *)image_digger_turned_over);
 
@@ -2385,6 +2389,8 @@ void man_rip()
 
         delay_ms(30);
     }
+
+    erase_4_15(man_x_graph, man_y_graph); // Стереть надгробный камень
 
     man_state = CREATURE_RIP;
 }
