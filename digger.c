@@ -1979,7 +1979,7 @@ void process_missile()
                     if (bug->state != CREATURE_ALIVE) continue; //  Пропустить неживых врагов
 
                     // Проверить, что выстрел попал во врага
-                    if (check_collision_4_15(mis_x_graph, mis_y_graph, bug->x_graph, bug->y_graph))
+                    if (check_collision(mis_x_graph, mis_y_graph, bug->x_graph, bug->y_graph, missile_x_size, missile_y_size))
                     {
                         explode = 1; // Взорвать выстрел
                         bug->state = CREATURE_RIP; // Враг был убит выстрелом
@@ -2346,11 +2346,12 @@ void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
  */
 void man_rip()
 {
-//    erase_4_15(man_x_graph, man_y_graph); // Стереть Диггера
+    erase_4_15(man_x_graph, man_y_graph); // Стереть Диггера
 
     // Последовательность высоты на которую подпрыгивает перевёрнутый Диггер
     static uint8_t bounce[8] = { 3, 5, 6, 6, 5, 4, 3, 0 };
 
+    uint16_t prev_y_graph = 0;
     uint16_t period = 19000 / N;
     uint16_t i = 0;
     while (period < 36000 / N) // Звук убиения Диггера
@@ -2362,8 +2363,10 @@ void man_rip()
             uint16_t y_graph = man_y_graph - bounce[i >> 3];
             // gnaw(DIR_UP, man_x_graph, y_graph + 1);
             // Анимация подпрыгивающего перевёрнутого Диггера
-            sp_paint_brick(man_x_graph, y_graph + 15, 4, 1, 0);
-            sp_4_15_put(man_x_graph, y_graph, (uint8_t *)image_digger_turned_over);
+            // sp_paint_brick(man_x_graph, y_graph + 15, 4, 1, 0);
+            sp_put(man_x_graph, y_graph, sizeof(image_digger_turned_over[0]), sizeof(image_digger_turned_over) / sizeof(image_digger_turned_over[0]),
+                   (uint8_t *)image_digger_turned_over, (uint8_t *)outline_digger_turned_over);
+            delay_ms(100);
         }
 
         if (i++ < 10)

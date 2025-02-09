@@ -102,7 +102,7 @@ extern const uint8_t image_rip[5][15][4];
  * @brief Перевёрнутый Диггер
  */
 extern const uint8_t image_digger_turned_over[15][4];
-// extern const uint8_t outline_digger_turned_over[15][4];
+extern const uint8_t outline_digger_turned_over[15][4];
 
 /**
  * @brief Драгоценный камень (монетка)
