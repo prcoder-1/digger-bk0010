@@ -2202,19 +2202,6 @@ void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
 
                 man_x_graph += dir_matrix[man_dir].x;
                 man_y_graph += dir_matrix[man_dir].y;
-
-                clear_background_bits(man_x_graph, man_y_graph, man_dir); // Если Диггер движется, то очистить биты фона, который был "прогрызен"
-
-                // Удалить монеты съеденные Диггером
-                const uint8_t man_abs_x_pos = man_x_graph - FIELD_X_OFFSET;
-                const uint8_t man_abs_y_pos = man_y_graph - FIELD_Y_OFFSET;
-                const uint8_t man_x_log = man_abs_x_pos / POS_X_STEP;
-                const uint8_t man_y_log = man_abs_y_pos / POS_Y_STEP;
-
-                if (remove_coin(man_x_log, man_y_log))
-                {
-                    eat_coin();
-                }
             }
             else man_dir = man_prev_dir;
 
@@ -2275,11 +2262,26 @@ void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
             {
                 if (man_x_graph != prev_man_x_graph || man_y_graph != prev_man_y_graph) // Если Диггер переместился
                 {
+                     // Очистить биты фона, который был "прогрызен"
+                    clear_background_bits(man_x_graph, man_y_graph, man_dir);
+                    clear_background_bits(man_x_graph, man_y_graph, man_dir ^ 1);
+
                     // Стереть след от Диггера с нужной стороы
                     erase_trail(man_dir, man_x_graph, man_y_graph);
 
                     // Нарисовать "прогрыз" от движения Диггера
                     gnaw(man_dir, prev_man_x_graph, prev_man_y_graph);
+
+                    // Удалить монеты съеденные Диггером
+                    const uint8_t man_abs_x_pos = man_x_graph - FIELD_X_OFFSET;
+                    const uint8_t man_abs_y_pos = man_y_graph - FIELD_Y_OFFSET;
+                    const uint8_t man_x_log = man_abs_x_pos / POS_X_STEP;
+                    const uint8_t man_y_log = man_abs_y_pos / POS_Y_STEP;
+
+                    if (remove_coin(man_x_log, man_y_log))
+                    {
+                        eat_coin();
+                    }
                 }
             }
 
@@ -2358,7 +2360,7 @@ void man_rip()
         if (man_state != CREATURE_DEAD_MONEY_BAG)
         {
             uint16_t y_graph = man_y_graph - bounce[i >> 3];
-            gnaw(DIR_UP, man_x_graph, y_graph + 1);
+            // gnaw(DIR_UP, man_x_graph, y_graph + 1);
             // Анимация подпрыгивающего перевёрнутого Диггера
             sp_paint_brick(man_x_graph, y_graph + 15, 4, 1, 0);
             sp_4_15_put(man_x_graph, y_graph, (uint8_t *)image_digger_turned_over);
