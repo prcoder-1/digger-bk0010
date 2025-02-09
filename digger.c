@@ -2096,7 +2096,7 @@ void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
                 }
             }
 
-            if (!mis_wait && ((code == 32) || (port_state & ((1 << PAR_INTERF_LEFT_BUTTON) | (1 << PAR_INTERF_RIGHT_BUTTON))))) mis_fire = 1;
+            if (!mis_wait && (port_state & ((1 << PAR_INTERF_LEFT_BUTTON) | (1 << PAR_INTERF_RIGHT_BUTTON)))) mis_fire = 1;
 
             if (new_code) // Если поступил новый скан-код
             {
@@ -2105,6 +2105,12 @@ void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
                     case 12:  // СБР - Пауза
                     {
                         while (!((*(volatile uint8_t *)REG_KEY_STATE) & (1 << KEY_STATE_STATE)));
+                        break;
+                    }
+
+                    case 32:  // Пробел - выстрел
+                    {
+                        if (!mis_wait) mis_fire = 1;
                         break;
                     }
 
