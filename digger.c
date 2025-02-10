@@ -641,11 +641,13 @@ void clear_background_bits(uint16_t x_graph, uint16_t y_graph, enum direction di
 
         case DIR_RIGHT:
         {
-            if (++x_rem >= 4)
-            {
-                x_rem -= 4;
-                x_log++;
-            }
+            // if (++x_rem >= 4)
+            // {
+            //     x_rem -= 4;
+            //     x_log++;
+            // }
+
+            x_log++;
 
             break;
         }
@@ -663,11 +665,13 @@ void clear_background_bits(uint16_t x_graph, uint16_t y_graph, enum direction di
 
         case DIR_DOWN:
         {
-            if (++y_rem >= 4)
-            {
-                y_rem -= 4;
-                y_log++;
-            }
+            // if (++y_rem >= 4)
+            // {
+            //     y_rem -= 4;
+            //     y_log++;
+            // }
+
+            y_log++;
 
             break;
         }
@@ -2366,7 +2370,7 @@ void man_rip()
             // sp_paint_brick(man_x_graph, y_graph + 15, 4, 1, 0);
             sp_put(man_x_graph, y_graph, sizeof(image_digger_turned_over[0]), sizeof(image_digger_turned_over) / sizeof(image_digger_turned_over[0]),
                    (uint8_t *)image_digger_turned_over, (uint8_t *)outline_digger_turned_over);
-            delay_ms(100);
+            // delay_ms(100);
         }
 
         if (i++ < 10)
@@ -2485,22 +2489,20 @@ void process_game_state()
             init_game(); // Установить игру в начальное состояние
         }
     }
-    // else
-    // {
-        if (done_snd)
-        {
-            done_snd = 0;
 
-            // Циклическое увеличение номера уровня
-            level_no++;
-            level_no &= LEVELS_NUM - 1;
+    if (done_snd)
+    {
+        done_snd = 0;
 
-            // Увеличение сложности после прохождения очередного уровня (максимальный уровень 9)
-            if (difficulty < 10) difficulty++;
+        // Циклическое увеличение номера уровня
+        level_no++;
+        level_no &= LEVELS_NUM - 1;
 
-            init_level(); // Инициализация нового уровня
-        }
-    // }
+        // Увеличение сложности после прохождения очередного уровня (максимальный уровень 9)
+        if (difficulty < 10) difficulty++;
+
+        init_level(); // Инициализация нового уровня
+    }
 }
 
 extern void start();
