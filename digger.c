@@ -8,7 +8,7 @@
 #include "digger_levels.h"
 #include "digger_music.h"
 
-#define DEBUG // Режим отладки включен
+// #define DEBUG // Режим отладки включен
 
 #define SCREEN_Y_OFFSET 25
 
@@ -1811,7 +1811,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                     if (bug_x_log == bag_x_log && bug->dir == DIR_UP) bug->dir = DIR_DOWN;
 
                     // Проверить, что враг попал под падающий мешок
-                    if ((bag->count > 1) && check_collision_4_15(bug->x_graph, bug->y_graph, bag_x_graph, bag_y_graph))
+                    if (check_collision_4_15(bug->x_graph, bug->y_graph, bag_x_graph, bag_y_graph))
                     {
                         bug->state = CREATURE_DEAD_MONEY_BAG; // Враг был убит мешком с деньгами
                         bug->dead_bag = bag; // Указатель на мешок которым был убит враг
