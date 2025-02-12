@@ -153,6 +153,7 @@ uint16_t man_x_graph;          /// Положение Диггера по оси
 uint16_t man_y_graph;          /// Положение Диггера по оси Y в графических координатах
 enum direction man_dir;        /// Направление движения Диггера
 enum direction man_prev_dir;   /// Предыдущее направление движения Диггера
+enum direction man_new_dir;    /// Желаемое новое направление движения Диггера
 enum creature_state man_state; /// Состояние Диггера (жив, убит, лежит дохлый)
 struct bag_info *man_dead_bag; /// Указатель на мешок от котрого погиб Диггер
 
@@ -1666,7 +1667,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                             case DIR_STOP: // Если мешок неподвижен
                             {
                                 // Если Диггер двигался вверх и он находится под мешком, то пока не начинать раскачивать мешок
-                                if ((man_x_log == bag_x_log) && (man_y_log == bag_y_log + 1) && man_dir != DIR_UP)
+                                if ((man_x_log == bag_x_log) && (man_y_log == bag_y_log + 1) && man_new_dir != DIR_UP)
                                 {
                                     // Начать раскачивать мешок
                                     bag->state = BAG_LOOSE;  // Мешок раскачивается
@@ -2079,7 +2080,7 @@ void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
         if (man_wait) man_wait--; // Если Диггер в режиме задержки (при толкании мешков)
         else
         {
-            enum direction man_new_dir = DIR_STOP;
+            man_new_dir = DIR_STOP;
 
             // Обработка управления с клавиатуры и джойстика
             volatile uint16_t port_state = *((uint16_t *)REG_PAR_INTERF); // Состояние регистра параллельного порта
