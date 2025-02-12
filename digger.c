@@ -243,14 +243,15 @@ int remove_coin(uint8_t x_log, uint8_t y_log);
  */
 void print_dec(uint16_t number, uint16_t x_graph, uint16_t y_graph)
 {
-    char buf[5] = { '0','0','0','0','0' }; // Буфер для 5 десятичных знаков
+    constexpr char zero = '0';
+    char buf[5] = { zero, zero, zero, zero, zero }; // Буфер для 5 десятичных знаков
 
     char *ptr = &buf[sizeof(buf)];
     uint_to_str(number, &ptr);
 
     for (uint8_t i = 0; i < sizeof(buf); ++i)
     {
-        uint16_t index = buf[i] - '0';
+        uint16_t index = buf[i] - zero;
         sp_put(x_graph, y_graph, sizeof(ch_digits[0][0]), sizeof(ch_digits[0]) / sizeof(ch_digits[0][0]), (uint8_t *)ch_digits[index], nullptr); // Вывести спрайт цифры
         x_graph += sizeof(ch_digits[0][0]);
     }
@@ -562,11 +563,13 @@ void init_level()
  */
 uint16_t full_bite(uint8_t byte)
 {
-    byte = ~byte;
-    if (!(byte & 0xF0)) return 1;
-    if (!(byte & 0x0F)) return 1;
+    int bits_count;
+    for (bits_count = 0; byte; bits_count++)
+    {
+        byte &= byte - 1;
+    }
 
-    return 0;
+    return bits_count > 1;
 }
 
 /**
@@ -1663,7 +1666,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                             case DIR_STOP: // Если мешок неподвижен
                             {
                                 // Если Диггер двигался вверх и он находится под мешком, то пока не начинать раскачивать мешок
-                                if (!(man_dir == DIR_UP &&  (man_x_log == bag_x_log && (man_y_log == bag_y_log + 1))))
+                                if ((man_x_log == bag_x_log) && (man_y_log == bag_y_log + 1) && man_dir != DIR_UP)
                                 {
                                     // Начать раскачивать мешок
                                     bag->state = BAG_LOOSE;  // Мешок раскачивается
