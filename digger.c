@@ -8,7 +8,7 @@
 #include "digger_levels.h"
 #include "digger_music.h"
 
-// #define DEBUG // Режим отладки включен
+#define DEBUG // Режим отладки включен
 
 #define SCREEN_Y_OFFSET 25
 
@@ -377,9 +377,10 @@ void init_level_state()
     for (uint16_t i = 0; i < MAX_BAGS; ++i)
     {
         struct bag_info *bag = &bags[i];  // Структура с информацией о мешке
-        if (bag->state < BAG_LOOSE) continue; // Пропустить неактивные и стационарные мешки
+        if (bag->state < BAG_FALLING) continue; // Пропустить неактивные и стационарные мешки
 
-        erase_4_15(bag->x_graph, bag->y_graph); // Стереть мешок
+        sp_put(bag->x_graph, bag->y_graph, sizeof(image_bag[0]), sizeof(image_bag) / sizeof(image_bag[0]), 0, (uint8_t *)outline_bag); // Стереть мешок
+        // erase_4_15(bag->x_graph, bag->y_graph); // Стереть мешок
         bag->state = BAG_INACTIVE;
     }
 
@@ -1695,7 +1696,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                         uint8_t *bag_outline = bag_outlines[count_rem]; // Указатель на маску
 
                         // Нарисовать спрайт раскачивающегося мешка (используя маску)
-                        sp_put(bag_x_graph, bag_y_graph, sizeof(image_bag_left[0]), sizeof(image_bag_left) / sizeof(image_bag_left[0]), bag_image, bag_outline);
+                        sp_put(bag_x_graph, bag_y_graph, sizeof(image_bag[0]), sizeof(image_bag) / sizeof(image_bag[0]), bag_image, bag_outline);
                     }
                 }
                 else
