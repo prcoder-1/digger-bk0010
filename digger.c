@@ -121,7 +121,6 @@ struct bug_info
     int8_t image_phase_inc;    ///< Направление изменения фазы анимации при выводе спрайта (+1 или -1)
     uint8_t x_graph;           ///< Положение по оси X в графических координатах
     uint8_t y_graph;           ///< Положение по оси Y в графических координатах
-    struct bag_info *dead_bag; ///< Указатель на мешок от котрого погиб враг
 };
 #pragma pack(pop)
 
@@ -1480,7 +1479,6 @@ void process_bugs()
                         bug->image_phase_inc = 1;       // Начальное направление изменения фазы
                         bug->x_graph = bug_start_x;     // Начальная графическая координата по оси X
                         bug->y_graph = bug_start_y;     // Начальная графическая координата по оси Y
-                        bug->dead_bag = 0;              // Указатель на мешок, коттторый убил врага
                         bug->type = BUG_NOBBIN;         // Враги рождаются в виде Ноббинов
                         bug->dir = DIR_STOP;            // Начальное направление движения
 
@@ -1562,45 +1560,12 @@ void process_bugs()
                 break;
             }
 
-            case CREATURE_DEAD_MONEY_BAG: // Враг погиб от мешка с деньгами и летит вместе с ним
+            case CREATURE_DEAD_MONEY_BAG: // Враг погиб от мешка с деньгами
             {
-                uint8_t bag_y_pos = bug->dead_bag->y_graph; // Вертикальная позиция мешка от которого погиб враг
-                if (bag_y_pos + MOVE_Y_STEP > bug->y_graph)
-                {
-                    erase_trail(DIR_DOWN, bug->x_graph, bug->y_graph);
-                    bug->y_graph = bag_y_pos; // Если мешок опустился ниже врага, враг перемещается за мешком
-                }
-
-                switch (bug->type)
-                {
-                    case BUG_HOBBIN:
-                    {
-                        // Нарисовать погибшего Хоббина
-                        if (bug->dir == DIR_RIGHT)
-                        {
-                            // Смотрит вправо
-                            sp_4_15_put(bug->x_graph, bug->y_graph, (uint8_t *)image_hobbin_right_dead);
-                        }
-                        else
-                        {
-                            // Смотрит влево (отзеркаленный правый)
-                            sp_4_15_h_mirror_put(bug->x_graph, bug->y_graph, (uint8_t *)image_hobbin_right_dead);
-                        }
-
-                        break;
-                    }
-
-                    case BUG_NOBBIN:
-                    {
-                        // Нарисовать погибшего Ноббина
-                        sp_4_15_put(bug->x_graph, bug->y_graph, (uint8_t *)image_nobbin_dead);
-                        break;
-                    }
-                }
-
                 bug->count = 1;
                 bug->state = CREATURE_RIP; // Враг лежит дохлый
-                add_score_250(); // Добавить 250 очков за убитого врага
+                add_score_250(); // Добавить 250 очков за убитого мешком врага
+
                 break;
             }
 
@@ -1757,7 +1722,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                 // Стереть падающий мешок по старым координатам
                 if (bag->count) // Если номер этажа не нулевой
                 {
-                    // Если пролетел больше одного этажа, то стираем прямоушольником
+                    // Если пролетел больше одного этажа, то стираем прямоугольником
                     erase_4_15(bag->x_graph, bag->y_graph);
                 }
                 else
@@ -1818,7 +1783,6 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                     if (check_collision_4_15(bug->x_graph, bug->y_graph, bag_x_graph, bag_y_graph))
                     {
                         bug->state = CREATURE_DEAD_MONEY_BAG; // Враг был убит мешком с деньгами
-                        bug->dead_bag = bag; // Указатель на мешок которым был убит враг
 
                         // В бонус-режиме увеличить количество создаваемых врагов компенсируя убитых мешками
                         if (bonus_state == BONUS_ON)

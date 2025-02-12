@@ -34,7 +34,7 @@ extern const uint8_t image_nobbin[3][15][4];
 /**
  * @brief Падающий дохлый Ноббин
  */
-extern const uint8_t image_nobbin_dead[15][4];
+// extern const uint8_t image_nobbin_dead[15][4];
 // extern const uint8_t outline_nobbin_dead[15][4];
 
 /**
@@ -47,7 +47,7 @@ extern const uint8_t image_hobbin_right[3][15][4];
 /**
  * @brief Падающий дохлый Хоббин смотрящий вправо
  */
-extern const uint8_t image_hobbin_right_dead[15][4];
+// extern const uint8_t image_hobbin_right_dead[15][4];
 // extern const uint8_t outline_hobbin_right_dead[15][4];
 
 /**
