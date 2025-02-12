@@ -2016,7 +2016,7 @@ void process_missile()
     }
 }
 
-void man_rip();
+void man_rip(int bounce);
 
 /**
  * @brief Съесть монету (драгоценный камень)
@@ -2283,7 +2283,7 @@ void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
                     bugs_active--; // Уменьшить количество активных врагов
                     bugs_total++;  // Увеличить количество создаваемых врагов компенсируя съеденных
                 }
-                else man_rip();
+                else man_rip(1);
             }
 
             man_prev_dir = man_dir;
@@ -2302,11 +2302,12 @@ void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
             }
 
             // Нарисовать перевёрнутого Диггера
-            sp_4_15_put(man_x_graph, man_y_graph, (uint8_t *)image_digger_turned_over);
+            sp_put(man_x_graph, man_y_graph, sizeof(image_digger_turned_over[0]), sizeof(image_digger_turned_over) / sizeof(image_digger_turned_over[0]),
+                   (uint8_t *)image_digger_turned_over, (uint8_t *)outline_digger_turned_over);
 
             if (man_dead_bag->dir == DIR_STOP)
             {
-                man_rip();
+                man_rip(0);
             }
         }
     }
@@ -2316,42 +2317,45 @@ void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
  * @brief Подпрограмма анимации гибели Диггера, отрисовки надгробного камня и
  *        воспроизведения музыкального сопровождения
  */
-void man_rip()
+void man_rip(int bounce)
 {
-    erase_4_15(man_x_graph, man_y_graph); // Стереть Диггера
-
-    // Последовательность высоты на которую подпрыгивает перевёрнутый Диггер
-    static uint8_t bounce[8] = { 3, 5, 6, 6, 5, 4, 3, 0 };
-
-    uint16_t prev_y_graph = 0;
-    uint16_t period = 19000 / N;
-    uint16_t i = 0;
-    while (period < 36000 / N) // Звук убиения Диггера
+    if (bounce)
     {
-        if (snd_effects) sound(period, 2);
+        erase_4_15(man_x_graph, man_y_graph); // Стереть Диггера
 
-        if (man_state != CREATURE_DEAD_MONEY_BAG)
+        // Последовательность высоты на которую подпрыгивает перевёрнутый Диггер
+        static uint8_t bounce[8] = { 3, 5, 6, 6, 5, 4, 3, 0 };
+
+        uint16_t prev_y_graph = 0;
+        uint16_t period = 19000 / N;
+        uint16_t i = 0;
+        while (period < 36000 / N) // Звук убиения Диггера
         {
-            uint16_t y_graph = man_y_graph - bounce[i >> 3];
-            // gnaw(DIR_UP, man_x_graph, y_graph + 1);
-            // Анимация подпрыгивающего перевёрнутого Диггера
-            // sp_paint_brick(man_x_graph, y_graph + 15, 4, 1, 0);
-            sp_put(man_x_graph, y_graph, sizeof(image_digger_turned_over[0]), sizeof(image_digger_turned_over) / sizeof(image_digger_turned_over[0]),
-                   (uint8_t *)image_digger_turned_over, (uint8_t *)outline_digger_turned_over);
-            // delay_ms(100);
+            if (snd_effects) sound(period, 2);
+
+            if (man_state != CREATURE_DEAD_MONEY_BAG)
+            {
+                uint16_t y_graph = man_y_graph - bounce[i >> 3];
+                // gnaw(DIR_UP, man_x_graph, y_graph + 1);
+                // Анимация подпрыгивающего перевёрнутого Диггера
+                // sp_paint_brick(man_x_graph, y_graph + 15, 4, 1, 0);
+                sp_put(man_x_graph, y_graph, sizeof(image_digger_turned_over[0]), sizeof(image_digger_turned_over) / sizeof(image_digger_turned_over[0]),
+                    (uint8_t *)image_digger_turned_over, (uint8_t *)outline_digger_turned_over);
+                // delay_ms(100);
+            }
+
+            if (i++ < 10)
+            {
+                period -= 1000 / N;
+            }
+            else
+            {
+                period += 500 / N;
+            }
         }
 
-        if (i++ < 10)
-        {
-            period -= 1000 / N;
-        }
-        else
-        {
-            period += 500 / N;
-        }
+        delay_ms(500);
     }
-
-    delay_ms(500);
 
     // TODO: Удалить врагов с которыми коллизия
     // for (uint8_t i = 0; i < bugs_max; ++i)
