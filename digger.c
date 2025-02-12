@@ -2340,8 +2340,16 @@ void man_rip(int bounce)
                 // gnaw(DIR_UP, man_x_graph, y_graph + 1);
                 // Анимация подпрыгивающего перевёрнутого Диггера
                 // sp_paint_brick(man_x_graph, y_graph + 15, 4, 1, 0);
+                if (prev_y_graph)
+                {
+                    sp_put(man_x_graph, prev_y_graph, sizeof(outline_digger_turned_over[0]), sizeof(outline_digger_turned_over) / sizeof(outline_digger_turned_over[0]),
+                        0, (uint8_t *)outline_digger_turned_over);
+                }
+
                 sp_put(man_x_graph, y_graph, sizeof(image_digger_turned_over[0]), sizeof(image_digger_turned_over) / sizeof(image_digger_turned_over[0]),
                     (uint8_t *)image_digger_turned_over, (uint8_t *)outline_digger_turned_over);
+                prev_y_graph = y_graph;
+
                 // delay_ms(100);
             }
 
