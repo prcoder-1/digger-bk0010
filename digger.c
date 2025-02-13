@@ -2284,7 +2284,11 @@ void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
                     bugs_active--; // Уменьшить количество активных врагов
                     bugs_total++;  // Увеличить количество создаваемых врагов компенсируя съеденных
                 }
-                else man_rip();
+                else
+                {
+                    erase_4_15(man_x_graph, man_y_graph); // Стереть Диггера
+                    man_rip();
+                }
             }
 
             man_prev_dir = man_dir;
