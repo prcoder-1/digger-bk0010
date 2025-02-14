@@ -8,7 +8,7 @@
 #include "digger_levels.h"
 #include "digger_music.h"
 
-#define DEBUG // Режим отладки включен
+// #define DEBUG // Режим отладки включен
 
 #define SCREEN_Y_OFFSET 25
 
@@ -2465,7 +2465,17 @@ void process_game_state()
         }
         else
         {
-            // TODO: Game Over
+#if !defined(DEBUG)
+            constexpr uint16_t go_width = sizeof(game_over[0]);
+            constexpr uint16_t go_height = sizeof(game_over) / go_width;
+            constexpr uint16_t go_x = (SCREEN_BYTE_WIDTH - go_width) / 2;
+            constexpr uint16_t go_y = (SCREEN_PIX_HEIGHT - go_height) / 2;
+
+            // Вывести надпись "Game Over"
+            sp_paint_brick(go_x - MOVE_X_STEP, go_y - MOVE_Y_STEP, go_width + 2 * MOVE_X_STEP, go_height + 2 * MOVE_Y_STEP, 0);
+            sp_put(go_x, go_y, go_width, go_height, (uint8_t *)game_over, 0);
+            delay_ms(5000);
+#endif
             init_game(); // Установить игру в начальное состояние
         }
     }

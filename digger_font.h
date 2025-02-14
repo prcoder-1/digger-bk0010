@@ -8,4 +8,4 @@ extern const uint8_t ch_digits[10][12][3]; // Символы цифр ('0'-'9')
 // extern const uint8_t ch_dot[12][3];        // Символ '.' (точка)
 // extern const uint8_t ch_underline[12][3];  // Символ '_' (подчёркивание)
 // extern const uint8_t ch_space[12][3];      // Символ ' ' (пробел)
-
+extern const uint8_t game_over[12][27];
