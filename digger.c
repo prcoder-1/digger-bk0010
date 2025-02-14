@@ -1743,7 +1743,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                     bag->count++; // Увеличить количество этажей, которые пролетел мешок
 
                     // Остановить мешок, если клетка под ним не повреждена или он долетел до последнего этажа
-                    if ((bag_y_log == H_MAX - 1) || !background[bag_y_log + 1][bag_x_log]) stop_bag(bag);
+                    if ((bag_y_log == H_MAX - 1) || !full_bite(background[bag_y_log + 1][bag_x_log])) stop_bag(bag);
                 }
 
                 remove_coin(bag_x_log, bag_y_log); // Удалить монету в клетке куда попал мешок
