@@ -318,13 +318,6 @@ void erase_4_15(uint16_t x_graph, uint16_t y_graph)
     sp_paint_brick(x_graph, y_graph, 4, 15, 0);
 }
 
-/**
- * @brief Проверка соприкосновения (по расстояниям) по оси X и по оси Y
- */
-int check_collision(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t dist_x, uint8_t dist_y)
-{
-    return (ABS(x2 - x1) < dist_x) && (ABS(y2 - y1) < dist_y);
-}
 
 /**
  * @brief Проверка соприкосновения (по расстояниям) по оси X и по оси Y
@@ -1758,7 +1751,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                 if (man_state == CREATURE_ALIVE) //  Если Диггер жив
                 {
                     // Проверить, что Диггер попал под падающий под мешок
-                    if (check_collision(man_x_graph, man_y_graph, bag_x_graph, bag_y_graph, 4, 12))
+                    if (check_collision_4_15(man_x_graph, man_y_graph, bag_x_graph, bag_y_graph))
                     {
                         man_state = CREATURE_DEAD_MONEY_BAG; // Диггер погиб от падающего мешка
                         man_dead_bag = bag; // Указатель на мешок от которого погиб Диггер
@@ -1931,7 +1924,7 @@ void process_missile()
 
             uint8_t explode = 0;
 
-            // Проверить если координаты выходят за рамки игрового поля
+            // Проверить если координаты выходят за рамки игрового поля или впереди нету прохода
             if (check_out_of_range(mis_dir, mis_x_graph, mis_y_graph) || !check_path(mis_dir, mis_x_graph, mis_y_graph))
             {
                 explode = 1; // Взорвать выстрел
@@ -1948,11 +1941,10 @@ void process_missile()
                 for (uint8_t i = 0; i < bugs_max; ++i)
                 {
                     struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
-                    if (!bugs_active) continue; // Пропустить неактивных врагов
                     if (bug->state != CREATURE_ALIVE) continue; //  Пропустить неживых врагов
 
                     // Проверить, что выстрел попал во врага
-                    if (check_collision(mis_x_graph, mis_y_graph, bug->x_graph, bug->y_graph, missile_x_size, missile_y_size))
+                    if (check_collision_4_15(mis_x_graph, mis_y_graph, bug->x_graph, bug->y_graph))
                     {
                         explode = 1; // Взорвать выстрел
                         bug->state = CREATURE_RIP; // Враг был убит выстрелом
