@@ -702,9 +702,6 @@ void clear_background_bits(uint16_t x_graph, uint16_t y_graph, enum direction di
  */
 int check_out_of_range(enum direction dir, uint16_t x_graph, uint16_t y_graph)
 {
-    // print_dec(x_graph, 0, MAX_Y_POS + 2 * POS_Y_STEP);
-    // print_dec(y_graph, sizeof(ch_digits[0][0]) * 5 + 1, MAX_Y_POS + 2 * POS_Y_STEP);
-
     return (
         (dir == DIR_RIGHT && x_graph >= MAX_X_POS) ||
         (dir == DIR_LEFT  && x_graph <= MIN_X_POS) ||
@@ -1925,7 +1922,8 @@ void process_missile()
             uint8_t explode = 0;
 
             // Проверить если координаты выходят за рамки игрового поля или впереди нету прохода
-            if (check_out_of_range(mis_dir, mis_x_graph, mis_y_graph) || !check_path(mis_dir, mis_x_graph, mis_y_graph))
+
+            if (!check_path(mis_dir, mis_x_graph, mis_y_graph))
             {
                 explode = 1; // Взорвать выстрел
             }
