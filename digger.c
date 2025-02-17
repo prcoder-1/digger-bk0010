@@ -37,8 +37,6 @@
 #define BONUS_LIFE_SCORE 20000 // Количество очков для дополнительной жизни
 #define MAX_LIVES 4 // Максимальное количество жизней
 
-#define NV 4 // Делитель для звуковой процедуры "вибрато"
-
 /**
  * @brief Перечисление типов врагов
  */
@@ -210,6 +208,8 @@ uint8_t  explode_snd;        /// Флаг, означающий, что звук
 uint8_t  done_snd;           /// Флаг, означающий, что звук завершения уровня включен
 uint8_t  bug_snd;            /// Флаг, означающий, что звук съедания врага в бонус-режиме включен
 uint8_t  life_snd;           /// Флаг, означающий, что звук получения дополнительной жизни включен
+uint16_t music_idx;          /// Индекс ноты в фоновой музыке
+uint16_t music_count;        /// Счётчик повторов ноты музыки
 
 #if defined(DEBUG)
 /**
@@ -425,6 +425,8 @@ void init_level_state()
     done_snd = 0;
     bug_snd = 0;
     life_snd = 0;
+    music_idx = 0;
+    music_count = 0;
 }
 
 /**
@@ -1365,26 +1367,26 @@ void sound_effect()
         money_snd = 0;
     }
 
-    if (chase_snd) // Звук включения бонус-режима
-    {
-        uint16_t durance = 75;
-        chase_snd_flip = ~chase_snd_flip;
-        if (chase_snd_flip) sound(1230 / N, durance);
-        else sound(1513 / N, durance);
-    }
+    // if (chase_snd) // Звук включения бонус-режима
+    // {
+    //     uint16_t durance = 75;
+    //     chase_snd_flip = ~chase_snd_flip;
+    //     if (chase_snd_flip) sound(1230 / N, durance);
+    //     else sound(1513 / N, durance);
+    // }
 
-    if (done_snd) // Звук завершения уровня
-    {
-        static const uint8_t done_periods[] = { C5 / NV, E5 / NV, G5 / NV, D5 / NV, F5 / NV, A5 / NV, E5 / NV, G5 / NV, B5 / NV, C5 / 2 / NV};
-
-        for (uint16_t i = 0; i < sizeof(done_periods) / sizeof(done_periods[0]); ++i)
-        {
-            uint8_t period = done_periods[i];
-            uint16_t durance = (i == 9) ? 800 : 300;
-            sound_vibrato(period, durance);
-            delay_ms(2);
-        }
-    }
+    // if (done_snd) // Звук завершения уровня
+    // {
+    //     static const uint8_t done_periods[] = { C5 / NV, E5 / NV, G5 / NV, D5 / NV, F5 / NV, A5 / NV, E5 / NV, G5 / NV, B5 / NV, C5 / 2 / NV};
+    //
+    //     for (uint16_t i = 0; i < sizeof(done_periods) / sizeof(done_periods[0]); ++i)
+    //     {
+    //         uint8_t period = done_periods[i];
+    //         uint16_t durance = (i == 9) ? 800 : 300;
+    //         sound_vibrato(period, durance);
+    //         delay_ms(2);
+    //     }
+    // }
 
     if (bug_snd) // Звук съедаемого врага в бонус-режиме
     {
@@ -2330,9 +2332,6 @@ void man_rip()
         if (man_state != CREATURE_DEAD_MONEY_BAG)
         {
             uint16_t y_graph = man_y_graph - bounce[i >> 3];
-            // gnaw(DIR_UP, man_x_graph, y_graph + 1);
-            // Анимация подпрыгивающего перевёрнутого Диггера
-            // sp_paint_brick(man_x_graph, y_graph + 15, 4, 1, 0);
             if (prev_y_graph)
             {
                 sp_put(man_x_graph, prev_y_graph, sizeof(outline_digger_turned_over[0]), sizeof(outline_digger_turned_over) / sizeof(outline_digger_turned_over[0]),
@@ -2342,8 +2341,6 @@ void man_rip()
             sp_put(man_x_graph, y_graph, sizeof(image_digger_turned_over[0]), sizeof(image_digger_turned_over) / sizeof(image_digger_turned_over[0]),
                 (uint8_t *)image_digger_turned_over, (uint8_t *)outline_digger_turned_over);
             prev_y_graph = y_graph;
-
-            // delay_ms(100);
         }
 
         if (i++ < 10)
@@ -2459,16 +2456,16 @@ void process_game_state()
         else
         {
 #if !defined(DEBUG)
-            constexpr uint16_t go_width = sizeof(game_over[0]);
-            constexpr uint16_t go_height = sizeof(game_over) / go_width;
-            constexpr uint16_t go_x = (SCREEN_BYTE_WIDTH - go_width) / 2;
-            constexpr uint16_t go_y = (SCREEN_PIX_HEIGHT - go_height) / 2;
-
-            // Вывести надпись "Game Over"
-            sp_paint_brick(go_x - 2 * MOVE_X_STEP, go_y - 2 * MOVE_Y_STEP, go_width + 4 * MOVE_X_STEP, go_height + 4 * MOVE_Y_STEP, 0xFF);
-            sp_paint_brick(go_x - MOVE_X_STEP, go_y - MOVE_Y_STEP, go_width + 2 * MOVE_X_STEP, go_height + 2 * MOVE_Y_STEP, 0);
-            sp_put(go_x, go_y, go_width, go_height, (uint8_t *)game_over, 0);
-            delay_ms(5000);
+            // constexpr uint16_t go_width = sizeof(game_over[0]);
+            // constexpr uint16_t go_height = sizeof(game_over) / go_width;
+            // constexpr uint16_t go_x = (SCREEN_BYTE_WIDTH - go_width) / 2;
+            // constexpr uint16_t go_y = (SCREEN_PIX_HEIGHT - go_height) / 2;
+            //
+            // // Вывести надпись "Game Over"
+            // sp_paint_brick(go_x - 2 * MOVE_X_STEP, go_y - 2 * MOVE_Y_STEP, go_width + 4 * MOVE_X_STEP, go_height + 4 * MOVE_Y_STEP, 0xFF);
+            // sp_paint_brick(go_x - MOVE_X_STEP, go_y - MOVE_Y_STEP, go_width + 2 * MOVE_X_STEP, go_height + 2 * MOVE_Y_STEP, 0);
+            // sp_put(go_x, go_y, go_width, go_height, (uint8_t *)game_over, 0);
+            // delay_ms(5000);
 #endif
             init_game(); // Установить игру в начальное состояние
         }
@@ -2544,6 +2541,13 @@ void main()
         // Рспечатать оставшееся свободное время
         print_dec(*((volatile uint16_t *)REG_TVE_COUNT), 0, MAX_Y_POS + 2 * POS_Y_STEP);
 #endif
+        sound_vibrato(music_popcorn[music_idx][0] * 4, *((volatile uint16_t *)REG_TVE_COUNT) / 16);
+        if (++music_count >= 1 << music_popcorn[music_idx][1])
+        {
+            music_count = 0;
+            if (++music_idx >= sizeof(music_popcorn) / sizeof(music_popcorn)[0]) music_idx = 0;
+        }
+
         while ((tve_csr->reg & (1 << TVE_CSR_FL)) == 0); // Ожидать срабатывания таймера.
     }
 }

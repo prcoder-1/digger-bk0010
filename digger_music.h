@@ -3,6 +3,8 @@
 
 //#define N 64 // Делитель периодов нот
 #define N 20 // Делитель периодов нот
+#define NV 4 // Делитель для звуковой процедуры "вибрато"
+#define NM 16 // Делитель для фоновой музыки
 
 // Периоды нот
 #define	C3	(9122 / N)
@@ -63,7 +65,7 @@
 #define	NW (T << 4)               // 16 * T
 
 // extern const uint8_t music0[][2]; // Музыка для режима "Бонус"
-// extern const uint8_t music1[][2]; // Обычная музыка "Popcorn"
+extern const uint8_t music_popcorn[145][2]; // Музыка "Popcorn"
 // extern const uint8_t music2[][2]; // Траурный марш
 // extern const uint8_t music_coin[][2]; // Звуки съедания монеток (камешков)
 

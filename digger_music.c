@@ -1,5 +1,5 @@
 #include "digger_music.h"
-
+/*
 const uint8_t music0[][2] = { // Музыка для режима "Бонус"
     { C4,NE }, { C4,NE }, { C4,NQ }, { C4,NE }, { C4,NE }, { C4,NQ }, { C4,NE }, { C4,NE }, { F4,NQ }, { G4,NQ }, { A4,NQ },
     { C4,NE }, { C4,NE }, { C4,NQ }, { C4,NE }, { C4,NE }, { C4,NQ }, { F4,NE }, { A4,NE }, { G4,NQ }, { E4,NQ }, { C4,NQ },
@@ -22,41 +22,44 @@ const uint8_t music0[][2] = { // Музыка для режима "Бонус"
     { D5,NQ }, { A4,NQ }, { D5,NQ }, { A4,NQ }, { D5,NQ }, { C5,NQ }, { B4,NQ }, { C5,NQ }, { B4,NQ }, { C5,NQ },
     { 0, 0 }
 };
+*/
 
-const uint8_t music1[][2] = { // Обычная музыка "Popcorn"
-    { D4,NE }, { C4,NE },
-    { D4,NE }, { A3,NE }, { F3,NE }, { A3,NE }, { D3,NQ }, { D4,NE }, { C4,NE },
-    { D4,NE }, { A3,NE }, { F3,NE }, { A3,NE }, { D3,NQ }, { D4,NE }, { E4,NE },
-    { F4,NE }, { E4,NE }, { F4,NE }, { D4,NE }, { E4,NE }, { D4,NE }, { E4,NE }, { C4,NE },
-    { D4,NE }, { C4,NE }, { D4,NE }, { AS3,NE }, { D4,NQ }, { D4,NE }, { C4,NE },
+// Музыка "Popcorn"
+const uint8_t music_popcorn[145][2] = {
+    { D4 / NM, 1 }, { C4 / NM, 1 },
+    { D4 / NM, 1 }, { A3 / NM, 1 }, { F3 / NM, 1 }, { A3 / NM, 1 }, { D3 / NM, 2 }, { D4 / NM, 1 }, { C4 / NM, 1 },
+    { D4 / NM, 1 }, { A3 / NM, 1 }, { F3 / NM, 1 }, { A3 / NM, 1 }, { D3 / NM, 2 }, { D4 / NM, 1 }, { E4 / NM, 1 },
+    { F4 / NM, 1 }, { E4 / NM, 1 }, { F4 / NM, 1 }, { D4 / NM, 1 }, { E4 / NM, 1 }, { D4 / NM, 1 }, { E4 / NM, 1 }, { C4 / NM, 1 },
+    { D4 / NM, 1 }, { C4 / NM, 1 }, { D4 / NM, 1 }, { AS3/ NM, 1 }, { D4 / NM, 2 }, { D4 / NM, 1 }, { C4 / NM, 1 },
 
-    { D4,NE }, { A3,NE }, { F3,NE }, { A3,NE }, { D3,NQ }, { D4,NE }, { C4,NE },
-    { D4,NE }, { A3,NE }, { F3,NE }, { A3,NE }, { D3,NQ }, { D4,NE }, { E4,NE },
-    { F4,NE }, { E4,NE }, { F4,NE }, { D4,NE }, { E4,NE }, { D4,NE }, { E4,NE }, { C4,NE },
-    { D4,NE }, { C4,NE }, { D4,NE }, { E4,NE }, { F4,NQ }, { A4,NE }, { G4,NE },
+    { D4 / NM, 1 }, { A3 / NM, 1 }, { F3 / NM, 1 }, { A3 / NM, 1 }, { D3 / NM, 2 }, { D4 / NM, 1 }, { C4 / NM, 1 },
+    { D4 / NM, 1 }, { A3 / NM, 1 }, { F3 / NM, 1 }, { A3 / NM, 1 }, { D3 / NM, 2 }, { D4 / NM, 1 }, { E4 / NM, 1 },
+    { F4 / NM, 1 }, { E4 / NM, 1 }, { F4 / NM, 1 }, { D4 / NM, 1 }, { E4 / NM, 1 }, { D4 / NM, 1 }, { E4 / NM, 1 }, { C4 / NM, 1 },
+    { D4 / NM, 1 }, { C4 / NM, 1 }, { D4 / NM, 1 }, { E4 / NM, 1 }, { F4 / NM, 2 }, { A4 / NM, 1 }, { G4 / NM, 1 },
 
-    { A4,NE }, { F4,NE }, { C4,NE }, { F4,NE }, { A3,NQ }, { A4,NE }, { G4,NE },
-    { A4,NE }, { F4,NE }, { C4,NE }, { F4,NE }, { A3,NQ }, { A4,NE }, { B4,NE },
-    { C5,NE }, { B4,NE }, { C5,NE }, { A4,NE }, { B4,NE }, { A4,NE }, { B4,NE }, { G4,NE },
-    { A4,NE }, { G4,NE }, { A4,NE }, { F4,NE }, { A4,NQ }, { A4,NE }, { G4,NE },
+    { A4 / NM, 1 }, { F4 / NM, 1 }, { C4 / NM, 1 }, { F4 / NM, 1 }, { A3 / NM, 2 }, { A4 / NM, 1 }, { G4 / NM, 1 },
+    { A4 / NM, 1 }, { F4 / NM, 1 }, { C4 / NM, 1 }, { F4 / NM, 1 }, { A3 / NM, 2 }, { A4 / NM, 1 }, { B4 / NM, 1 },
+    { C5 / NM, 1 }, { B4 / NM, 1 }, { C5 / NM, 1 }, { A4 / NM, 1 }, { B4 / NM, 1 }, { A4 / NM, 1 }, { B4 / NM, 1 }, { G4 / NM, 1 },
+    { A4 / NM, 1 }, { G4 / NM, 1 }, { A4 / NM, 1 }, { F4 / NM, 1 }, { A4 / NM, 2 }, { A4 / NM, 1 }, { G4 / NM, 1 },
 
-    { A4,NE }, { F4,NE }, { C4,NE }, { F4,NE }, { A3,NQ }, { A4,NE }, { G4,NE },
-    { A4,NE }, { F4,NE }, { C4,NE }, { F4,NE }, { A3,NQ }, { A4,NE }, { B4,NE },
-    { C5,NE }, { B4,NE }, { C5,NE }, { A4,NE }, { B4,NE }, { A4,NE }, { B4,NE }, { G4,NE },
-    { A4,NE }, { G4,NE }, { A4,NE }, { F4,NE }, { A4,NQ }, { D5,NE }, { C5,NE },
+    { A4 / NM, 1 }, { F4 / NM, 1 }, { C4 / NM, 1 }, { F4 / NM, 1 }, { A3 / NM, 2 }, { A4 / NM, 1 }, { G4 / NM, 1 },
+    { A4 / NM, 1 }, { F4 / NM, 1 }, { C4 / NM, 1 }, { F4 / NM, 1 }, { A3 / NM, 2 }, { A4 / NM, 1 }, { B4 / NM, 1 },
+    { C5 / NM, 1 }, { B4 / NM, 1 }, { C5 / NM, 1 }, { A4 / NM, 1 }, { B4 / NM, 1 }, { A4 / NM, 1 }, { B4 / NM, 1 }, { G4 / NM, 1 },
+    { A4 / NM, 1 }, { G4 / NM, 1 }, { A4 / NM, 1 }, { F4 / NM, 1 }, { A4 / NM, 2 }, { D5 / NM, 1 }, { C5 / NM, 1 },
 
-    { A4,NE }, { F4,NE }, { C4,NE }, { F4,NE }, { A3,NQ }, { A4,NE }, { G4,NE },
-    { A4,NE }, { F4,NE }, { C4,NE }, { F4,NE }, { A3,NQ }, { A4,NE }, { B4,NE },
-    { C5,NE }, { B4,NE }, { C5,NE }, { A4,NE }, { B4,NE }, { A4,NE }, { B4,NE }, { G4,NE },
-    { A4,NE }, { G4,NE }, { F4,NE }, { G4,NE }, { A4,NQ },
-    { 0, 0 }
+    { A4 / NM, 1 }, { F4 / NM, 1 }, { C4 / NM, 1 }, { F4 / NM, 1 }, { A3 / NM, 2 }, { A4 / NM, 1 }, { G4 / NM, 1 },
+    { A4 / NM, 1 }, { F4 / NM, 1 }, { C4 / NM, 1 }, { F4 / NM, 1 }, { A3 / NM, 2 }, { A4 / NM, 1 }, { B4 / NM, 1 },
+    { C5 / NM, 1 }, { B4 / NM, 1 }, { C5 / NM, 1 }, { A4 / NM, 1 }, { B4 / NM, 1 }, { A4 / NM, 1 }, { B4 / NM, 1 }, { G4 / NM, 1 },
+    { A4 / NM, 1 }, { G4 / NM, 1 }, { F4 / NM, 1 }, { G4 / NM, 1 }, { A4 / NM, 2 }
 };
 
-const uint8_t music2[][2] = { // Траурный марш
-    { REST,NE }, { C4,N6 }, { C4,NQ }, { C4,NE }, { C4,N6 }, { DS4,NQ }, { D4,NE }, { D4,NQ }, { C4,NE }, { C4,NQ }, { B3,NE }, { C4,N12 },
-    { REST,NW }, { REST,NW }, { REST,NW }, { REST,NW }, { REST,NW }, { REST,NW }, { REST,NW }, { REST,NW }, { REST,NW }, { REST,NW }, { REST,NW }, { REST,NW },
-    { 0, 0 }
-};
+
+
+// const uint8_t music2[][2] = { // Траурный марш
+//     { REST,NE }, { C4,N6 }, { C4,NQ }, { C4,NE }, { C4,N6 }, { DS4,NQ }, { D4,NE }, { D4,NQ }, { C4,NE }, { C4,NQ }, { B3,NE }, { C4,N12 },
+//     { REST,NW }, { REST,NW }, { REST,NW }, { REST,NW }, { REST,NW }, { REST,NW }, { REST,NW }, { REST,NW }, { REST,NW }, { REST,NW }, { REST,NW }, { REST,NW },
+//     { 0, 0 }
+// };
 
 // const uint8_t music3[][2] = { /* tico-tico */
 //     { C5,NQ }, { AS4,NQ }, { C5,NQ }, { G4,NQ }, { DS4,NQ }, { G4,NQ }, { C4,NH },
@@ -111,7 +114,7 @@ void init_music(uint8_t x)
     // if (x==2) /* death march */
     //     rst_dead();     /* turn off dead sound */
 }
-
+/*
 void play_music(const uint8_t *music_ptr, uint8_t  **cur_ptr)
 {
     asm volatile (
@@ -162,3 +165,4 @@ void play_music(const uint8_t *music_ptr, uint8_t  **cur_ptr)
         : "r0", "r1", "r2", "r3", "r4", "cc", "memory"
     );
 }
+*/
