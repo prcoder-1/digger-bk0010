@@ -353,6 +353,9 @@ void init_level_state()
 {
     bonus_state = BONUS_OFF;
 
+    // Стереть вишенку
+    erase_4_15(FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP, FIELD_Y_OFFSET);
+
     // Отключение индикации бонус-режима
     bonus_indicator(0);
 
