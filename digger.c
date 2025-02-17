@@ -1367,27 +1367,27 @@ void sound_effect()
         money_snd = 0;
     }
 
-    // if (chase_snd) // Звук включения бонус-режима
-    // {
-    //     uint16_t durance = 75;
-    //     chase_snd_flip = ~chase_snd_flip;
-    //     if (chase_snd_flip) sound(1230 / N, durance);
-    //     else sound(1513 / N, durance);
-    // }
+    if (chase_snd) // Звук включения бонус-режима
+    {
+        uint16_t durance = 75;
+        chase_snd_flip = ~chase_snd_flip;
+        if (chase_snd_flip) sound(1230 / N, durance);
+        else sound(1513 / N, durance);
+    }
 
-    // if (done_snd) // Звук завершения уровня
-    // {
-    //     static const uint8_t done_periods[] = { C5 / NV, E5 / NV, G5 / NV, D5 / NV, F5 / NV, A5 / NV, E5 / NV, G5 / NV, B5 / NV, C5 / 2 / NV};
-    //
-    //     for (uint16_t i = 0; i < sizeof(done_periods) / sizeof(done_periods[0]); ++i)
-    //     {
-    //         uint8_t period = done_periods[i];
-    //         uint16_t durance = (i == 9) ? 800 : 300;
-    //         sound_vibrato(period, durance);
-    //         delay_ms(2);
-    //     }
-    // }
+    if (done_snd) // Звук завершения уровня
+    {
+        static const uint8_t done_periods[] = { C5 / NV, E5 / NV, G5 / NV, D5 / NV, F5 / NV, A5 / NV, E5 / NV, G5 / NV, B5 / NV, C5 / 2 / NV};
 
+        for (uint16_t i = 0; i < sizeof(done_periods) / sizeof(done_periods[0]); ++i)
+        {
+            uint8_t period = done_periods[i];
+            uint16_t durance = (i == 9) ? 800 : 300;
+            sound_vibrato(period, durance);
+            delay_ms(2);
+        }
+    }
+/*
     if (bug_snd) // Звук съедаемого врага в бонус-режиме
     {
         uint16_t c1 = 0;
@@ -1416,7 +1416,7 @@ void sound_effect()
 
         bug_snd = 0;
     }
-
+*/
     if (life_snd) // Звук получения жизни
     {
         sound(14 + life_snd, 40);
@@ -2541,8 +2541,8 @@ void main()
         // Рспечатать оставшееся свободное время
         print_dec(*((volatile uint16_t *)REG_TVE_COUNT), 0, MAX_Y_POS + 2 * POS_Y_STEP);
 #endif
-        sound_vibrato(music_popcorn[music_idx][0] * 4, *((volatile uint16_t *)REG_TVE_COUNT) / 16);
-        if (++music_count >= 1 << music_popcorn[music_idx][1])
+        sound_vibrato(music_popcorn[music_idx][0] * 4, 9);
+        if (++music_count >= 2 << music_popcorn[music_idx][1])
         {
             music_count = 0;
             if (++music_idx >= sizeof(music_popcorn) / sizeof(music_popcorn)[0]) music_idx = 0;
