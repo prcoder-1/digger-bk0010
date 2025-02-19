@@ -621,7 +621,7 @@ uint8_t check_path(enum direction dir, uint8_t x_graph, uint8_t y_graph)
  * @param y_graph - графическая координата по оси Y
  * @param dir - направлкние движения
  */
-void clear_background_bits(uint16_t x_graph, uint16_t y_graph, enum direction dir)
+void set_background_bits(uint16_t x_graph, uint16_t y_graph, enum direction dir)
 {
     const uint16_t abs_x_pos = x_graph - FIELD_X_OFFSET;
     const uint16_t abs_y_pos = y_graph - FIELD_Y_OFFSET;
@@ -845,7 +845,7 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
         // Отрисовка спрайта передвигаемого мешка
         sp_put(bag_x_graph, bag_y_graph, 4, 15, (uint8_t *)image_bag, (uint8_t *)outline_bag);
 
-        clear_background_bits(bag_x_graph, bag_y_graph, dir); // Сбросить биты матрицы фона
+        set_background_bits(bag_x_graph, bag_y_graph, dir); // Сбросить биты матрицы фона
         remove_coin(bag_x_log, bag_y_log); // Удалить монеты уничтоженные мешком
 
         // Установить новые координаты мешка
@@ -1046,7 +1046,7 @@ void move_bug(struct bug_info *bug)
         }
 
         // Очистить биты фона прогрызенные Хоббином
-        clear_background_bits(bug_x_graph, bug_y_graph, bug->dir);
+        set_background_bits(bug_x_graph, bug_y_graph, bug->dir);
 
         // Стерерь кусочек фона на экране в соответствии с направлением движения и текущим положением
         gnaw(bug->dir, bug_x_graph, bug_y_graph);
@@ -1630,7 +1630,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                             case DIR_STOP: // Если мешок неподвижен
                             {
                                 // Если Диггер двигался вверх и он находится под мешком, то пока не начинать раскачивать мешок
-                                if ((man_x_log == bag_x_log) && (man_y_log == bag_y_log + 1) && man_new_dir != DIR_UP)
+                                if (!((man_x_log == bag_x_log) && (man_y_log == bag_y_log + 1) && (man_new_dir == DIR_UP)))
                                 {
                                     // Начать раскачивать мешок
                                     bag->state = BAG_LOOSE;  // Мешок раскачивается
@@ -1714,8 +1714,8 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
 
                 // Прогрызть фон и сбросить биты матрицы фона
                 gnaw(DIR_UP, bag_x_graph, bag_y_graph + 9);
-                clear_background_bits(bag_x_graph, bag_y_graph, DIR_DOWN); // Сбросить биты матрицы фона
-                clear_background_bits(bag_x_graph, bag_y_graph - 1, DIR_DOWN); // Сбросить биты матрицы фона
+                set_background_bits(bag_x_graph, bag_y_graph, DIR_DOWN); // Сбросить биты матрицы фона
+                set_background_bits(bag_x_graph, bag_y_graph - 1, DIR_DOWN); // Сбросить биты матрицы фона
 
                 // Стереть падающий мешок по старым координатам
                 if (bag->count) // Если номер этажа не нулевой
@@ -2233,8 +2233,8 @@ void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
                 if (man_x_graph != prev_man_x_graph || man_y_graph != prev_man_y_graph) // Если Диггер переместился
                 {
                      // Очистить биты фона, который был "прогрызен"
-                    clear_background_bits(man_x_graph, man_y_graph, man_dir);
-                    clear_background_bits(man_x_graph, man_y_graph, man_dir ^ 1);
+                    set_background_bits(man_x_graph, man_y_graph, man_dir);
+                    set_background_bits(man_x_graph, man_y_graph, man_dir ^ 1);
 
                     // Стереть след от Диггера с нужной стороы
                     erase_trail(man_dir, man_x_graph, man_y_graph);
