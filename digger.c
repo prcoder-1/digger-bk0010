@@ -1623,7 +1623,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                 if (bag_x_rem == 0) // Если мешок находится в серединге клетки игрового поля по-горизонтали
                 {
                     // Если мешок не на самой нижней линии и клетка ниже повреждена
-                    if ((bag_y_log != H_MAX - 1) && background[bag_y_log + 1][bag_x_log])
+                    if ((bag_y_log != H_MAX - 1) && (background[bag_y_log + 1][bag_x_log] & 0x66)  )
                     {
                         switch (bag->dir)
                         {
