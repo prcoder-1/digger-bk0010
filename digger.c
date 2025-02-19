@@ -560,7 +560,9 @@ void init_level()
  */
 uint16_t full_bite(uint8_t byte)
 {
-    if ((byte & 0xF0 == 0xF0) || (byte & 0xF == 0xF)) return 1;
+    if (((byte & 0xF0) == 0xF0) || ((byte & 0xF) == 0xF)) return 1;
+
+    return 0;
 
     // int bits_count;
     // for (bits_count = 0; byte; bits_count++)
