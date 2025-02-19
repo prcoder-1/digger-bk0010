@@ -560,13 +560,15 @@ void init_level()
  */
 uint16_t full_bite(uint8_t byte)
 {
-    int bits_count;
-    for (bits_count = 0; byte; bits_count++)
-    {
-        byte &= byte - 1;
-    }
+    if ((byte & 0xF0 == 0xF0) || (byte & 0xF == 0xF)) return 1;
 
-    return bits_count > 1;
+    // int bits_count;
+    // for (bits_count = 0; byte; bits_count++)
+    // {
+    //     byte &= byte - 1;
+    // }
+    //
+    // return bits_count > 1;
 }
 
 /**
@@ -584,7 +586,7 @@ uint8_t check_path(enum direction dir, uint8_t x_graph, uint8_t y_graph)
     const uint8_t abs_y_pos = y_graph - FIELD_Y_OFFSET;
     uint8_t x_log = abs_x_pos / POS_X_STEP;
     uint8_t y_log = abs_y_pos / POS_Y_STEP;
-    const uint8_t current_cell = background[y_log][x_log];
+    const uint8_t current_cell = background[y_log][x_log]; // Состояние текущей клетки
 
     static const struct
     {
@@ -593,10 +595,10 @@ uint8_t check_path(enum direction dir, uint8_t x_graph, uint8_t y_graph)
         uint8_t mask;
         uint8_t cur_mask;
     } dir_matrix[4] = {
-        { -1,  0, 0x08, 0x01 },
-        {  1,  0, 0x01, 0x08 },
-        {  0, -1, 0x80, 0x10 },
-        {  0,  1, 0x10, 0x80 }
+        { -1,  0, 0x08, 0x01 }, // Влево
+        {  1,  0, 0x01, 0x08 }, // Вправо
+        {  0, -1, 0x80, 0x10 }, // Вверх
+        {  0,  1, 0x10, 0x80 }  // Вниз
     } ;
 
     x_log += dir_matrix[dir].x;
@@ -604,7 +606,7 @@ uint8_t check_path(enum direction dir, uint8_t x_graph, uint8_t y_graph)
 
     if ((x_log >= W_MAX) || (y_log >= H_MAX)) return 0;
 
-    const uint8_t neighbor_cell = background[y_log][x_log];
+    const uint8_t neighbor_cell = background[y_log][x_log]; // Состояние соседней клетки
     if (full_bite(neighbor_cell) && ((neighbor_cell & dir_matrix[dir].mask) || (current_cell & dir_matrix[dir].cur_mask))) return 1;
 
     return 0;
