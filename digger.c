@@ -373,7 +373,8 @@ void init_level_state()
     for (uint16_t i = 0; i < MAX_BAGS; ++i)
     {
         struct bag_info *bag = &bags[i];  // Структура с информацией о мешке
-        if (bag->state < BAG_FALLING) continue; // Пропустить неактивные и стационарные мешки
+        if (bag->state == BAG_INACTIVE) continue; // Пропустить неактивные мешки
+        if ((bag->state == BAG_STATIONARY) && (bag->dir == DIR_STOP)) continue; // Пропустить стационарные мешки
 
         sp_put(bag->x_graph, bag->y_graph, sizeof(image_bag[0]), sizeof(image_bag) / sizeof(image_bag[0]), 0, (uint8_t *)outline_bag); // Стереть мешок
         // erase_4_15(bag->x_graph, bag->y_graph); // Стереть мешок
