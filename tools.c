@@ -1,6 +1,38 @@
 #include "tools.h"
 #include "memory.h"
 
+uint16_t abs(const int16_t x)
+{
+    uint16_t rv;
+    asm(
+        "cmp %[x], $0\n\t"
+        "bge .l_quit%=\n\t"
+        "neg %[x]\n"
+".l_quit%=:\n\t"
+        "rts pc\n\t"
+        : "=r" (rv)
+        : [x]"r"(x)
+    );
+
+    return rv;
+}
+
+uint8_t absb(const int8_t x)
+{
+    uint8_t rv;
+    asm(
+        "cmpb %[x], $0\n\t"
+        "bge .l_quit%=\n\t"
+        "negb %[x]\n"
+".l_quit%=:\n\t"
+        "rts pc\n\t"
+        : "=r" (rv)
+        : [x]"r"(x)
+    );
+
+    return rv;
+}
+
 void delay_ms(uint16_t time) // TODO: калибровка задержки
 {
     asm volatile (
