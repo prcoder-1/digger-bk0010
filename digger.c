@@ -2309,6 +2309,7 @@ void man_rip()
 
             sp_put(man_x_graph, y_graph, sizeof(image_digger_turned_over[0]), sizeof(image_digger_turned_over) / sizeof(image_digger_turned_over[0]),
                 (uint8_t *)image_digger_turned_over, (uint8_t *)outline_digger_turned_over);
+
             prev_y_graph = y_graph;
         }
         else
@@ -2390,7 +2391,7 @@ void process_bonus()
                 chase_snd = bonus_flash;
 
                 // Мигание при включении бонус-режима
-                bonus_indicator((bonus_time & 1) ? 0xFF : 0x00);
+                bonus_indicator((bonus_time & 1) ? (bonus_flash ? 0xFF : 0xAA) : 0x00);
 
                 // TODO: Включить музыку бонус-режима
             }

@@ -1,7 +1,6 @@
 #pragma once
 #include <stdint.h>
 
-//#define N 64 // Делитель периодов нот
 #define N 20 // Делитель периодов нот
 
 // Периоды нот
