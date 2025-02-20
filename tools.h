@@ -89,23 +89,7 @@ inline void TRAP(const uint8_t trap_no)
  *
  * @param x - 16-битное целок
  */
-inline uint16_t abs16(const int16_t x)
-{
-    uint16_t rv;
-
-    asm volatile (
-        "tst %[x]\n\t"
-        "bge .l_pos%=\n\t"
-        "neg %[x]\n"
-".l_pos%=:\n\t"
-        "mov %[x], %[rv]\n\t"
-        : [rv]"=r"(rv)
-        : [x]"r"(x)
-        : "cc"
-    );
-
-    return rv;
-}
+uint16_t abs(const int16_t x);
 
 /**
  * @brief Приостанавливает выполнение программы на заддное в параметре время.
