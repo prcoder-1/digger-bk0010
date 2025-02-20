@@ -913,56 +913,20 @@ void move_bug(struct bug_info *bug)
         }
 
         // Поиск порядка наилучших направлений движения
+        dir_1 = (man_x_graph < bug_x_graph) ? DIR_LEFT : DIR_RIGHT;
+        dir_2 = (man_y_graph < bug_y_graph) ? DIR_UP   : DIR_DOWN;
+
+        // Если расстояние по горизонтали превышает расстояние по вертикали, то отдать приоритет оси X
         if (ABS(man_y_graph - bug_y_graph) > ABS(man_x_graph - bug_x_graph))
         {
             // Если расстояние по вертикали превышает расстояние по горизонтали, то отдать приоритет оси Y
-            if (man_y_graph < bug_y_graph)
-            { // Если Диггер выше врага
-                dir_1 = DIR_UP;   // Наиболее приоритетное направление - вверх
-                dir_4 = DIR_DOWN; // Наименее приоритетное направление - вниз
-            }
-            else
-            { // Если Диггер ниже врага
-                dir_1 = DIR_DOWN; // Наиболее приоритетное направление - вниз
-                dir_4 = DIR_UP;   // Наименее приоритетное направление - вверх
-            }
-
-            if (man_x_graph < bug_x_graph)
-            { // Если диггер левее врага
-                dir_2 = DIR_LEFT;  // Более приоритетное направление - влево
-                dir_3 = DIR_RIGHT; // Менее приоритетное направление - вправо
-            }
-            else
-            { // Если Диггер правее врага
-                dir_2 = DIR_RIGHT; // Более приоритетное направление - вправо
-                dir_3 = DIR_LEFT;  // Менее приоритетное направление - влево
-            }
+            dir_1 ^= dir_2;
+            dir_2 ^= dir_1;
+            dir_1 ^= dir_2;
         }
-        else
-        {
-            // Если расстояние по горизонтали превышает расстояние по вертикали, то отдать приоритет оси X
-            if (man_x_graph < bug_x_graph)
-            { // Если диггер левее врага
-                dir_1 = DIR_LEFT;  // Наиболее приоритетное направление - влево
-                dir_4 = DIR_RIGHT; // Наименее приоритетное направление - вправо
-            }
-            else
-            { // Если Диггер правее врага
-                dir_1 = DIR_RIGHT; // Наиболее приоритетное направление - вправо
-                dir_4 = DIR_LEFT;  // Наименее приоритетное направление - влево
-            }
 
-            if (man_y_graph < bug_y_graph)
-            { // Если Диггер выше врага
-                dir_2 = DIR_UP;   // Более приоритетное направление - вверх
-                dir_3 = DIR_DOWN; // Менее приоритетное направление - вниз
-            }
-            else
-            { // Если Диггер ниже врага
-                dir_2 = DIR_DOWN; // Более приоритетное направление - вниз
-                dir_3 = DIR_UP;   // Менее приоритетное направление - вверх
-            }
-        }
+        dir_3 = dir_2 ^ 1;
+        dir_4 = dir_1 ^ 1;
 
         // Если включён режим Бонус, то поменять порядок направлений чтобы враги разбегались
         if (bonus_state == BONUS_ON)
@@ -2335,9 +2299,8 @@ void man_rip()
         if (man_state != CREATURE_DEAD_MONEY_BAG)
         {
             uint16_t y_graph = man_y_graph - bounce[i >> 3];
-            // gnaw(DIR_UP, man_x_graph, y_graph + 1);
+
             // Анимация подпрыгивающего перевёрнутого Диггера
-            // sp_paint_brick(man_x_graph, y_graph + 15, 4, 1, 0);
             if (prev_y_graph)
             {
                 sp_put(man_x_graph, prev_y_graph, sizeof(outline_digger_turned_over[0]), sizeof(outline_digger_turned_over) / sizeof(outline_digger_turned_over[0]),
@@ -2347,8 +2310,10 @@ void man_rip()
             sp_put(man_x_graph, y_graph, sizeof(image_digger_turned_over[0]), sizeof(image_digger_turned_over) / sizeof(image_digger_turned_over[0]),
                 (uint8_t *)image_digger_turned_over, (uint8_t *)outline_digger_turned_over);
             prev_y_graph = y_graph;
-
-            // delay_ms(100);
+        }
+        else
+        {
+            delay_ms(10);
         }
 
         if (i++ < 10)
