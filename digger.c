@@ -324,7 +324,7 @@ void erase_4_15(uint16_t x_graph, uint16_t y_graph)
  */
 int check_collision_4_15(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
 {
-    return (absb(x2 - x1) < 4) && (absb(y2 - y1) < 15);
+    return (abs8(x2 - x1) < 4) && (abs8(y2 - y1) < 15);
 }
 
 /**
@@ -917,7 +917,7 @@ void move_bug(struct bug_info *bug)
         dir_2 = (man_y_graph < bug_y_graph) ? DIR_UP   : DIR_DOWN;
 
         // Если расстояние по горизонтали превышает расстояние по вертикали, то отдать приоритет оси X
-        if (abs(man_y_graph - bug_y_graph) > abs(man_x_graph - bug_x_graph))
+        if (abs16(man_y_graph - bug_y_graph) > abs16(man_x_graph - bug_x_graph))
         {
             // Если расстояние по вертикали превышает расстояние по горизонтали, то отдать приоритет оси Y
             dir_1 ^= dir_2;
