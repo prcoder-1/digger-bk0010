@@ -324,7 +324,7 @@ void erase_4_15(uint16_t x_graph, uint16_t y_graph)
  */
 int check_collision_4_15(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
 {
-    return (abs8(x2 - x1) < 4) && (abs8(y2 - y1) < 15);
+    return (abs16(x2 - x1) < 4) && (abs16(y2 - y1) < 15);
 }
 
 /**

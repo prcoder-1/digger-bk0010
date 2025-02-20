@@ -108,29 +108,6 @@ inline uint16_t abs16(const int16_t x)
 }
 
 /**
- * @brief Возвращает абсолютное значение 8-битного целого
- *
- * @param x - 8-битное целок
- */
-inline uint8_t abs8(const int8_t x)
-{
-    uint8_t rv;
-
-    asm volatile (
-        "tstb %[x]\n\t"
-        "bge .l_pos%=\n\t"
-        "negb %[x]\n"
-".l_pos%=:\n\t"
-        "mov %[x], %[rv]\n\t"
-        : [rv]"=r"(rv)
-        : [x]"r"(x)
-        : "cc"
-    );
-
-    return rv;
-}
-
-/**
  * @brief Приостанавливает выполнение программы на заддное в параметре время.
  *
  * @param value - время в миллисекундах
