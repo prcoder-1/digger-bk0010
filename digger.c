@@ -2264,7 +2264,7 @@ void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
             uint8_t bag_y_pos = man_dead_bag->y_graph; // Вертикальная позиция мешка от которого погиб Диггер
             if (bag_y_pos > man_y_graph)
             {
-                erase_trail(DIR_DOWN, man_x_graph, man_y_graph);
+                erase_4_15(man_x_graph, man_y_graph);
                 man_y_graph = bag_y_pos; // Если мешок опустился ниже Диггера, Диггер перемещается за мешком
             }
 
