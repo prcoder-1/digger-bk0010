@@ -267,7 +267,7 @@ void print_lives()
     constexpr uint16_t one_pos_width = sizeof(image_digger_right[1][0]) + 1; // Ширина спрайта Диггера плюс один байт
     constexpr uint16_t height = sizeof(image_digger_right[1]) / sizeof(image_digger_right[1][0]); // Высота спрайта Диггера
     int16_t width = MAX_LIVES * one_pos_width; //  Общий размер места занимаемый спрайтами Диггера
-    uint8_t *sprite = (uint8_t *)image_digger_right[1];
+    uint8_t *sprite = (uint8_t *)image_digger_right[2];
 
     for (uint16_t l = 1; width > 0; man_x_offset += one_pos_width, width -= one_pos_width)
     {
@@ -1073,22 +1073,25 @@ void move_bug(struct bug_info *bug)
                     switch (bag->state)
                     {
                         case BAG_STATIONARY: //  Если мешок стоит на месте
+                        case BAG_LOOSE:      // Если мешок раскачивается
                         {
                             enum direction dir = bug->dir;
 
                             // Если Ноббин движется влево или вправо
-                            if ((dir == DIR_LEFT) || (dir == DIR_RIGHT))
+                            if ((dir == DIR_UP) || (dir == DIR_DOWN) || move_bag(bag, dir))
                             {
-                                if (move_bag(bag, dir)) // Попытаться переместить мешок
+                                // Если мешок не удалось подвинуть, отменить передвижение врага
+                                bug->x_graph = bug_x_graph;
+                                bug->y_graph = bug_y_graph;
+                                bug->count++; // Увеличить счётчик застревания
+                                bug->wait++; // Задержать врага перед мешком
+
+                                if ((dir == DIR_UP) || (dir == DIR_DOWN))
                                 {
-                                    // Если мешок не удалось подвинуть, отменить передвижение врага
-                                    bug->x_graph = bug_x_graph;
-                                    bug->y_graph = bug_y_graph;
-                                    bug->count++; // Увеличить счётчик застревания
-                                    break;
+                                    bug->dir ^= 1; // Инвертировать направление движения врага
                                 }
 
-                                bug->wait++; // Задержать врага перед мешком
+                                break;
                             }
 
                             break;
