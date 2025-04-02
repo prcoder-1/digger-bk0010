@@ -38,7 +38,7 @@ cd gcc-14.2.0
 ./contrib/download_prerequisites
 ```
 
-Скачиваем туда же и применяем [патч](https://github.com/prcoder-1/digger-bk0010/raw/refs/heads/main/gcc-KP1801BM1.patch) для получения возможности использования компилятором команд процессора **sob и xor**, которые присутсвуют в процессоре **КР1801ВМ1**, но отсутствуют в **DEC PDP-11/10**:
+Скачиваем туда же и применяем [патч](https://github.com/prcoder-1/digger-bk0010/raw/refs/heads/main/gcc-KP1801BM1.patch) для получения возможности использования компилятором команд процессора **sob и xor**, которые присутствуют в процессоре **КР1801ВМ1**, но отсутствуют в **DEC PDP-11/10**:
 ```
 wget https://github.com/prcoder-1/digger-bk0010/raw/refs/heads/main/gcc-KP1801BM1.patch
 patch -p1 < gcc-KP1801BM1.patch
