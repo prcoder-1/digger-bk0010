@@ -1713,8 +1713,6 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
 
                 remove_coin(bag_x_log, bag_y_log); // Удалить монету в клетке куда попал мешок
 
-                // TODO: Удалить мешки встречающиеся на пути (dest_coin(x, y))
-
                 // Нарисовать падающий мешок
                 sp_4_15_put(bag_x_graph, bag_y_graph, (uint8_t *)image_bag_fall);
                 // sp_put(bag_x_graph, bag_y_graph, sizeof(image_bag_fall[0]), sizeof(image_bag_fall) / sizeof(image_bag_fall[0]),
@@ -2419,6 +2417,20 @@ void process_game_state()
     if (coin_time > 0) coin_time--;
     else coin_snd_note = -1;
 
+    if (done_snd)
+    {
+        done_snd = 0;
+
+        // Циклическое увеличение номера уровня
+        level_no++;
+        level_no &= LEVELS_NUM - 1;
+
+        // Увеличение сложности после прохождения очередного уровня (максимальный уровень 9)
+        if (difficulty < 10) difficulty++;
+
+        init_level(); // Инициализация нового уровня
+    }
+
     if (man_state == CREATURE_RIP)
     {
         lives--;                    // Уменьшить количество жизней
@@ -2446,20 +2458,6 @@ void process_game_state()
 #endif
             init_game(); // Установить игру в начальное состояние
         }
-    }
-
-    if (done_snd)
-    {
-        done_snd = 0;
-
-        // Циклическое увеличение номера уровня
-        level_no++;
-        level_no &= LEVELS_NUM - 1;
-
-        // Увеличение сложности после прохождения очередного уровня (максимальный уровень 9)
-        if (difficulty < 10) difficulty++;
-
-        init_level(); // Инициализация нового уровня
     }
 }
 
