@@ -170,6 +170,11 @@ void process_demo_state()
     constexpr uint16_t cherry_display_time = emerald_print_time + print_to_next;
     constexpr uint16_t cherry_print_time = cherry_display_time + end_to_print;
 
+    // Время до повтора демо
+    constexpr uint16_t demo_restart_time = cherry_print_time + 50;
+
+    print_dec(cherry_print_time, 0, 0);
+
     switch (demo_time)
     {
         case start_time:
@@ -328,7 +333,7 @@ void process_demo_state()
     if (!image_phase || image_phase >= 2) image_phase_inc = -image_phase_inc;
 
     // Увеличивать время Demo по кругу
-    if (++demo_time > 250) demo_time = 0;
+    if (++demo_time > demo_restart_time) demo_time = 0;
 
     play_music((uint16_t *)music0, &cur_music_ptr);
 }
