@@ -62,8 +62,10 @@
 #define	NW (T << 4)               // 16 * T
 
 extern const uint16_t music0[][2]; // Основная музыка "Popcorn"
-// extern const uint16_t music1[][2]; // Музыка для режима "Бонус"
+extern const uint16_t music1[][2]; // Музыка для режима "Бонус"
 // extern const uint16_t music2[][2]; // Траурный марш
 // extern const uint16_t music3[][2]; // tico-tico (сохранено для истории)
+
+extern const uint16_t* musics[]; // Списоу доступных музык
 
 void play_music(const uint16_t *music_ptr, uint16_t  **cur_ptr);

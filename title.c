@@ -111,6 +111,7 @@ void init_demo()
 }
 
 uint16_t *cur_music_ptr = nullptr;
+uint16_t music_no = 0;
 uint16_t demo_time = 0;
 uint16_t nobbin_x = 0, nobbin_y = 0;
 uint16_t hobbin_x = 0, hobbin_y = 0;
@@ -331,9 +332,14 @@ void process_demo_state()
     if (!image_phase || image_phase >= 2) image_phase_inc = -image_phase_inc;
 
     // Увеличивать время Demo по кругу
-    if (++demo_time > demo_restart_time) demo_time = 0;
+    if (++demo_time > demo_restart_time)
+    {
+        demo_time = 0;
+        music_no = ~music_no;
+        music_no &= 1;
+    }
 
-    play_music((uint16_t *)music0, &cur_music_ptr);
+    play_music(musics[music_no], &cur_music_ptr);
 }
 
 extern void start();
