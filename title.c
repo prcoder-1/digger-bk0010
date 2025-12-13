@@ -33,10 +33,36 @@ void print_dec(uint16_t number, uint16_t x_graph, uint16_t y_graph)
 }
 
 /**
+ * @brief Вывод строки
+ *
+ * @param str - строка для вывода
+ * @param x_graph - координата X по которой будет осуществлён вывод числа
+ * @param y_graph - координата Y по которой будет осуществлён вывод числа
+ */
+void print_str(char *str, uint16_t x_graph, uint16_t y_graph)
+{
+    while (*str)
+    {
+        char c = *str++;
+        if (c != ' ')
+        {
+            uint16_t index = c - 'A';
+            sp_put(x_graph, y_graph, sizeof(ch_alpha[0][0]), sizeof(ch_alpha[0]) / sizeof(ch_alpha[0][0]), (uint8_t *)ch_alpha[index], nullptr); // Вывести спрайт буквы
+        }
+
+        x_graph += sizeof(ch_alpha[0][0]);
+    }
+}
+
+/**
  * @brief Инициализация игры
  */
 void init_game()
 {
+    sp_paint_brick(0, 0, SCREEN_BYTE_WIDTH, 12, 0b10101010); // Очистить экран с верха до начала игрового поля
+
+    const uint16_t x_pos = SCREEN_BYTE_WIDTH / 2 - sizeof(ch_alpha[0][0]) * 11 / 2;
+    print_str("D I G G E R", x_pos, 0);
 }
 
 /**
@@ -64,8 +90,6 @@ void main()
 
     set_PSW(1 << PSW_I); // Замаскировать прерывания IRQ
     ((union KEY_STATE *)REG_KEY_STATE)->bits.INT_MASK = 1; // Отключить прерывание от клавиатуры
-
-    sp_paint_brick(0, 0, SCREEN_BYTE_WIDTH, 12, 0b10101010); // Очистить экран с верха до начала игрового поля
 
     volatile uint16_t *t_limit = (volatile uint16_t *)REG_TVE_LIMIT;
     volatile union TVE_CSR *tve_csr = (volatile union TVE_CSR *)REG_TVE_CSR;

@@ -29,6 +29,7 @@ const uint16_t music0[][2] = { // Основная музыка "Popcorn"
     { 0, 0 }
 };
 
+/*
 const uint16_t music1[][2] = { // Музыка для режима "Бонус"
     { C4,NE }, { C4,NE }, { C4,NQ }, { C4,NE }, { C4,NE }, { C4,NQ }, { C4,NE }, { C4,NE }, { F4,NQ }, { G4,NQ }, { A4,NQ },
     { C4,NE }, { C4,NE }, { C4,NQ }, { C4,NE }, { C4,NE }, { C4,NQ }, { F4,NE }, { A4,NE }, { G4,NQ }, { E4,NQ }, { C4,NQ },
@@ -51,23 +52,28 @@ const uint16_t music1[][2] = { // Музыка для режима "Бонус"
     { D5,NQ }, { A4,NQ }, { D5,NQ }, { A4,NQ }, { D5,NQ }, { C5,NQ }, { B4,NQ }, { C5,NQ }, { B4,NQ }, { C5,NQ },
     { 0, 0 }
 };
+*/
 
-// const uint16_t music2[][2] = { // Траурный марш
-//     { C4,N6 }, { C4,NQ }, { C4,NE }, { C4,N6 }, { DS4,NQ }, { D4,NE }, { D4,NQ }, { C4,NE }, { C4,NQ }, { B3,NE }, { C4,N12 }, { 0, 0 }
-// };
+/*
+const uint16_t music2[][2] = { // Траурный марш
+    { C4,N6 }, { C4,NQ }, { C4,NE }, { C4,N6 }, { DS4,NQ }, { D4,NE }, { D4,NQ }, { C4,NE }, { C4,NQ }, { B3,NE }, { C4,N12 }, { 0, 0 }
+};
+*/
 
-// const uint16_t music3[][2] = { // tico-tico
-//     { C5, NQ }, { AS4,NQ }, { C5,NQ  }, { G4,NQ  }, { DS4,NQ }, { G4,NQ }, { C4,NH },
-//     { C5, NQ }, { AS4,NQ }, { C5,NQ  }, { G4,NQ  }, { DS4,NQ }, { G4,NQ }, { C4,NH },
-//     { C5, NQ }, { D5,NQ  }, { DS5,NQ }, { DS5,NQ }, { DS5,NQ }, { C5,NQ }, { D5,NQ }, { D5,NQ }, { D5,NQ },
-//     { AS4,NQ }, { C5,NQ  }, { C5,NQ  }, { C5,NQ  }, { B4,NQ  }, { C5,12 },
-//
-//     { C5,NQ }, { AS4,NQ }, { C5,NQ }, { G4,NQ }, { DS4,NQ }, { G4,NQ }, { C4,NH },
-//     { C5,NQ }, { AS4,NQ }, { C5,NQ }, { G4,NQ }, { DS4,NQ }, { G4,NQ }, { C4,NH },
-//     { C5,NQ }, { D5,NQ }, { DS5,NQ }, { DS5,NQ }, { DS5,NQ }, { C5,NQ }, { D5,NQ }, { D5,NQ }, { D5,NQ },
-//     { AS4,NQ }, { C5,NQ }, { C5,NQ }, { C5,NQ }, { B4,NQ }, { C5,12 },
-//     { 0, 0 }
-// };
+/*
+const uint16_t music3[][2] = { // tico-tico (сохраненое для истории)
+    { C5, NQ }, { AS4,NQ }, { C5,NQ  }, { G4,NQ  }, { DS4,NQ }, { G4,NQ }, { C4,NH },
+    { C5, NQ }, { AS4,NQ }, { C5,NQ  }, { G4,NQ  }, { DS4,NQ }, { G4,NQ }, { C4,NH },
+    { C5, NQ }, { D5,NQ  }, { DS5,NQ }, { DS5,NQ }, { DS5,NQ }, { C5,NQ }, { D5,NQ }, { D5,NQ }, { D5,NQ },
+    { AS4,NQ }, { C5,NQ  }, { C5,NQ  }, { C5,NQ  }, { B4,NQ  }, { C5,12 },
+
+    { C5,NQ }, { AS4,NQ }, { C5,NQ }, { G4,NQ }, { DS4,NQ }, { G4,NQ }, { C4,NH },
+    { C5,NQ }, { AS4,NQ }, { C5,NQ }, { G4,NQ }, { DS4,NQ }, { G4,NQ }, { C4,NH },
+    { C5,NQ }, { D5,NQ }, { DS5,NQ }, { DS5,NQ }, { DS5,NQ }, { C5,NQ }, { D5,NQ }, { D5,NQ }, { D5,NQ },
+    { AS4,NQ }, { C5,NQ }, { C5,NQ }, { C5,NQ }, { B4,NQ }, { C5,12 },
+    { 0, 0 }
+};
+*/
 
 void play_music(const uint16_t *music_ptr, uint16_t  **cur_ptr)
 {
