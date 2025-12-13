@@ -1397,7 +1397,7 @@ void sound_effect()
 /**
  * @brief Инициализация игры
  */
-void init_game()
+void init_demo()
 {
     difficulty = 0; // Начальный уровень сложности
     level_no = 0;   // Начальный уровень
@@ -2411,7 +2411,7 @@ void process_bonus()
 /**
  * @brief Обработка общего состояния игры (переход на новый уровень, Game Over и т.д.)
  */
-void process_game_state()
+void process_demo_state()
 {
     // Декрементировать таймер между последовательными съедениями драгоценных камней (монеток)
     if (coin_time > 0) coin_time--;
@@ -2456,7 +2456,7 @@ void process_game_state()
             sp_put(go_x, go_y, go_width, go_height, (uint8_t *)game_over, 0);
             delay_ms(5000);
 #endif
-            init_game(); // Установить игру в начальное состояние
+            init_demo(); // Установить игру в начальное состояние
         }
     }
 }
@@ -2487,7 +2487,7 @@ void main()
     constexpr uint16_t FPS = 10; // Частота обновления кадров
     *t_limit = 3000000 / 128 / 4 / FPS;
 
-    init_game(); // Начальная инициализация игры
+    init_demo(); // Начальная инициализация игры
 
     for (;;) // Основной бесконечный цикл игры
     {
@@ -2508,7 +2508,7 @@ void main()
         process_man(man_x_rem, man_y_rem);
         process_bonus();
         if (snd_effects) sound_effect();
-        process_game_state();
+        process_demo_state();
 
 #if defined(DEBUG)
         draw_coin_minimap(); // Нарисовать мини-карту монеток
