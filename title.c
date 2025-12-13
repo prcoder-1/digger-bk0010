@@ -79,29 +79,35 @@ void init_demo()
     sp_paint_brick_long(0, 0, SCREEN_BYTE_WIDTH, SCREEN_PIX_HEIGHT, 0); // Очистка экрана
 
     uint16_t y_pos = 0;
+
+    // Строка "D I G G E R"
     print_str(digger_str, digger_str_x_pos, y_pos);
     y_pos += str_height + y_space;
 
-    sp_paint_brick_long(0, y_pos, SCREEN_BYTE_WIDTH, 2, 0b11111111);
+    // Верхняя линия рамки
+    sp_paint_brick_long(0, y_pos, SCREEN_BYTE_WIDTH, 2, 0b01010101);
     y_pos += 2;
 
     one_player_y = y_pos + y_space;
 
+    // Строка "ONE"
     print_str(one_str, one_x_pos, one_player_y);
     one_player_y += str_height + y_space;
 
+    // Строка "PLAYER"
     print_str(player_str, player_x_pos, one_player_y);
 
     one_player_y += str_height + y_space * 2;
 
-    sp_paint_brick_long(0, y_pos, 1, table_height, 0b00000011);
-    sp_paint_brick_long(SCREEN_BYTE_WIDTH - 1, y_pos, 1, table_height, 0b11000000);
-    sp_paint_brick_long(SCREEN_BYTE_WIDTH / 2, y_pos, 1, table_height, 0b11000000);
-    sp_paint_brick_long(SCREEN_BYTE_WIDTH / 2 + 1, y_pos, 1, table_height, 0b00000011);
+    // Вертикальные линии рамки и разделитель
+    sp_paint_brick_long(0, y_pos, 1, table_height, 0b00000001);
+    sp_paint_brick_long(SCREEN_BYTE_WIDTH - 1, y_pos, 1, table_height, 0b01000000);
+    sp_paint_brick_long(SCREEN_BYTE_WIDTH / 2, y_pos, 1, table_height, 0b01000000);
+    sp_paint_brick_long(SCREEN_BYTE_WIDTH / 2 + 1, y_pos, 1, table_height, 0b00000001);
     y_pos += table_height;
 
-    sp_paint_brick_long(0, y_pos, SCREEN_BYTE_WIDTH, 2, 0b11111111);
-
+    // Нижняя линия рамки
+    sp_paint_brick_long(0, y_pos, SCREEN_BYTE_WIDTH, 2, 0b01010101);
 }
 
 uint16_t *cur_music_ptr = nullptr;
@@ -169,7 +175,8 @@ void process_demo_state()
         {
             // Очистка области Demo
             nobbin_x = hobbin_x = digger_x = 0;
-            sp_paint_brick_long(SCREEN_BYTE_WIDTH / 2 + 2, one_player_y, SCREEN_BYTE_WIDTH / 2 - 3, table_height - one_player_y, 0);
+            constexpr uint16_t demo_height = table_height - (str_height + y_space * 2) * 2;
+            sp_paint_brick_long(SCREEN_BYTE_WIDTH / 2 + 2, one_player_y, SCREEN_BYTE_WIDTH / 2 - 3, demo_height, 0);
             break;
         }
 
