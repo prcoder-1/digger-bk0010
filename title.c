@@ -173,8 +173,6 @@ void process_demo_state()
     // Время до повтора демо
     constexpr uint16_t demo_restart_time = cherry_print_time + 50;
 
-    print_dec(cherry_print_time, 0, 0);
-
     switch (demo_time)
     {
         case start_time:
