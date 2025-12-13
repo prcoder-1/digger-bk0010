@@ -103,6 +103,7 @@ void play_music(const uint16_t *music_ptr, uint16_t  **cur_ptr)
         "asr r3\n\t"
         "asr r3\n\t"
         "asr r3\n\t"
+        "asr r3\n\t"
         "br .l5_%=\n\t"
 ".l4_%=:\n\t"
         "asl r3\n\t"
