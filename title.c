@@ -59,10 +59,10 @@ uint16_t one_player_y;
  */
 void init_game()
 {
-    const uint16_t char_width = sizeof(ch_alpha[0][0]);
-    const uint16_t str_height = sizeof(ch_alpha[0]) / char_width;
-    const uint16_t y_space = 8;
-    const uint16_t windmill_height = 32;
+    constexpr uint16_t char_width = sizeof(ch_alpha[0][0]);
+    constexpr uint16_t str_height = sizeof(ch_alpha[0]) / char_width;
+    constexpr uint16_t y_space = 8;
+    constexpr uint16_t windmill_height = 32;
 
     sp_paint_brick_long(0, 0, SCREEN_BYTE_WIDTH, SCREEN_PIX_HEIGHT, 0); // Очистка экрана
 
@@ -113,6 +113,7 @@ void process_game_state()
 {
     constexpr uint16_t image_width = sizeof(image_nobbin[0][0]);
     constexpr uint16_t image_height = sizeof(image_nobbin[0]) / sizeof(image_nobbin[0][0]); // Высота спрайта Ноббина
+    constexpr uint16_t y_space = 8;
 
     switch (demo_time)
     {
@@ -140,6 +141,7 @@ void process_game_state()
         {
             const char nobbin_str[] = "NOBBIN";
             print_str(nobbin_str, demo_x + image_width * 2 - 1, demo_y);
+            demo_y += image_height + y_space;
             break;
         }
     }
