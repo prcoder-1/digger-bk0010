@@ -4,7 +4,7 @@
 #include "tools.h"
 #include "emt.h"
 #include "digger_sprites.h"
-#include "digger_font.h"
+#include "digger_short_font.h"
 #include "digger_levels.h"
 #include "digger_music.h"
 

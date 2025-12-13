@@ -1,55 +1,55 @@
 #pragma once
 #include <stdint.h>
 
-#define N 20 // Делитель периодов нот
+#define N 96u // Делитель периодов нот
 
 // Периоды нот
-#define	C3	(9122 / N)
-#define	CS3	(8610 / N)
-#define	D3	(8127 / N)
-#define	DS3	(7671 / N)
-#define	E3	(7240 / N)
-#define	F3	(6834 / N)
-#define	FS3	(6450 / N)
-#define	G3	(6088 / N)
-#define	GS3	(5747 / N)
-#define	A3	(5424 / N)
-#define	AS3	(5120 / N)
-#define	B3	(4832 / N)
+#define	C3	(9122u / N)
+#define	CS3	(8610u / N)
+#define	D3	(8127u / N)
+#define	DS3	(7671u / N)
+#define	E3	(7240u / N)
+#define	F3	(6834u / N)
+#define	FS3	(6450u / N)
+#define	G3	(6088u / N)
+#define	GS3	(5747u / N)
+#define	A3	(5424u / N)
+#define	AS3	(5120u / N)
+#define	B3	(4832u / N)
 
-#define	C4	(4561 / N)
-#define	CS4	(4305 / N)
-#define	D4	(4063 / N)
-#define	DS4	(3835 / N)
-#define	E4	(3620 / N)
-#define	F4	(3417 / N)
-#define	FS4	(3225 / N)
-#define	G4	(3044 / N)
-#define	GS4	(2873 / N)
-#define	A4	(2712 / N)
-#define	AS4	(2560 / N)
-#define	B4	(2416 / N)
+#define	C4	(4561u / N)
+#define	CS4	(4305u / N)
+#define	D4	(4063u / N)
+#define	DS4	(3835u / N)
+#define	E4	(3620u / N)
+#define	F4	(3417u / N)
+#define	FS4	(3225u / N)
+#define	G4	(3044u / N)
+#define	GS4	(2873u / N)
+#define	A4	(2712u / N)
+#define	AS4	(2560u / N)
+#define	B4	(2416u / N)
 
-#define	C5	(2280 / N)
-#define	CS5	(2152 / N)
-#define	D5	(2032 / N)
-#define	DS5	(1918 / N)
-#define	E5	(1810 / N)
-#define	F5	(1708 / N)
-#define	FS5	(1612 / N)
-#define	G5	(1522 / N)
-#define	GS5	(1437 / N)
-#define	A5	(1356 / N)
-#define	AS5	(1280 / N)
-#define	B5	(1208 / N)
+#define	C5	(2280u / N)
+#define	CS5	(2152u / N)
+#define	D5	(2032u / N)
+#define	DS5	(1918u / N)
+#define	E5	(1810u / N)
+#define	F5	(1708u / N)
+#define	FS5	(1612u / N)
+#define	G5	(1522u / N)
+#define	GS5	(1437u / N)
+#define	A5	(1356u / N)
+#define	AS5	(1280u / N)
+#define	B5	(1208u / N)
 
-#define	C6	(1140 / N)
-#define	CS6	(1076 / N)
-#define	D6	(1016 / N)
+#define	C6	(1140u / N)
+#define	CS6	(1076u / N)
+#define	D6	(1016u / N)
 
-#define REST 0xFF // Специальное значение - пауза (без звука)
+#define REST 0xFFu // Специальное значение - пауза (без звука)
 
-#define T 64 // Множитель длительности
+#define T 15u // Множитель длительности
 
 // Длительность нот
 #define NS (T << 0)               //  1 * T
@@ -61,10 +61,9 @@
 #define	N12 ((T << 3) + (T << 2)) // 12 * T
 #define	NW (T << 4)               // 16 * T
 
-// extern const uint8_t music0[][2]; // Музыка для режима "Бонус"
-// extern const uint8_t music1[][2]; // Обычная музыка "Popcorn"
-// extern const uint8_t music2[][2]; // Траурный марш
-// extern const uint8_t music_coin[][2]; // Звуки съедания монеток (камешков)
+extern const uint16_t music0[][2]; // Основная музыка "Popcorn"
+extern const uint16_t music1[][2]; // Музыка для режима "Бонус"
+extern const uint16_t music2[][2]; // Траурный марш
+extern const uint16_t music3[][2]; // tico-tico
 
-// void init_music(uint8_t x);
-// void play_music(const uint8_t *music_ptr, uint8_t  **cur_ptr);
+void play_music(const uint16_t *music_ptr, uint16_t  **cur_ptr);
