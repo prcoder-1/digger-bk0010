@@ -103,8 +103,8 @@ void init_game()
 uint16_t *cur_music_ptr = nullptr;
 uint16_t demo_time = 0;
 uint16_t demo_x, demo_y;
-uint8_t image_phase;       ///< Фаза анимации при выводе спрайта
-int8_t image_phase_inc;    ///< Направление изменения фазы анимации при выводе спрайта (+1 или -1)
+uint8_t image_phase;        ///< Фаза анимации при выводе спрайта
+int8_t image_phase_inc = 1; ///< Направление изменения фазы анимации при выводе спрайта (+1 или -1)
 
 /**
  * @brief Обработка общего состояния игры (переход на новый уровень, Game Over и т.д.)
@@ -141,9 +141,31 @@ void process_game_state()
         {
             const char nobbin_str[] = "NOBBIN";
             print_str(nobbin_str, demo_x + image_width * 2 - 1, demo_y);
+            break;
+        }
+
+        case 84:
+        {
+            demo_x = SCREEN_BYTE_WIDTH - 7;
             demo_y += image_height + y_space;
             break;
         }
+
+        case 90 ... 111:
+        {
+            sp_paint_brick_long(demo_x + image_width, demo_y, 1, image_height, 0);
+            sp_4_15_h_mirror_put(demo_x, demo_y, (uint8_t *)image_hobbin_right[image_phase]);
+            demo_x--;
+            break;
+        }
+
+        case 117:
+        {
+            const char hobbin_str[] = "HOBBIN";
+            print_str(hobbin_str, demo_x + image_width * 2 - 1, demo_y);
+            break;
+        }
+
     }
 
     // Увеличить/уменьшить фазу на единицу
@@ -179,7 +201,7 @@ void main()
     volatile uint16_t *t_limit = (volatile uint16_t *)REG_TVE_LIMIT;
     volatile union TVE_CSR *tve_csr = (volatile union TVE_CSR *)REG_TVE_CSR;
 
-    constexpr uint16_t FPS = 15; // Частота обновления кадров
+    constexpr uint16_t FPS = 50; // Частота обновления кадров
     *t_limit = 3000000 / 128 / 4 / FPS;
 
     init_game(); // Начальная инициализация игры
