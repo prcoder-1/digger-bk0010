@@ -133,9 +133,10 @@ void process_demo_state()
     constexpr uint16_t move_start_pos = SCREEN_BYTE_WIDTH - 6;
 
     constexpr uint16_t start_time = 0;
-    constexpr uint16_t start_delay = 30;
+    constexpr uint16_t start_delay = 20;
     constexpr uint16_t move_durance = 22;
-    constexpr uint16_t end_to_print = 6;
+    constexpr uint16_t end_to_print = 4;
+    constexpr uint16_t print_to_next = 6;
 
     // Тайминги отображения Ноббина в демо
     constexpr uint16_t nobbin_start_time = start_time + start_delay;
@@ -144,29 +145,29 @@ void process_demo_state()
     constexpr uint16_t nobbin_print_time = nobbin_end_time + end_to_print;
 
     // Тайминги отображения Хоббина в демо
-    constexpr uint16_t hobbin_start_time = nobbin_print_time + 6;
+    constexpr uint16_t hobbin_start_time = nobbin_print_time + print_to_next;
     constexpr uint16_t hobbin_begin_time = hobbin_start_time + 1;
     constexpr uint16_t hobbin_end_time = hobbin_begin_time + move_durance;
     constexpr uint16_t hobbin_mirror_time = hobbin_end_time + 1;
     constexpr uint16_t hobbin_print_time = hobbin_mirror_time + end_to_print;
 
     // Тайминги отображения Диггера в демо
-    constexpr uint16_t digger_start_time = hobbin_print_time + 6;
+    constexpr uint16_t digger_start_time = hobbin_print_time + print_to_next;
     constexpr uint16_t digger_begin_time = digger_start_time + 1;
     constexpr uint16_t digger_end_time = digger_begin_time + move_durance;
     constexpr uint16_t digger_mirror_time = digger_end_time + 1;
     constexpr uint16_t digger_print_time = digger_mirror_time + end_to_print;
 
     // Тайминги отображения мешка в демо
-    constexpr uint16_t bag_display_time = digger_print_time + 6;
+    constexpr uint16_t bag_display_time = digger_print_time + print_to_next;
     constexpr uint16_t bag_print_time = bag_display_time + end_to_print;
 
     // Тайминги отображения монеты в демо
-    constexpr uint16_t emerald_display_time = bag_print_time + 6;
+    constexpr uint16_t emerald_display_time = bag_print_time + print_to_next;
     constexpr uint16_t emerald_print_time = emerald_display_time + end_to_print;
 
     // Тайминги отображения вишенки в демо
-    constexpr uint16_t cherry_display_time = emerald_print_time + 6;
+    constexpr uint16_t cherry_display_time = emerald_print_time + print_to_next;
     constexpr uint16_t cherry_print_time = cherry_display_time + end_to_print;
 
     switch (demo_time)
