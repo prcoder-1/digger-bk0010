@@ -102,7 +102,9 @@ void init_game()
 
 uint16_t *cur_music_ptr = nullptr;
 uint16_t demo_time = 0;
-uint16_t demo_x, demo_y;
+uint16_t nobbin_x = 0, nobbin_y = 0;
+uint16_t hobbin_x = 0, hobbin_y = 0;
+bool hobbin_mirror;
 uint8_t image_phase;        ///< Фаза анимации при выводе спрайта
 int8_t image_phase_inc = 1; ///< Направление изменения фазы анимации при выводе спрайта (+1 или -1)
 
@@ -125,47 +127,62 @@ void process_game_state()
 
         case 50:
         {
-            demo_x = SCREEN_BYTE_WIDTH - 7;
-            demo_y = one_player_y;
+            nobbin_x = SCREEN_BYTE_WIDTH - 7;
+            nobbin_y = one_player_y;
         }
 
         case 51 ... 71:
         {
-            sp_paint_brick_long(demo_x + image_width, demo_y, 1, image_height, 0);
-            sp_4_15_put(demo_x, demo_y, (uint8_t *)image_nobbin[image_phase]);
-            demo_x--;
+            nobbin_x--;
             break;
         }
 
         case 77:
         {
             const char nobbin_str[] = "NOBBIN";
-            print_str(nobbin_str, demo_x + image_width * 2 - 1, demo_y);
+            print_str(nobbin_str, nobbin_x + image_width * 2 - 1, nobbin_y);
             break;
         }
 
         case 84:
         {
-            demo_x = SCREEN_BYTE_WIDTH - 7;
-            demo_y += image_height + y_space;
+            hobbin_mirror = true;
+            hobbin_x = SCREEN_BYTE_WIDTH - 7;
+            hobbin_y = nobbin_y + image_height + y_space;
             break;
         }
 
         case 90 ... 111:
         {
-            sp_paint_brick_long(demo_x + image_width, demo_y, 1, image_height, 0);
-            sp_4_15_h_mirror_put(demo_x, demo_y, (uint8_t *)image_hobbin_right[image_phase]);
-            demo_x--;
+            hobbin_x--;
             break;
         }
 
-        case 117:
+        case 112:
+        {
+            hobbin_mirror = false;
+            break;
+        }
+
+        case 118:
         {
             const char hobbin_str[] = "HOBBIN";
-            print_str(hobbin_str, demo_x + image_width * 2 - 1, demo_y);
+            print_str(hobbin_str, hobbin_x + image_width * 2 - 1, hobbin_y);
             break;
         }
+    }
 
+    if (nobbin_x)
+    {
+        sp_paint_brick_long(nobbin_x + image_width, nobbin_y, 1, image_height, 0);
+        sp_4_15_put(nobbin_x, nobbin_y, (uint8_t *)image_nobbin[image_phase]);
+    }
+
+    if (hobbin_x)
+    {
+        sp_paint_brick_long(hobbin_x + image_width, hobbin_y, 1, image_height, 0);
+        if (hobbin_mirror) sp_4_15_h_mirror_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_right[image_phase]);
+        else sp_4_15_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_right[image_phase]);
     }
 
     // Увеличить/уменьшить фазу на единицу
