@@ -152,7 +152,7 @@ void process_game_state()
             break;
         }
 
-        case 90 ... 111:
+        case 85 ... 106:
         {
             hobbin_x--;
             break;
