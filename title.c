@@ -70,6 +70,7 @@ const char player_str[] = "PLAYER";
 constexpr uint16_t player_x_pos = (SCREEN_BYTE_WIDTH + SCREEN_BYTE_WIDTH / 2 - char_width * sizeof(player_str) + char_width) / 2;
 
 uint16_t one_player_y;
+uint16_t note_index = 0;
 
 /**
  * @brief Инициализация игры
@@ -339,7 +340,10 @@ void process_demo_state()
         music_no &= 1;
     }
 
-    play_music(musics[music_no], &cur_music_ptr);
+    uint8_t period = popcorn_periods[note_index];
+    uint16_t duration = popcorn_durations[note_index++];
+    if (!period || !duration) note_index = 0;
+    sound(period, duration);
 }
 
 extern void start();

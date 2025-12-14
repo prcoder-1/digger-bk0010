@@ -1,7 +1,8 @@
 #pragma once
 #include <stdint.h>
 
-#define N 96u // Делитель периодов нот
+#define N 20u // Делитель периодов нот
+#define NV 4u // Делитель для звуковой процедуры "вибрато"
 
 // Периоды нот
 #define	C3	(9122u / N)
@@ -49,7 +50,7 @@
 
 #define REST 0xFFu // Специальное значение - пауза (без звука)
 
-#define T 15u // Множитель длительности
+#define T 64u // Множитель длительности
 
 // Длительность нот
 #define NS (T << 0)               //  1 * T
@@ -61,11 +62,10 @@
 #define	N12 ((T << 3) + (T << 2)) // 12 * T
 #define	NW (T << 4)               // 16 * T
 
-extern const uint16_t music0[][2]; // Основная музыка "Popcorn"
-extern const uint16_t music1[][2]; // Музыка для режима "Бонус"
-// extern const uint16_t music2[][2]; // Траурный марш
-// extern const uint16_t music3[][2]; // tico-tico (сохранено для истории)
+// Основная музыка "Popcorn"
+extern const uint16_t popcorn_periods[];
+extern const uint16_t popcorn_durations[];
 
-extern const uint16_t* musics[]; // Списоу доступных музык
-
-void play_music(const uint16_t *music_ptr, uint16_t  **cur_ptr);
+// Музыка для режима "Бонус"
+extern const uint16_t bonus_periods[];
+extern const uint16_t popcorn_durations[];
