@@ -340,7 +340,7 @@ void process_demo_state()
         music_no &= 1;
     }
 
-    uint8_t period = popcorn_periods[note_index];
+    uint16_t period = popcorn_periods[note_index];
     uint16_t duration = popcorn_durations[note_index++];
     if (!period || !duration) note_index = 0;
     sound(period, duration);
