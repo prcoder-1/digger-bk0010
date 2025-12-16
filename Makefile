@@ -1,7 +1,7 @@
 BIN_FILE_1=digger_tpc.bin
-BIN_FILE_2=digger_title.bin
+BIN_FILE_2=digger_tit.bin
 OUT_FILE_1=digger_tpc.out
-OUT_FILE_2=digger_title.out
+OUT_FILE_2=digger_tit.out
 OPT_FLAG=-O2
 XGCC=/home/prcoder/xgcc
 GCC_FLAGS=-std=gnu23 -fomit-frame-pointer -msoft-float -fcprop-registers -fPIC -nostartfiles -nodefaultlibs -nostdlib -m10 $(OPT_FLAG) -I$(XGCC)/include

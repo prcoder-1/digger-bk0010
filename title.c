@@ -9,6 +9,32 @@
 
 #define COIN_Y_OFFSET 3 // Смещение спрайта монетки в ячейке по оси Y
 
+void sound_tmr(uint16_t period, uint8_t durance)
+{
+    asm volatile (
+        "movb %[durance], r0\n\t"
+        "swab r0\n\t"
+        "mov r0, @%[REG_TVE_LIMIT]\n\t"
+        "mov %[TIMER_MODE], @%[REG_TVE_CSR]\n"
+        "mov %[period], r1\n\t"
+        "mov $0100, r2\n\t"
+        "clr r0\n\t"
+".l1_%=:\n\t"
+        "mov r1, r3\n\t"
+        "mov r0, @$-062\n"
+".l2_%=:\n\t"
+        "sob r3, .l2_%=\n\t"
+        "xor r2, r0\n\t"
+        "movb @%[REG_TVE_CSR], r3\n\t"
+        "tstb r3\n\t"
+        "bge .l1_%=\n\t"
+        :
+        : [period]"g"(period), [durance]"g"(durance), [REG_TVE_LIMIT]"i"(REG_TVE_LIMIT), [REG_TVE_CSR]"i"(REG_TVE_CSR),
+          [TIMER_MODE]"i"((1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN) | (1 << TVE_CSR_D16) /*| (1 << TVE_CSR_D4)*/)
+        : "r0", "r1", "r2", "r3", "cc", "memory"
+    );
+}
+
 /**
  * @brief Вывод 16-битного десятичного числа
  *
@@ -343,7 +369,7 @@ void process_demo_state()
     uint16_t period = popcorn_periods[note_index];
     uint16_t duration = popcorn_durations[note_index++];
     if (!period || !duration) note_index = 0;
-    sound(period, duration);
+    sound_tmr(period, duration);
 }
 
 extern void start();

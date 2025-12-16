@@ -1,18 +1,19 @@
 #include "sound.h"
+#include "memory.h"
 
 void sound(uint16_t period, uint16_t durance)
 {
     asm volatile (
-        "mov %[period], r1\n\t"  // r1 = period
-        "mov %[durance], r2\n\t" // r2 = durance
+        "mov %[period], r1\n\t"
+        "mov %[durance], r2\n\t"
         "mov $0100, r3\n\t"
         "clr r0\n\t"
 ".l1_%=:\n\t"
         "mov r1, r4\n"
         "mov r0, @$-062\n\t"
+        "xor r3, r0\n\t"
 ".l2_%=:\n\t"
         "sob r4, .l2_%=\n\t"
-        "xor r3, r0\n\t"
         "sob r2, .l1_%=\n\t"
         :
         : [period]"g"(period), [durance]"g"(durance)
@@ -20,11 +21,17 @@ void sound(uint16_t period, uint16_t durance)
     );
 }
 
-void sound_vibrato(uint16_t period, uint16_t durance)
+void sound_vibrato(uint16_t period, uint8_t durance)
 {
     asm volatile (
         "mov %[period], r1\n\t"  // r1 = period
-        "mov %[durance], r2\n\t" // r2 = durance
+        "movb %[durance], r2\n\t" // r2 = durance
+        "asl r2\n\t"
+        "asl r2\n\t"
+        "asl r2\n\t"
+        "asl r2\n\t"
+        "asl r2\n\t"
+        "asl r2\n\t"
         "mov $0100, r3\n\t"
         "clr r0\n\t"
 ".l1_%=:\n\t"

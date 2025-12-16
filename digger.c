@@ -1350,7 +1350,7 @@ void sound_effect()
         for (uint16_t i = 0; i < sizeof(done_periods) / sizeof(done_periods[0]); ++i)
         {
             uint8_t period = done_periods[i];
-            uint16_t durance = (i == 9) ? 800 : 300;
+            uint8_t durance = (i == 9) ? 13 : 5;
             sound_vibrato(period, durance);
             delay_ms(2);
         }
@@ -2344,12 +2344,12 @@ void man_rip()
 
     // Траурный марш
     static const uint8_t music_dead_periods[]   = { C4 / NV, C4 / NV, C4 / NV, C4 / NV, DS4 / NV, D4 / NV, D4 / NV, C4 / NV, C4 / NV, B3 / NV, C4 / NV  };
-    static const uint16_t music_dead_durations[] = { N6, NQ, NE, N6, NQ, NE, NQ, NE, NQ, NE, N12 };
+    static const uint8_t music_dead_durations[] = { N6, NQ, NE, N6, NQ, NE, NQ, NE, NQ, NE, N12 };
 
     for (uint16_t i = 0; i < sizeof(music_dead_periods)/ sizeof(music_dead_periods[0]); ++i)
     {
         uint8_t period = music_dead_periods[i];
-        uint16_t duration = music_dead_durations[i];
+        uint8_t duration = music_dead_durations[i];
         if (snd_effects) sound_vibrato(period, duration);
 
         if (i < sizeof(image_rip) / sizeof(image_rip[0]))

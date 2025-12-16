@@ -152,7 +152,7 @@ enum TVE_CSR_BITS
     TVE_CSR_FL,     /**< Флаг события таймера */
 };
 
-# define TMR_FREQ 23438
+#define TMR_FREQ 23438
 
 /**
  * @brief Регистр управления таймера

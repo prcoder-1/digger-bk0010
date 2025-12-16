@@ -31,7 +31,7 @@ const uint16_t popcorn_periods[] = {
         0
 };
 
-const uint16_t popcorn_durations[] = {
+const uint8_t popcorn_durations[] = {
         NE, NE,
         NE, NE, NE, NE, NQ, NE, NE,
         NE, NE, NE, NE, NQ, NE, NE,
@@ -86,7 +86,7 @@ const uint16_t bonus_periods[] = {
     0
 };
 
-const uint16_t bonus_durations[] = {
+const uint8_t bonus_durations[] = {
     NE, NE, NQ, NE, NE, NQ, NE, NE, NQ, NQ, NQ,
     NE, NE, NQ, NE, NE, NQ, NE, NE, NQ, NQ, NQ,
     NE, NE, NQ, NE, NE, NQ, NE, NE, NQ, NQ, NQ,
