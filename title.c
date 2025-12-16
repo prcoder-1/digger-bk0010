@@ -13,7 +13,11 @@ void sound_tmr(uint16_t period, uint8_t durance)
 {
     asm volatile (
         "movb %[durance], r0\n\t"
-        "swab r0\n\t"
+        "asl r0\n\t"
+        "asl r0\n\t"
+        "asl r0\n\t"
+        "asl r0\n\t"
+        "asl r0\n\t"
         "mov r0, @%[REG_TVE_LIMIT]\n\t"
         "mov %[TIMER_MODE], @%[REG_TVE_CSR]\n"
         "mov %[period], r1\n\t"
@@ -138,7 +142,7 @@ void init_demo()
 }
 
 uint16_t *cur_music_ptr = nullptr;
-uint16_t music_no = 0;
+uint16_t note_duration_count = 0;
 uint16_t demo_time = 0;
 uint16_t nobbin_x = 0, nobbin_y = 0;
 uint16_t hobbin_x = 0, hobbin_y = 0;
@@ -362,12 +366,15 @@ void process_demo_state()
     if (++demo_time > demo_restart_time)
     {
         demo_time = 0;
-        music_no = ~music_no;
-        music_no &= 1;
     }
 
     uint16_t period = popcorn_periods[note_index];
-    uint16_t duration = popcorn_durations[note_index++];
+    uint16_t duration = popcorn_durations[note_index];
+    if (note_duration_count++ >= 8)
+    {
+        note_duration_count = 0;
+        note_index++;
+    }
     if (!period || !duration) note_index = 0;
     sound_tmr(period, duration);
 }
