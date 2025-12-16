@@ -376,7 +376,7 @@ void process_demo_state()
         note_index++;
     }
     if (!period || !duration) note_index = 0;
-    sound_tmr(period, duration);
+    else sound_tmr(period, duration);
 }
 
 extern void start();
