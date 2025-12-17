@@ -17,7 +17,6 @@ void sound_tmr(uint16_t period, uint8_t durance)
         "asl r0\n\t"
         "asl r0\n\t"
         "asl r0\n\t"
-        "asl r0\n\t"
         "mov r0, @%[REG_TVE_LIMIT]\n\t"
         "mov %[TIMER_MODE], @%[REG_TVE_CSR]\n"
         "mov %[period], r1\n\t"
@@ -26,16 +25,16 @@ void sound_tmr(uint16_t period, uint8_t durance)
 ".l1_%=:\n\t"
         "mov r1, r3\n\t"
         "mov r0, @$-062\n"
-        "bit $0100, r0\n\t"
-        "beq .l2_%=\n\t"
-        "asr r4\n\t"
-        "asr r4\n\t"
-        "asr r4\n\t"
-        "br .l3_%=\n\t"
-".l2_%=:\n\t"
-        "asl r4\n\t"
-        "asl r4\n\t"
-        "asl r4\n\t"
+//         "bit $0100, r0\n\t"
+//         "beq .l2_%=\n\t"
+//         "asr r4\n\t"
+//         "asr r4\n\t"
+//         "asr r4\n\t"
+//         "br .l3_%=\n\t"
+// ".l2_%=:\n\t"
+//         "asl r4\n\t"
+//         "asl r4\n\t"
+//         "asl r4\n\t"
 ".l3_%=:\n\t"
         "sob r3, .l3_%=\n\t"
         "xor r2, r0\n\t"
@@ -351,6 +350,7 @@ void process_demo_state()
         sp_paint_brick_long(nobbin_x + image_width, nobbin_y, 1, image_height, 0);
         sp_4_15_put(nobbin_x, nobbin_y, (uint8_t *)image_nobbin[image_phase]);
     }
+    else delay_ms(1);
 
     if (hobbin_x)
     {
@@ -358,6 +358,7 @@ void process_demo_state()
         if (hobbin_mirror) sp_4_15_h_mirror_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_right[image_phase]);
         else sp_4_15_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_right[image_phase]);
     }
+    else delay_ms(2);
 
     if (digger_x)
     {
@@ -365,6 +366,7 @@ void process_demo_state()
         if (digger_mirror) sp_4_15_h_mirror_put(digger_x, digger_y, (uint8_t *)image_digger_right[image_phase]);
         else sp_4_15_put(digger_x, digger_y, (uint8_t *)image_digger_right[image_phase]);
     }
+    else delay_ms(2);
 
     // Увеличить/уменьшить фазу на единицу
     image_phase += image_phase_inc;
@@ -380,7 +382,7 @@ void process_demo_state()
 
     uint16_t period = popcorn_periods[note_index];
     uint16_t duration = popcorn_durations[note_index];
-    if (note_duration_count++ >= 8)
+    if (note_duration_count++ >= 16)
     {
         note_duration_count = 0;
         note_index++;
