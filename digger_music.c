@@ -1,7 +1,7 @@
 #include "digger_music.h"
 
 // Основная музыка "Popcorn"
-const uint16_t popcorn_periods[] = {
+const uint8_t popcorn_periods[] = {
         D4, C4,
         D4, A3, F3, A3, D3, D4, C4,
         D4, A3, F3, A3, D3, D4, E4,
@@ -62,7 +62,7 @@ const uint8_t popcorn_durations[] = {
 };
 
  // Музыка для режима "Бонус"
-const uint16_t bonus_periods[] = {
+const uint8_t bonus_periods[] = {
     C4, C4, C4, C4, C4, C4, C4, C4, F4, G4, A4,
     C4, C4, C4, C4, C4, C4, F4, A4, G4, E4, C4,
     C4, C4, C4, C4, C4, C4, C4, C4, F4, G4, A4,

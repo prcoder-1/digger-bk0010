@@ -61,9 +61,9 @@
 #define	NW 16
 
 // Основная музыка "Popcorn"
-extern const uint16_t popcorn_periods[];
+extern const uint8_t popcorn_periods[];
 extern const uint8_t popcorn_durations[];
 
 // Музыка для режима "Бонус"
-extern const uint16_t bonus_periods[];
+extern const uint8_t bonus_periods[];
 extern const uint8_t popcorn_durations[];
