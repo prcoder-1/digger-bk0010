@@ -150,8 +150,11 @@ void init_demo()
     sp_paint_brick_long(0, y_pos, SCREEN_BYTE_WIDTH, 2, 0b01010101);
 }
 
+constexpr uint16_t note_duration = 20;
+
 uint16_t *cur_music_ptr = nullptr;
-uint16_t note_duration_count = 0;
+uint16_t note_duration_count = note_duration;
+uint16_t silence_count = 0;
 uint16_t demo_time = 0;
 uint16_t nobbin_x = 0, nobbin_y = 0;
 uint16_t hobbin_x = 0, hobbin_y = 0;
@@ -174,52 +177,52 @@ void process_demo_state()
     constexpr uint16_t move_start_pos = SCREEN_BYTE_WIDTH - 6;
 
     constexpr uint16_t start_time = 0;
-    constexpr uint16_t start_delay = 40;
-    constexpr uint16_t move_durance = 88;
+    constexpr uint16_t start_delay = 128;
+    constexpr uint16_t move_durance = 184; // 176
     constexpr uint16_t end_to_print = 8;
-    constexpr uint16_t print_to_next = 12;
+    constexpr uint16_t print_to_next = 16;
 
     // Тайминги отображения Ноббина в демо
     constexpr uint16_t nobbin_start_time = start_time + start_delay;
-    constexpr uint16_t nobbin_begin_time = nobbin_start_time + 2;
+    constexpr uint16_t nobbin_begin_time = nobbin_start_time + 1;
     constexpr uint16_t nobbin_end_time = nobbin_begin_time + move_durance;
     constexpr uint16_t nobbin_print_time = nobbin_end_time + end_to_print;
 
     // Тайминги отображения Хоббина в демо
     constexpr uint16_t hobbin_start_time = nobbin_print_time + print_to_next;
-    constexpr uint16_t hobbin_begin_time = hobbin_start_time + 2;
+    constexpr uint16_t hobbin_begin_time = hobbin_start_time + 1;
     constexpr uint16_t hobbin_end_time = hobbin_begin_time + move_durance;
-    constexpr uint16_t hobbin_mirror_time = hobbin_end_time + 2;
+    constexpr uint16_t hobbin_mirror_time = hobbin_end_time + 1;
     constexpr uint16_t hobbin_print_time = hobbin_mirror_time + end_to_print;
 
     // Тайминги отображения Диггера в демо
     constexpr uint16_t digger_start_time = hobbin_print_time + print_to_next;
-    constexpr uint16_t digger_begin_time = digger_start_time + 2;
+    constexpr uint16_t digger_begin_time = digger_start_time + 1;
     constexpr uint16_t digger_end_time = digger_begin_time + move_durance;
-    constexpr uint16_t digger_mirror_time = digger_end_time + 2;
+    constexpr uint16_t digger_mirror_time = digger_end_time + 1;
     constexpr uint16_t digger_print_time = digger_mirror_time + end_to_print;
 
     // Тайминги отображения мешка в демо
-    constexpr uint16_t bag_display_time = digger_print_time + print_to_next;
+    constexpr uint16_t bag_display_time = digger_print_time + move_durance;
     constexpr uint16_t bag_print_time = bag_display_time + end_to_print;
 
     // Тайминги отображения монеты в демо
-    constexpr uint16_t emerald_display_time = bag_print_time + print_to_next;
+    constexpr uint16_t emerald_display_time = bag_print_time + move_durance;
     constexpr uint16_t emerald_print_time = emerald_display_time + end_to_print;
 
     // Тайминги отображения вишенки в демо
-    constexpr uint16_t cherry_display_time = emerald_print_time + print_to_next;
+    constexpr uint16_t cherry_display_time = emerald_print_time + move_durance;
     constexpr uint16_t cherry_print_time = cherry_display_time + end_to_print;
 
     // Время до повтора демо
-    constexpr uint16_t demo_restart_time = cherry_print_time + 50;
+    constexpr uint16_t demo_restart_time = cherry_print_time + 256;
 
     volatile uint16_t *t_limit = (volatile uint16_t *)REG_TVE_LIMIT;
     volatile union TVE_CSR *tve_csr = (volatile union TVE_CSR *)REG_TVE_CSR;
 
     uint16_t duration = popcorn_durations[note_index];
 
-    *t_limit = (17 - duration) << 1;
+    *t_limit = (17 - duration) << 2;
     tve_csr->reg = (1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN) | (1 << TVE_CSR_D4);
 
     switch (demo_time)
@@ -242,7 +245,7 @@ void process_demo_state()
 
         case nobbin_begin_time ... nobbin_end_time:
         {
-            if (!(demo_time & 3)) nobbin_x--;
+            if (!(demo_time & 7)) nobbin_x--;
             break;
         }
 
@@ -263,7 +266,7 @@ void process_demo_state()
 
         case hobbin_begin_time ... hobbin_end_time:
         {
-            if (!(demo_time & 3)) hobbin_x--;
+            if (!(demo_time & 7)) hobbin_x--;
             break;
         }
 
@@ -290,7 +293,7 @@ void process_demo_state()
 
         case digger_begin_time ... digger_end_time:
         {
-            if (!(demo_time & 3)) digger_x--;
+            if (!(demo_time & 7)) digger_x--;
             break;
         }
 
@@ -391,13 +394,20 @@ void process_demo_state()
     while ((tve_csr->reg & (1 << TVE_CSR_FL)) == 0); // Ожидать срабатывания таймера.
 
     uint16_t period = popcorn_periods[note_index];
-    if (note_duration_count++ >= 20)
+    if (!period)
     {
-        note_duration_count = 0;
+        note_index = 0;
+        silence_count = 512;
+        return;
+    }
+
+    if (--note_duration_count == 0)
+    {
+        note_duration_count = note_duration;
         note_index++;
     }
 
-    if (!period || !duration) note_index = 0;
+    if (silence_count > 0) silence_count--;
     else sound_tmr(period, duration);
 }
 
