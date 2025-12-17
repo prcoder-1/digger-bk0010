@@ -15,6 +15,7 @@ void sound_tmr(uint16_t period, uint8_t durance)
         "movb %[durance], r0\n\t"
         "asl r0\n\t"
         "asl r0\n\t"
+        "asl r0\n\t"
         "mov r0, @%[REG_TVE_LIMIT]\n\t"
         "mov %[TIMER_MODE], @%[REG_TVE_CSR]\n"
         "mov %[period], r1\n\t"
@@ -143,7 +144,7 @@ void init_demo()
     sp_paint_brick_long(0, y_pos, SCREEN_BYTE_WIDTH, 2, 0b01010101);
 }
 
-constexpr uint16_t note_duration = 20;
+constexpr uint16_t note_duration = 16;
 constexpr uint16_t inter_note_delay = 1;
 
 uint16_t demo_time = 0;
