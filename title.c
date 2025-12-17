@@ -3,7 +3,7 @@
 #include "sound.h"
 #include "tools.h"
 #include "emt.h"
-#include "digger_sprites.h"
+#include "digger_sprites_title.h"
 #include "digger_full_font.h"
 #include "digger_music.h"
 
@@ -355,10 +355,10 @@ void process_demo_state()
     if (hobbin_x)
     {
         sp_paint_brick_long(hobbin_x + image_width, hobbin_y, 1, image_height, 0);
-        if (hobbin_mirror) sp_4_15_h_mirror_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_right[image_phase]);
+        if (hobbin_mirror) sp_4_15_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_left[image_phase]);
         else sp_4_15_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_right[image_phase]);
     }
-    else delay_ms(2);
+    else delay_ms(1);
 
     if (digger_x)
     {
@@ -366,7 +366,7 @@ void process_demo_state()
         if (digger_mirror) sp_4_15_h_mirror_put(digger_x, digger_y, (uint8_t *)image_digger_right[image_phase]);
         else sp_4_15_put(digger_x, digger_y, (uint8_t *)image_digger_right[image_phase]);
     }
-    else delay_ms(2);
+    else delay_ms(1);
 
     // Увеличить/уменьшить фазу на единицу
     image_phase += image_phase_inc;

@@ -35,6 +35,9 @@ full-font-file: digger_full_font.c
 sprites-file: digger_sprites.c
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o digger_sprites.o digger_sprites.c
 
+sprites-file-title: digger_sprites_title.c
+	pdp11-aout-gcc ${GCC_FLAGS} -c -o digger_sprites_title.o digger_sprites_title.c
+
 music-file: digger_music.c
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o digger_music.o digger_music.c
 
@@ -52,8 +55,8 @@ libs: memory.s divmulmod.s sprites.c sound.c tools.c
 digger-out-file: crt0 digger-main-file sprites-file short-font-file levels-file libs
 	pdp11-aout-ld -T a.out.ld -Map digger.map -o ${OUT_FILE_1} crt0.o digger_sprites.o digger_short_font.o digger_levels.o digger.o libs.a
 
-title-out-file: crt0 title-main-file sprites-file full-font-file music-file libs
-	pdp11-aout-ld -T a.out.ld -Map title.map -o ${OUT_FILE_2} crt0.o digger_sprites.o digger_full_font.o digger_music.o title.o libs.a
+title-out-file: crt0 title-main-file sprites-file-title full-font-file music-file libs
+	pdp11-aout-ld -T a.out.ld -Map title.map -o ${OUT_FILE_2} crt0.o digger_sprites_title.o digger_full_font.o digger_music.o title.o libs.a
 
 aout2bin:
 	gcc aout2bin.c -o aout2bin
