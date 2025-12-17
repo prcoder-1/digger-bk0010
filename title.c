@@ -214,6 +214,14 @@ void process_demo_state()
     // Время до повтора демо
     constexpr uint16_t demo_restart_time = cherry_print_time + 50;
 
+    volatile uint16_t *t_limit = (volatile uint16_t *)REG_TVE_LIMIT;
+    volatile union TVE_CSR *tve_csr = (volatile union TVE_CSR *)REG_TVE_CSR;
+
+    uint16_t duration = popcorn_durations[note_index];
+
+    *t_limit = (16 - duration) << 3;
+    tve_csr->reg = (1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN) | (1 << TVE_CSR_D16);
+
     switch (demo_time)
     {
         case start_time:
@@ -377,8 +385,9 @@ void process_demo_state()
         demo_time = 0;
     }
 
+    while ((tve_csr->reg & (1 << TVE_CSR_FL)) == 0); // Ожидать срабатывания таймера.
+
     uint16_t period = popcorn_periods[note_index];
-    uint16_t duration = popcorn_durations[note_index];
     if (note_duration_count++ >= 16)
     {
         note_duration_count = 0;
@@ -407,9 +416,5 @@ void main()
     ((union KEY_STATE *)REG_KEY_STATE)->bits.INT_MASK = 1; // Отключить прерывание от клавиатуры
 
     init_demo(); // Начальная инициализация игры
-
-    for (;;) // Основной бесконечный цикл демо
-    {
-        process_demo_state();
-    }
+    for (;;) process_demo_state(); // Основной бесконечный цикл демо
 }
