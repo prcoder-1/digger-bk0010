@@ -20,11 +20,6 @@ void sound_tmr(uint16_t period, uint8_t durance)
 ".l1_%=:\n\t"
         "mov r1, r3\n\t"
         "mov r0, @$-062\n"
-// ------- [Vibrato] -------
-        "bit $0100, r0\n\t"
-        "beq .l2_%=\n\t"
-        "asr r3\n\t"
-// ------- [Vibrato] -------
 ".l2_%=:\n\t"
         "sob r3, .l2_%=\n\t"
         "xor r2, r0\n\t"
