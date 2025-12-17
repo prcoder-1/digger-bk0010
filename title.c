@@ -15,7 +15,6 @@ void sound_tmr(uint16_t period, uint8_t durance)
         "movb %[durance], r0\n\t"
         "asl r0\n\t"
         "asl r0\n\t"
-        "asl r0\n\t"
         "mov r0, @%[REG_TVE_LIMIT]\n\t"
         "mov %[TIMER_MODE], @%[REG_TVE_CSR]\n"
         "mov %[period], r1\n\t"
@@ -24,16 +23,18 @@ void sound_tmr(uint16_t period, uint8_t durance)
 ".l1_%=:\n\t"
         "mov r1, r3\n\t"
         "mov r0, @$-062\n"
-//         "bit $0100, r0\n\t"
-//         "beq .l2_%=\n\t"
-//         "asr r4\n\t"
-//         "asr r4\n\t"
-//         "asr r4\n\t"
-//         "br .l3_%=\n\t"
-// ".l2_%=:\n\t"
-//         "asl r4\n\t"
-//         "asl r4\n\t"
-//         "asl r4\n\t"
+// ------- [Vibrato] -------
+        "bit $0100, r0\n\t"
+        "beq .l2_%=\n\t"
+        "asr r4\n\t"
+        "asr r4\n\t"
+        "asr r4\n\t"
+        "br .l3_%=\n\t"
+".l2_%=:\n\t"
+        "asl r4\n\t"
+        "asl r4\n\t"
+        "asl r4\n\t"
+// ------- [Vibrato] -------
 ".l3_%=:\n\t"
         "sob r3, .l3_%=\n\t"
         "xor r2, r0\n\t"
@@ -218,7 +219,7 @@ void process_demo_state()
 
     uint16_t duration = popcorn_durations[note_index];
 
-    *t_limit = (16 - duration) << 1;
+    *t_limit = (17 - duration) << 1;
     tve_csr->reg = (1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN) | (1 << TVE_CSR_D4);
 
     switch (demo_time)
@@ -372,11 +373,14 @@ void process_demo_state()
         else sp_4_15_put(digger_x, digger_y, (uint8_t *)image_digger_right[image_phase]);
     }
 
-    // Увеличить/уменьшить фазу на единицу
-    image_phase += image_phase_inc;
+    if (demo_time & 3)
+    {
+        // Увеличить/уменьшить фазу на единицу
+        image_phase += image_phase_inc;
 
-    // Переключить направление изменения фазы, если фаза дошла до предельного значения
-    if (!image_phase || image_phase >= 2) image_phase_inc = -image_phase_inc;
+        // Переключить направление изменения фазы, если фаза дошла до предельного значения
+        if (!image_phase || image_phase >= 2) image_phase_inc = -image_phase_inc;
+    }
 
     // Увеличивать время Demo по кругу
     if (++demo_time > demo_restart_time)
@@ -387,7 +391,7 @@ void process_demo_state()
     while ((tve_csr->reg & (1 << TVE_CSR_FL)) == 0); // Ожидать срабатывания таймера.
 
     uint16_t period = popcorn_periods[note_index];
-    if (note_duration_count++ >= 16)
+    if (note_duration_count++ >= 20)
     {
         note_duration_count = 0;
         note_index++;
