@@ -26,17 +26,10 @@ void sound_tmr(uint16_t period, uint8_t durance)
 // ------- [Vibrato] -------
         "bit $0100, r0\n\t"
         "beq .l2_%=\n\t"
-        "asr r4\n\t"
-        "asr r4\n\t"
-        "asr r4\n\t"
-        "br .l3_%=\n\t"
-".l2_%=:\n\t"
-        "asl r4\n\t"
-        "asl r4\n\t"
-        "asl r4\n\t"
+        "asr r3\n\t"
 // ------- [Vibrato] -------
-".l3_%=:\n\t"
-        "sob r3, .l3_%=\n\t"
+".l2_%=:\n\t"
+        "sob r3, .l2_%=\n\t"
         "xor r2, r0\n\t"
         "movb @%[REG_TVE_CSR], r3\n\t"
         "tstb r3\n\t"
@@ -151,10 +144,8 @@ void init_demo()
 }
 
 constexpr uint16_t note_duration = 20;
+constexpr uint16_t inter_note_delay = 1;
 
-uint16_t *cur_music_ptr = nullptr;
-uint16_t note_duration_count = note_duration;
-uint16_t silence_count = 0;
 uint16_t demo_time = 0;
 uint16_t nobbin_x = 0, nobbin_y = 0;
 uint16_t hobbin_x = 0, hobbin_y = 0;
@@ -165,6 +156,9 @@ uint16_t cherry_x = 0, cherry_y = 0;
 bool hobbin_mirror, digger_mirror;
 uint8_t image_phase;        ///< Фаза анимации при выводе спрайта
 int8_t image_phase_inc = 1; ///< Направление изменения фазы анимации при выводе спрайта (+1 или -1)
+uint16_t *cur_music_ptr = nullptr;
+uint16_t note_duration_count = note_duration;
+uint16_t silence_count = 0;
 
 /**
  * @brief Обработка общего состояния игры (переход на новый уровень, Game Over и т.д.)
@@ -393,6 +387,20 @@ void process_demo_state()
 
     while ((tve_csr->reg & (1 << TVE_CSR_FL)) == 0); // Ожидать срабатывания таймера.
 
+    if (silence_count > 0)
+    {
+        silence_count--;
+        return;
+    }
+
+    if (--note_duration_count == 0)
+    {
+        note_duration_count = note_duration;
+        note_index++;
+        silence_count = inter_note_delay;
+        return;
+    }
+
     uint16_t period = popcorn_periods[note_index];
     if (!period)
     {
@@ -401,14 +409,7 @@ void process_demo_state()
         return;
     }
 
-    if (--note_duration_count == 0)
-    {
-        note_duration_count = note_duration;
-        note_index++;
-    }
-
-    if (silence_count > 0) silence_count--;
-    else sound_tmr(period, duration);
+    sound_tmr(period, duration);
 }
 
 extern void start();
