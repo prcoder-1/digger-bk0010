@@ -16,7 +16,6 @@ void sound_tmr(uint16_t period, uint8_t durance)
         "asl r0\n\t"
         "asl r0\n\t"
         "asl r0\n\t"
-        "asl r0\n\t"
         "mov r0, @%[REG_TVE_LIMIT]\n\t"
         "mov %[TIMER_MODE], @%[REG_TVE_CSR]\n"
         "mov %[period], r1\n\t"
@@ -219,8 +218,8 @@ void process_demo_state()
 
     uint16_t duration = popcorn_durations[note_index];
 
-    *t_limit = (16 - duration) << 3;
-    tve_csr->reg = (1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN) | (1 << TVE_CSR_D16);
+    *t_limit = (16 - duration) << 1;
+    tve_csr->reg = (1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN) | (1 << TVE_CSR_D4);
 
     switch (demo_time)
     {
@@ -393,6 +392,7 @@ void process_demo_state()
         note_duration_count = 0;
         note_index++;
     }
+
     if (!period || !duration) note_index = 0;
     else sound_tmr(period, duration);
 }
