@@ -350,7 +350,6 @@ void process_demo_state()
         sp_paint_brick_long(nobbin_x + image_width, nobbin_y, 1, image_height, 0);
         sp_4_15_put(nobbin_x, nobbin_y, (uint8_t *)image_nobbin[image_phase]);
     }
-    else delay_ms(1);
 
     if (hobbin_x)
     {
@@ -358,7 +357,6 @@ void process_demo_state()
         if (hobbin_mirror) sp_4_15_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_left[image_phase]);
         else sp_4_15_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_right[image_phase]);
     }
-    else delay_ms(1);
 
     if (digger_x)
     {
@@ -366,7 +364,6 @@ void process_demo_state()
         if (digger_mirror) sp_4_15_h_mirror_put(digger_x, digger_y, (uint8_t *)image_digger_right[image_phase]);
         else sp_4_15_put(digger_x, digger_y, (uint8_t *)image_digger_right[image_phase]);
     }
-    else delay_ms(1);
 
     // Увеличить/уменьшить фазу на единицу
     image_phase += image_phase_inc;
