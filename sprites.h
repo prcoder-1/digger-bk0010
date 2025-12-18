@@ -25,8 +25,3 @@ void sp_put(uint16_t x, uint16_t y, uint16_t x_width, uint16_t y_width, const ui
  * @brief Закрашивает прямоугольник заданным образцом по заданным координатам в видеопамяти
  */
 void sp_paint_brick(uint16_t x, uint16_t y, uint8_t x_width, uint8_t y_width, uint8_t color);
-
-/**
- * @brief Закрашивает прямоугольник заданным образцом по заданным координатам в видеопамяти
- */
-void sp_paint_brick_long(uint16_t x, uint16_t y, uint16_t x_width, uint16_t y_width, uint8_t color);

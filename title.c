@@ -1,15 +1,16 @@
 #include "memory.h"
 #include "sprites.h"
+#include "sprites_title.h"
 #include "sound.h"
 #include "tools.h"
 #include "emt.h"
 #include "digger_sprites_title.h"
+#include "digger_music_title.h"
 #include "digger_full_font.h"
-#include "digger_music.h"
 
 #define COIN_Y_OFFSET 3 // Смещение спрайта монетки в ячейке по оси Y
 
-void sound_tmr(uint16_t period, uint8_t durance)
+void sound_tmr(uint16_t period, uint8_t durance, uint16_t count)
 {
     asm volatile (
         "movb %[durance], @%[REG_TVE_LIMIT]\n\t"
@@ -20,14 +21,22 @@ void sound_tmr(uint16_t period, uint8_t durance)
 ".l1_%=:\n\t"
         "mov r1, r3\n\t"
         "mov r0, @$-062\n"
-".l2_%=:\n\t"
-        "sob r3, .l2_%=\n\t"
+
+//         "bit $0100, r0\n\t"
+//         "beq .l2_%=\n\t"
+//         "sub %[count], r4\n\t"
+//         "br .l3_%=\n\t"
+// ".l2_%=:\n\t"
+//         "add %[count], r4\n\t"
+
+".l3_%=:\n\t"
+        "sob r3, .l3_%=\n\t"
         "xor r2, r0\n\t"
         "movb @%[REG_TVE_CSR], r3\n\t"
         "tstb r3\n\t"
         "bge .l1_%=\n\t"
         :
-        : [period]"g"(period), [durance]"g"(durance), [REG_TVE_LIMIT]"i"(REG_TVE_LIMIT), [REG_TVE_CSR]"i"(REG_TVE_CSR),
+        : [period]"g"(period), [durance]"g"(durance), [count]"g"(count), [REG_TVE_LIMIT]"i"(REG_TVE_LIMIT), [REG_TVE_CSR]"i"(REG_TVE_CSR),
           [TIMER_MODE]"i"((1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN) | (1 << TVE_CSR_D16) /*| (1 << TVE_CSR_D4)*/)
         : "r0", "r1", "r2", "r3", "cc", "memory"
     );
@@ -135,8 +144,9 @@ void init_demo()
     sp_paint_brick_long(0, y_pos, SCREEN_BYTE_WIDTH, 2, 0b01010101);
 }
 
-constexpr uint16_t note_duration = 20;
+constexpr uint16_t note_duration = 10;
 constexpr uint16_t inter_note_delay = 1;
+constexpr uint16_t inter_music_delay = 512;
 
 uint16_t demo_time = 0;
 uint16_t nobbin_x = 0, nobbin_y = 0;
@@ -165,7 +175,7 @@ void process_demo_state()
     constexpr uint16_t start_time = 0;
     constexpr uint16_t start_delay = 128;
     constexpr uint16_t move_durance = 184; // 176
-    constexpr uint16_t end_to_print = 8;
+    constexpr uint16_t end_to_print = 16;
     constexpr uint16_t print_to_next = 16;
 
     // Тайминги отображения Ноббина в демо
@@ -208,7 +218,7 @@ void process_demo_state()
 
     uint16_t duration = popcorn_durations[note_index];
 
-    *t_limit = (17 - duration) << 2;
+    *t_limit = 48 - duration << 1;
     tve_csr->reg = (1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN) | (1 << TVE_CSR_D4);
 
     switch (demo_time)
@@ -397,11 +407,11 @@ void process_demo_state()
     if (!period)
     {
         note_index = 0;
-        silence_count = 512;
+        silence_count = inter_music_delay;
         return;
     }
 
-    sound_tmr(period, duration << 2);
+    sound_tmr(period, duration << 3, note_duration_count);
 }
 
 extern void start();
@@ -411,13 +421,13 @@ extern void start();
  */
 void main()
 {
-    EMT_14();
+    // EMT_14();
 
     typedef void (*vector)();
     *((volatile vector *)VEC_STOP) = start; // Установить вектор клавиши "СТОП" на _start
 
-    EMT_16(0233);
-    EMT_16(0236);
+    // EMT_16(0233);
+    // EMT_16(0236);
 
     set_PSW(1 << PSW_I); // Замаскировать прерывания IRQ
     ((union KEY_STATE *)REG_KEY_STATE)->bits.INT_MASK = 1; // Отключить прерывание от клавиатуры

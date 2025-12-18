@@ -1350,7 +1350,7 @@ void sound_effect()
         for (uint16_t i = 0; i < sizeof(done_periods) / sizeof(done_periods[0]); ++i)
         {
             uint8_t period = done_periods[i];
-            uint8_t durance = (i == 9) ? 13 : 5;
+            uint16_t durance = (i == 9) ? 800 : 300;
             sound_vibrato(period, durance);
             delay_ms(2);
         }
@@ -1395,7 +1395,7 @@ void sound_effect()
 /**
  * @brief Инициализация игры
  */
-void init_demo()
+void init_game()
 {
     difficulty = 0; // Начальный уровень сложности
     level_no = 0;   // Начальный уровень
@@ -2344,12 +2344,12 @@ void man_rip()
 
     // Траурный марш
     static const uint8_t music_dead_periods[]   = { C4 / NV, C4 / NV, C4 / NV, C4 / NV, DS4 / NV, D4 / NV, D4 / NV, C4 / NV, C4 / NV, B3 / NV, C4 / NV  };
-    static const uint8_t music_dead_durations[] = { N6, NQ, NE, N6, NQ, NE, NQ, NE, NQ, NE, N12 };
+    static const uint16_t music_dead_durations[] = { N6, NQ, NE, N6, NQ, NE, NQ, NE, NQ, NE, N12 };
 
     for (uint16_t i = 0; i < sizeof(music_dead_periods)/ sizeof(music_dead_periods[0]); ++i)
     {
         uint8_t period = music_dead_periods[i];
-        uint8_t duration = music_dead_durations[i];
+        uint16_t duration = music_dead_durations[i];
         if (snd_effects) sound_vibrato(period, duration);
 
         if (i < sizeof(image_rip) / sizeof(image_rip[0]))
@@ -2409,7 +2409,7 @@ void process_bonus()
 /**
  * @brief Обработка общего состояния игры (переход на новый уровень, Game Over и т.д.)
  */
-void process_demo_state()
+void process_game_state()
 {
     // Декрементировать таймер между последовательными съедениями драгоценных камней (монеток)
     if (coin_time > 0) coin_time--;
@@ -2454,7 +2454,7 @@ void process_demo_state()
             sp_put(go_x, go_y, go_width, go_height, (uint8_t *)game_over, 0);
             delay_ms(5000);
 #endif
-            init_demo(); // Установить игру в начальное состояние
+            init_game(); // Установить игру в начальное состояние
         }
     }
 }
@@ -2485,7 +2485,7 @@ void main()
     constexpr uint16_t FPS = 10; // Частота обновления кадров
     *t_limit = 3000000 / 128 / 4 / FPS;
 
-    init_demo(); // Начальная инициализация игры
+    init_game(); // Начальная инициализация игры
 
     for (;;) // Основной бесконечный цикл игры
     {
@@ -2506,7 +2506,7 @@ void main()
         process_man(man_x_rem, man_y_rem);
         process_bonus();
         if (snd_effects) sound_effect();
-        process_demo_state();
+        process_game_state();
 
 #if defined(DEBUG)
         draw_coin_minimap(); // Нарисовать мини-карту монеток

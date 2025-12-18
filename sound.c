@@ -21,17 +21,11 @@ void sound(uint16_t period, uint16_t durance)
     );
 }
 
-void sound_vibrato(uint16_t period, uint8_t durance)
+void sound_vibrato(uint16_t period, uint16_t durance)
 {
     asm volatile (
         "mov %[period], r1\n\t"  // r1 = period
-        "movb %[durance], r2\n\t" // r2 = durance
-        "asl r2\n\t"
-        "asl r2\n\t"
-        "asl r2\n\t"
-        "asl r2\n\t"
-        "asl r2\n\t"
-        "asl r2\n\t"
+        "mov %[durance], r2\n\t" // r2 = durance
         "mov $0100, r3\n\t"
         "clr r0\n\t"
 ".l1_%=:\n\t"

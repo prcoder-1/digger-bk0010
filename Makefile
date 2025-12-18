@@ -38,24 +38,25 @@ sprites-file: digger_sprites.c
 sprites-file-title: digger_sprites_title.c
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o digger_sprites_title.o digger_sprites_title.c
 
-music-file: digger_music.c
-	pdp11-aout-gcc ${GCC_FLAGS} -c -o digger_music.o digger_music.c
+music-file-title: digger_music_title.c
+	pdp11-aout-gcc ${GCC_FLAGS} -c -o digger_music_title.o digger_music_title.c
 
 crt0:
 	pdp11-aout-as ${AS_FLAGS} crt0.s -o crt0.o
 
-libs: memory.s divmulmod.s sprites.c sound.c tools.c
+libs: memory.s divmulmod.s sprites.c sprites_title.c sound.c tools.c
 	pdp11-aout-as ${AS_FLAGS} memory.s -o memory.o
 # 	pdp11-aout-as ${AS_FLAGS} divmulmod.s -o divmulmod.o
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o sprites.o sprites.c
+	pdp11-aout-gcc ${GCC_FLAGS} -c -o sprites_title.o sprites_title.c
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o sound.o sound.c
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o tools.o tools.c
-	pdp11-aout-ar rcs libs.a memory.o sprites.o sound.o tools.o  # divmulmod.o
+	pdp11-aout-ar rcs libs.a memory.o sprites.o sprites_title.o sound.o tools.o  # divmulmod.o
 
 digger-out-file: crt0 digger-main-file sprites-file short-font-file levels-file libs
 	pdp11-aout-ld -T a.out.ld -Map digger.map -o ${OUT_FILE_1} crt0.o digger_sprites.o digger_short_font.o digger_levels.o digger.o libs.a
 
-title-out-file: crt0 title-main-file sprites-file-title full-font-file music-file libs
+title-out-file: crt0 title-main-file sprites-file-title full-font-file music-file-title libs
 	pdp11-aout-ld -T a.out.ld -Map title.map -o ${OUT_FILE_2} crt0.o digger_sprites_title.o digger_full_font.o digger_music.o title.o libs.a
 
 aout2bin:
