@@ -2460,7 +2460,7 @@ void process_game_state()
 
             // Вывести надпись "Game Over"
             sp_clear_brick(go_x - 2 * MOVE_X_STEP, go_y - 2 * MOVE_Y_STEP, go_width + 4 * MOVE_X_STEP, go_height + 4 * MOVE_Y_STEP);
-//            sp_clear_brick(go_x - MOVE_X_STEP, go_y - MOVE_Y_STEP, go_width + 2 * MOVE_X_STEP, go_height + 2 * MOVE_Y_STEP, 0);
+//            sp_clear_brick(go_x - MOVE_X_STEP, go_y - MOVE_Y_STEP, go_width + 2 * MOVE_X_STEP, go_height + 2 * MOVE_Y_STEP);
             sp_put(go_x, go_y, go_width, go_height, (uint8_t *)game_over, 0);
             delay_ms(5000);
 #endif
