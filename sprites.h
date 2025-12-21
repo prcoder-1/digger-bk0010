@@ -22,6 +22,6 @@ void sp_4_15_hv_mirror_put(uint16_t x, uint16_t y, const uint8_t *image);
 void sp_put(uint16_t x, uint16_t y, uint16_t x_width, uint16_t y_width, const uint8_t *image, const uint8_t *outline);
 
 /**
- * @brief Закрашивает прямоугольник заданным образцом по заданным координатам в видеопамяти
+ * @brief Стирает прямоугольник по заданным координатам в видеопамяти
  */
-void sp_paint_brick(uint16_t x, uint16_t y, uint8_t x_width, uint8_t y_width, uint8_t color);
+void sp_clear_brick(uint16_t x, uint16_t y, uint8_t x_width, uint8_t y_width);

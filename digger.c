@@ -271,7 +271,7 @@ void print_lives()
     {
         if (++l > lives)
         {
-            sp_paint_brick(man_x_offset, man_y_offset, width, height, 0);
+            sp_clear_brick(man_x_offset, man_y_offset, width, height);
             break;
         }
 
@@ -313,7 +313,13 @@ void add_score_250()
  */
 void erase_4_15(uint16_t x_graph, uint16_t y_graph)
 {
-    sp_paint_brick(x_graph, y_graph, 4, 15, 0);
+    uint16_t *ptr = (uint16_t *)MEM_VIDEO;
+    ptr += SCREEN_WORD_WIDTH * y_graph + x_graph / 2;
+    for (uint16_t i = 0; i < 15; ++i)
+    {
+        *(ptr + 1) = *ptr = 0;
+        ptr += SCREEN_WORD_WIDTH;
+    }
 }
 
 
@@ -881,7 +887,7 @@ void erase_trail(enum direction dir, uint16_t x_graph, uint16_t y_graph)
     x_graph += dir_matrix[dir].x;
     y_graph += dir_matrix[dir].y;
 
-    sp_paint_brick(x_graph, y_graph, dir_matrix[dir].x_size, dir_matrix[dir].y_size, 0);
+    sp_clear_brick(x_graph, y_graph, dir_matrix[dir].x_size, dir_matrix[dir].y_size);
 }
 
 /**
@@ -1861,7 +1867,7 @@ void process_missile()
         else
         {
             // Стереть изображение взрыва
-            sp_paint_brick(mis_x_graph, mis_y_graph, explode_x_size, explode_y_size, 0);
+            sp_clear_brick(mis_x_graph, mis_y_graph, explode_x_size, explode_y_size);
             mis_flying = 0;  // Выстрел больше не летит
             mis_explode = 0; // И не взрывается
         }
@@ -1873,7 +1879,7 @@ void process_missile()
         {
             // Стереть предыдущее изображение выстрела
             // sp_put(mis_x_graph, mis_y_graph, missile_x_size, missile_y_size, nullptr, (uint8_t *)outline_missile);
-            sp_paint_brick(mis_x_graph, mis_y_graph, missile_x_size, missile_y_size, 0);
+            sp_clear_brick(mis_x_graph, mis_y_graph, missile_x_size, missile_y_size);
 
             // Переместить выстрел на один шаг в заданном направлении
             static const struct
@@ -2453,8 +2459,8 @@ void process_game_state()
             constexpr uint16_t go_y = (SCREEN_PIX_HEIGHT - go_height) / 2;
 
             // Вывести надпись "Game Over"
-            sp_paint_brick(go_x - 2 * MOVE_X_STEP, go_y - 2 * MOVE_Y_STEP, go_width + 4 * MOVE_X_STEP, go_height + 4 * MOVE_Y_STEP, 0xFF);
-            sp_paint_brick(go_x - MOVE_X_STEP, go_y - MOVE_Y_STEP, go_width + 2 * MOVE_X_STEP, go_height + 2 * MOVE_Y_STEP, 0);
+            sp_clear_brick(go_x - 2 * MOVE_X_STEP, go_y - 2 * MOVE_Y_STEP, go_width + 4 * MOVE_X_STEP, go_height + 4 * MOVE_Y_STEP);
+//            sp_clear_brick(go_x - MOVE_X_STEP, go_y - MOVE_Y_STEP, go_width + 2 * MOVE_X_STEP, go_height + 2 * MOVE_Y_STEP, 0);
             sp_put(go_x, go_y, go_width, go_height, (uint8_t *)game_over, 0);
             delay_ms(5000);
 #endif
