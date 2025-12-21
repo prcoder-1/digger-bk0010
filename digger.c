@@ -342,7 +342,7 @@ enum level_symbols getLevelSymbol(uint8_t y_log, uint8_t x_log)
     return (level[level_no][y_log][byte_no] >> (rem * 3)) & 7;
 }
 
-void bonus_indicator(uint8_t color);
+void bonus_indicator(uint16_t color);
 
 /**
  * @brief Инициализация переменных состояния перед старом уровня
@@ -2365,10 +2365,14 @@ void man_rip()
     man_state = CREATURE_RIP;
 }
 
-void bonus_indicator(uint8_t color)
+void bonus_indicator(uint16_t color)
 {
-    sp_paint_brick(0, 0, SCREEN_BYTE_WIDTH, SCREEN_Y_OFFSET, color);
-    sp_paint_brick(0, 255 - SCREEN_Y_OFFSET, SCREEN_BYTE_WIDTH, SCREEN_Y_OFFSET, color);
+    volatile uint16_t *ptr = (uint16_t *)MEM_VIDEO;
+    for (uint16_t i = 0; i < SCREEN_WORD_WIDTH * SCREEN_Y_OFFSET; ++i)
+    {
+        *(ptr + i) = color;
+        *(ptr + SCREEN_WORD_WIDTH * SCREEN_PIX_HEIGHT - 1 - i) = color;
+    }
 }
 
 /**
@@ -2390,7 +2394,7 @@ void process_bonus()
                 chase_snd = bonus_flash;
 
                 // Мигание при включении бонус-режима
-                bonus_indicator((bonus_time & 1) ? (bonus_flash ? 0xFF : 0xAA) : 0x00);
+                bonus_indicator((bonus_time & 1) ? (bonus_flash ? 0xFFFF : 0xAAAA) : 0x0000);
 
                 // TODO: Включить музыку бонус-режима
             }
@@ -2467,17 +2471,17 @@ extern void start();
 void main()
 {
     // EMT_14();
-    //
-    typedef void (*vector)();
-    *((volatile vector *)VEC_STOP) = start; // Установить вектор клавиши "СТОП" на _start
-
     // EMT_16(0233);
     // EMT_16(0236);
+
+    typedef void (*vector)();
+    *((volatile vector *)VEC_STOP) = start; // Установить вектор клавиши "СТОП" на _start
 
     set_PSW(1 << PSW_I); // Замаскировать прерывания IRQ
     ((union KEY_STATE *)REG_KEY_STATE)->bits.INT_MASK = 1; // Отключить прерывание от клавиатуры
 
-    sp_paint_brick(0, 0, SCREEN_BYTE_WIDTH, FIELD_Y_OFFSET - MOVE_Y_STEP * 3, 0); // Очистить экран с верха до начала игрового поля
+    volatile uint16_t *ptr = (uint16_t *)MEM_VIDEO;
+    for (uint16_t i = 0; i < SCREEN_WORD_WIDTH * (FIELD_Y_OFFSET - MOVE_Y_STEP * 3); ++i) *(ptr + i) = 0;
 
     volatile uint16_t *t_limit = (volatile uint16_t *)REG_TVE_LIMIT;
     volatile union TVE_CSR *tve_csr = (volatile union TVE_CSR *)REG_TVE_CSR;

@@ -2,6 +2,7 @@
 #include <stdint.h>
 
 #define nullptr 0
+#define memset __builtin_memset
 
 /**
  * @brief Распределение адресного пространства БК 0010
