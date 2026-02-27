@@ -62,7 +62,7 @@ int main(int ac, char *av[])
     uint8_t *text_ptr = (uint8_t *)(a_ptr + 1);
     uint16_t bin_size = a_ptr->text_size + a_ptr->bss_size + a_ptr->data_size;
     
-    printf("\nBinary file length   = %04o (%d byes)\n", bin_size, bin_size);
+    printf("\nBinary file length   = %04o (%d bytes)\n", bin_size, bin_size);
 
     f = fopen(av[2], "wb");
     if (!f)
