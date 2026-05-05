@@ -34,9 +34,6 @@ void sp_4_15_put(uint16_t x, uint16_t y, const uint8_t *image)
         "sob r2, .l1_%=\n\t"
         "br .l3_%=\n"
 
-        // Чётный путь: word-aligned mem-to-mem копирование исходных слов
-        // прямо в видеопамять — на 2 инструкции/итерация меньше предыдущей
-        // версии через временный r0.
 ".l2_%=:\n\t"
         "mov (r3)+, (r4)+\n\t"
         "mov (r3)+, (r4)\n\t"
@@ -88,8 +85,6 @@ void sp_4_15_h_mirror_put(uint16_t x, uint16_t y, const uint8_t *image)
         "sob r2, .l1_%=\n\t"
         "br .lq_%=\n"
 
-        // Чётный путь: r4 уже указывает на правый край спрайта (см. add $4, r4
-        // в прологе), pre-decrement word-write идёт справа-налево корректно.
 ".l2_%=:\n\t"
         "mov (r3)+, r0\n\t"
         "jsr pc, .l_mirror_%=\n\t"
@@ -184,7 +179,6 @@ void sp_4_15_hv_mirror_put(uint16_t x, uint16_t y, const uint8_t *image)
         "sob r2, .l1_%=\n\t"
         "br .lq_%=\n"
 
-        // Чётный путь: r4 уже указывает на правый край спрайта.
 ".l2_%=:\n\t"
         "mov (r3)+, r0\n\t"
         "jsr pc, .l_mirror_%=\n\t"
@@ -240,14 +234,6 @@ void sp_4_15_hv_mirror_put(uint16_t x, uint16_t y, const uint8_t *image)
     );
 }
 
-// sp_put — диспетчер на 3 пути. Большинство пикселей в горячем пути проходит
-// без проверок image/outline на каждый байт (они в исходной версии съедали
-// 4 инструкции из ~9 в теле inner loop):
-//   * "both"      — маска + изображение, типичный масочный спрайт.
-//   * "img_only"  — плоская копия (print_dec, фоновые блоки) через
-//                   movb (r1)+, (r5)+ — самая быстрая инструкция pdp-11.
-//   * fallback    — outline-only и (image=NULL, outline=NULL); сохраняет
-//                   исходный безопасный код на случай редких сценариев.
 void sp_put(uint16_t x, uint16_t y, uint16_t x_width, uint16_t y_width, const uint8_t *image, const uint8_t *outline)
 {
     asm(
@@ -268,8 +254,6 @@ void sp_put(uint16_t x, uint16_t y, uint16_t x_width, uint16_t y_width, const ui
         "mov %[outline], r2\n\t"
         "mov %[y_width], r4\n\t"
 
-        // Диспетчер: один раз выбираем оптимальный inner loop вместо
-        // двух tst+beq на каждый пиксель.
         "tst r1\n\t"
         "beq .L_no_img_%=\n\t"
         "tst r2\n\t"
@@ -278,7 +262,6 @@ void sp_put(uint16_t x, uint16_t y, uint16_t x_width, uint16_t y_width, const ui
 ".L_no_img_%=:\n\t"
         "br  .L_generic_%=\n"
 
-        // ---- both: image + outline (масочное рисование) ----
 ".L_both_%=:\n"
 ".L_b_y_%=:\n\t"
         "mov %[x_width], r3\n\t"
@@ -293,7 +276,6 @@ void sp_put(uint16_t x, uint16_t y, uint16_t x_width, uint16_t y_width, const ui
         "sob r4, .L_b_y_%=\n\t"
         "br .L_done_%=\n"
 
-        // ---- image_only: плоская копия без чтения экрана ----
 ".L_img_only_%=:\n"
 ".L_i_y_%=:\n\t"
         "mov %[x_width], r3\n\t"
@@ -305,8 +287,6 @@ void sp_put(uint16_t x, uint16_t y, uint16_t x_width, uint16_t y_width, const ui
         "sob r4, .L_i_y_%=\n\t"
         "br .L_done_%=\n"
 
-        // ---- generic: outline-only либо оба NULL.
-        // Оригинальный код с двойной проверкой на пиксель.
 ".L_generic_%=:\n"
 ".L_g_y_%=:\n\t"
         "mov %[x_width], r3\n\t"
