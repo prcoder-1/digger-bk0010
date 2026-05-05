@@ -25,7 +25,7 @@ enum PSW_BITS
 /**
  * @brief Получает слово состояния процессора (ССП)
  */
-inline uint16_t get_PSW()
+static inline uint16_t get_PSW()
 {
     char rv;
     asm volatile (
@@ -40,7 +40,7 @@ inline uint16_t get_PSW()
 /**
  * @brief Устанавливает слово состояния процессора (ССП)
  */
-inline void set_PSW(uint16_t psw)
+static inline void set_PSW(uint16_t psw)
 {
     asm volatile (
         "mov %0, r0\n\t"
@@ -52,7 +52,7 @@ inline void set_PSW(uint16_t psw)
 /**
  * @brief Обменивает местами байты в слове
   */
-inline uint16_t SWAB(uint16_t word)
+static inline uint16_t SWAB(uint16_t word)
 {
     asm volatile (
         "swab %0\n\t"
@@ -65,7 +65,7 @@ inline uint16_t SWAB(uint16_t word)
 /**
  * @brief Вызывает инструкцию HALT
   */
-inline void HALT(void)
+static inline void HALT(void)
 {
     asm volatile (
         "halt\n\t"
@@ -75,7 +75,7 @@ inline void HALT(void)
 /**
  * @brief Вызывает инструкцию TRAP с заданным номером
   */
-inline void TRAP(const uint8_t trap_no)
+static inline void TRAP(const uint8_t trap_no)
 {
     asm volatile (
         "trap %[trap_no]\n\t"
@@ -89,7 +89,7 @@ inline void TRAP(const uint8_t trap_no)
  *
  * @param x - 16-битное целок
  */
-inline uint16_t abs16(const int16_t x)
+static inline uint16_t abs16(const int16_t x)
 {
     uint16_t rv;
 

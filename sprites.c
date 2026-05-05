@@ -34,11 +34,12 @@ void sp_4_15_put(uint16_t x, uint16_t y, const uint8_t *image)
         "sob r2, .l1_%=\n\t"
         "br .l3_%=\n"
 
+        // Чётный путь: word-aligned mem-to-mem копирование исходных слов
+        // прямо в видеопамять — на 2 инструкции/итерация меньше предыдущей
+        // версии через временный r0.
 ".l2_%=:\n\t"
-        "mov (r3)+, r0\n\t"
-        "mov r0, (r4)+\n\t"
-        "mov (r3)+, r0\n\t"
-        "mov r0, (r4)\n\t"
+        "mov (r3)+, (r4)+\n\t"
+        "mov (r3)+, (r4)\n\t"
         "add $62, r4\n\t"
         "sob r2, .l2_%=\n"
 
@@ -87,10 +88,9 @@ void sp_4_15_h_mirror_put(uint16_t x, uint16_t y, const uint8_t *image)
         "sob r2, .l1_%=\n\t"
         "br .lq_%=\n"
 
+        // Чётный путь: r4 уже указывает на правый край спрайта (см. add $4, r4
+        // в прологе), pre-decrement word-write идёт справа-налево корректно.
 ".l2_%=:\n\t"
-        "add r4, $6\n"
-
-".l3_%=:\n\t"
         "mov (r3)+, r0\n\t"
         "jsr pc, .l_mirror_%=\n\t"
         "swab r0\n\t"
@@ -102,104 +102,7 @@ void sp_4_15_h_mirror_put(uint16_t x, uint16_t y, const uint8_t *image)
         "mov r0, -(r4)\n\t"
 
         "add $68, r4\n\t"
-        "sob r2, .l3_%=\n\t"
-        "br .lq_%=\n"
-
-".l_mirror_%=:\n\t"
-        // 16-bit word mirror
-        "mov r0, r1\n\t"      // r0 = r1 = ABCD EFGH
-        "bic $0x3333, r1\n\t" //      r1 = 0B0D 0F0H
-        "bic r1, r0\n\t"      //      r0 = A0C0 E0G0
-
-        "asl r0\n\t"
-        "asl r0\n\t"          //      r0 = 0A0C 0E0G
-
-        "clc\n\t"
-        "ror r1\n\t"
-        "ror r1\n\t"          //      r1 = B0D0 F0H0
-
-        "bis r1, r0\n\t"      //      r0 = BADC FEGH
-        "mov r0, r1\n\t"      //      r1 = BADC FEGH
-
-        "bic $0xF0F0, r1\n\t" //      r1 = 00DC 00GH
-        "bic r1, r0\n\t"      //      r0 = BA00 FE00
-
-        "asl r1\n\t"
-        "asl r1\n\t"
-        "asl r1\n\t"
-        "asl r1\n\t"          //      r0 = 00BA 00FE
-
-        "clc\n\t"
-        "ror r0\n\t"
-        "ror r0\n\t"
-        "ror r0\n\t"
-        "ror r0\n\t"          //      r1 = DC00 GH00
-
-        "bis r1, r0\n\t"      //      r0 = DCBA GHFE
-        "rts pc\n"
-
-".lq_%=:\n\t"
-        :
-        : [x]"g"(x), [y]"g"(y), [image]"m"(image)
-        : "r0", "r1", "r2", "r3", "r4", "r5", "cc", "memory"
-    );
-}
-
-void sp_4_15_hv_mirror_put(uint16_t x, uint16_t y, const uint8_t *image)
-{
-    asm(
-        "mov $040000, r4\n\t"
-        "mov %[y], r0\n\t"
-        "add $14, r0\n\t"
-        "asl r0\n\t"
-        "asl r0\n\t"
-        "asl r0\n\t"
-        "asl r0\n\t"
-        "asl r0\n\t"
-        "asl r0\n\t"
-        "add r0, r4\n\t"
-        "add %[x], r4\n\t"
-        "add $4, r4\n\t"
-
-        "mov %[image], r3\n\t"
-        "mov $15, r2\n\t"
-
-        "bit r4, $1\n\t"
-        "beq .l2_%=\n"
-
-".l1_%=:\n\t"
-        "mov (r3)+, r0\n\t"
-        "jsr pc, .l_mirror_%=\n\t"
-        "movb r0, -(r4)\n\t"
-        "swab r0\n\t"
-        "movb r0, -(r4)\n\t"
-
-        "mov (r3)+, r0\n\t"
-        "jsr pc, .l_mirror_%=\n\t"
-        "movb r0, -(r4)\n\t"
-        "swab r0\n\t"
-        "movb r0, -(r4)\n\t"
-
-        "sub $60, r4\n\t"
-        "sob r2, .l1_%=\n\t"
-        "br .lq_%=\n"
-
-".l2_%=:\n\t"
-        "add r4, $6\n"
-
-".l3_%=:\n\t"
-        "mov (r3)+, r0\n\t"
-        "jsr pc, .l_mirror_%=\n\t"
-        "swab r0\n\t"
-        "mov r0, -(r4)\n\t"
-
-        "mov (r3)+, r0\n\t"
-        "jsr pc, .l_mirror_%=\n\t"
-        "swab r0\n\t"
-        "mov r0, -(r4)\n\t"
-
-        "sub $60, r4\n\t"
-        "sob r2, .l3_%=\n\t"
+        "sob r2, .l2_%=\n\t"
         "br .lq_%=\n"
 
 ".l_mirror_%=:\n\t"
@@ -242,6 +145,109 @@ void sp_4_15_hv_mirror_put(uint16_t x, uint16_t y, const uint8_t *image)
     );
 }
 
+void sp_4_15_hv_mirror_put(uint16_t x, uint16_t y, const uint8_t *image)
+{
+    asm(
+        "mov $040000, r4\n\t"
+        "mov %[y], r0\n\t"
+        "add $14, r0\n\t"
+        "asl r0\n\t"
+        "asl r0\n\t"
+        "asl r0\n\t"
+        "asl r0\n\t"
+        "asl r0\n\t"
+        "asl r0\n\t"
+        "add r0, r4\n\t"
+        "add %[x], r4\n\t"
+        "add $4, r4\n\t"
+
+        "mov %[image], r3\n\t"
+        "mov $15, r2\n\t"
+
+        "bit r4, $1\n\t"
+        "beq .l2_%=\n"
+
+".l1_%=:\n\t"
+        "mov (r3)+, r0\n\t"
+        "jsr pc, .l_mirror_%=\n\t"
+        "movb r0, -(r4)\n\t"
+        "swab r0\n\t"
+        "movb r0, -(r4)\n\t"
+
+        "mov (r3)+, r0\n\t"
+        "jsr pc, .l_mirror_%=\n\t"
+        "movb r0, -(r4)\n\t"
+        "swab r0\n\t"
+        "movb r0, -(r4)\n\t"
+
+        "sub $60, r4\n\t"
+        "sob r2, .l1_%=\n\t"
+        "br .lq_%=\n"
+
+        // Чётный путь: r4 уже указывает на правый край спрайта.
+".l2_%=:\n\t"
+        "mov (r3)+, r0\n\t"
+        "jsr pc, .l_mirror_%=\n\t"
+        "swab r0\n\t"
+        "mov r0, -(r4)\n\t"
+
+        "mov (r3)+, r0\n\t"
+        "jsr pc, .l_mirror_%=\n\t"
+        "swab r0\n\t"
+        "mov r0, -(r4)\n\t"
+
+        "sub $60, r4\n\t"
+        "sob r2, .l2_%=\n\t"
+        "br .lq_%=\n"
+
+".l_mirror_%=:\n\t"
+        // 16-bit word mirror
+        "mov r0, r1\n\t"      // r0 = r1 = ABCD EFGH
+        "bic $0x3333, r1\n\t" //      r1 = 0B0D 0F0H
+        "bic r1, r0\n\t"      //      r0 = A0C0 E0G0
+
+        "asl r0\n\t"
+        "asl r0\n\t"          //      r0 = 0A0C 0E0G
+
+        "clc\n\t"
+        "ror r1\n\t"
+        "ror r1\n\t"          //      r1 = B0D0 F0H0
+
+        "bis r1, r0\n\t"      //      r0 = BADC FEGH
+        "mov r0, r1\n\t"      //      r1 = BADC FEGH
+
+        "bic $0xF0F0, r1\n\t" //      r1 = 00DC 00GH
+        "bic r1, r0\n\t"      //      r0 = BA00 FE00
+
+        "asl r1\n\t"
+        "asl r1\n\t"
+        "asl r1\n\t"
+        "asl r1\n\t"          //      r0 = 00BA 00FE
+
+        "clc\n\t"
+        "ror r0\n\t"
+        "ror r0\n\t"
+        "ror r0\n\t"
+        "ror r0\n\t"          //      r1 = DC00 GH00
+
+        "bis r1, r0\n\t"      //      r0 = DCBA GHFE
+        "rts pc\n"
+
+".lq_%=:\n\t"
+        :
+        : [x]"g"(x), [y]"g"(y), [image]"m"(image)
+        : "r0", "r1", "r2", "r3", "r4", "cc", "memory"
+    );
+}
+
+// sp_put — диспетчер на 3 пути. Большинство пикселей в горячем пути проходит
+// без проверок image/outline на каждый байт (они в исходной версии съедали
+// 4 инструкции из ~9 в теле inner loop):
+//   * "both"      — маска + изображение, типичный масочный спрайт.
+//   * "img_only"  — плоская копия (print_dec, фоновые блоки) через
+//                   movb (r1)+, (r5)+ — самая быстрая инструкция pdp-11.
+//   * fallback    — outline-only и (image=NULL, outline=NULL); сохраняет
+//                   исходный безопасный код на случай редких сценариев.
 void sp_put(uint16_t x, uint16_t y, uint16_t x_width, uint16_t y_width, const uint8_t *image, const uint8_t *outline)
 {
     asm(
@@ -258,32 +264,70 @@ void sp_put(uint16_t x, uint16_t y, uint16_t x_width, uint16_t y_width, const ui
         "add %[x], r5\n\t"
         "add %[x_width], r5\n"
 
-        "mov %[image], r1\n\t"   // r1 = image
-        "mov %[outline], r2\n\t" // r2 = outline
-        "mov %[y_width], r4\n"   // r4 = y_width
+        "mov %[image], r1\n\t"
+        "mov %[outline], r2\n\t"
+        "mov %[y_width], r4\n\t"
 
-".l_y_loop_%=:\n\t"
-        "mov %[x_width], r3\n\t" // r3 = x_width
+        // Диспетчер: один раз выбираем оптимальный inner loop вместо
+        // двух tst+beq на каждый пиксель.
+        "tst r1\n\t"
+        "beq .L_no_img_%=\n\t"
+        "tst r2\n\t"
+        "bne .L_both_%=\n\t"
+        "br  .L_img_only_%=\n"
+".L_no_img_%=:\n\t"
+        "br  .L_generic_%=\n"
+
+        // ---- both: image + outline (масочное рисование) ----
+".L_both_%=:\n"
+".L_b_y_%=:\n\t"
+        "mov %[x_width], r3\n\t"
         "sub r3, r5\n"
+".L_b_x_%=:\n\t"
+        "movb (r5), r0\n\t"
+        "bicb (r2)+, r0\n\t"
+        "bisb (r1)+, r0\n\t"
+        "movb r0, (r5)+\n\t"
+        "sob r3, .L_b_x_%=\n\t"
+        "add $64, r5\n\t"
+        "sob r4, .L_b_y_%=\n\t"
+        "br .L_done_%=\n"
 
-".l_x_loop_%=:\n\t"
+        // ---- image_only: плоская копия без чтения экрана ----
+".L_img_only_%=:\n"
+".L_i_y_%=:\n\t"
+        "mov %[x_width], r3\n\t"
+        "sub r3, r5\n"
+".L_i_x_%=:\n\t"
+        "movb (r1)+, (r5)+\n\t"
+        "sob r3, .L_i_x_%=\n\t"
+        "add $64, r5\n\t"
+        "sob r4, .L_i_y_%=\n\t"
+        "br .L_done_%=\n"
+
+        // ---- generic: outline-only либо оба NULL.
+        // Оригинальный код с двойной проверкой на пиксель.
+".L_generic_%=:\n"
+".L_g_y_%=:\n\t"
+        "mov %[x_width], r3\n\t"
+        "sub r3, r5\n"
+".L_g_x_%=:\n\t"
         "clr r0\n\t"
         "tst r2\n\t"
-        "beq .l1_%=\n\t"
-        "movb (r5), r0\n"
+        "beq .L_g_no_out_%=\n\t"
+        "movb (r5), r0\n\t"
         "bicb (r2)+, r0\n"
-".l1_%=:\n\t"
+".L_g_no_out_%=:\n\t"
         "tst r1\n\t"
-        "beq .l2_%=\n\t"
+        "beq .L_g_no_img_%=\n\t"
         "bisb (r1)+, r0\n"
-".l2_%=:\n\t"
-        "movb r0, (r5)+\n"
-        "sob r3, .l_x_loop_%=\n\t"
+".L_g_no_img_%=:\n\t"
+        "movb r0, (r5)+\n\t"
+        "sob r3, .L_g_x_%=\n\t"
+        "add $64, r5\n\t"
+        "sob r4, .L_g_y_%=\n"
 
-        "movb %[x_width], r0\n\t"
-        "add $64, r5\n"
-        "sob r4, .l_y_loop_%=\n\t"
-
+".L_done_%=:\n\t"
         :
         : [x]"g"(x), [y]"g"(y), [x_width]"g"(x_width), [y_width]"g"(y_width), [image]"m"(image), [outline]"m"(outline)
         : "r0", "r1", "r2", "r3", "r4", "r5", "cc", "memory"

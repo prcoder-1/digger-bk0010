@@ -95,6 +95,9 @@ enum bonus_state : uint8_t
 #pragma pack(push, 1)
 /**
  * @brief Состояние мешка с деньгами
+ *
+ * Размер дополнен до 8 байт: при индексации &bags[i] компилятор использует
+ * сдвиг (<<3) вместо вызова __mulhi3 на умножение на 5.
  */
 struct bag_info
 {
@@ -103,10 +106,13 @@ struct bag_info
     uint8_t x_graph;      ///< Положение по оси X в графических координатах
     uint8_t y_graph;      ///< Положение по оси Y в графических координатах
     uint8_t count;        ///< Счётчик
+    uint8_t _pad[3];      ///< Выравнивание до 8 байт (см. doxygen-комментарий выше)
 };
 
 /**
  * @brief Состояние врага (Хоббина/Ноббина)
+ *
+ * Размер дополнен до 16 байт по той же причине, что и bag_info.
  */
 struct bug_info
 {
@@ -119,13 +125,29 @@ struct bug_info
     int8_t image_phase_inc;    ///< Направление изменения фазы анимации при выводе спрайта (+1 или -1)
     uint8_t x_graph;           ///< Положение по оси X в графических координатах
     uint8_t y_graph;           ///< Положение по оси Y в графических координатах
+    uint8_t _pad[7];           ///< Выравнивание до 16 байт
 };
 #pragma pack(pop)
 
 /**
- * @brief Поле состояний ячеек фона
+ * @brief Единичные шаги по направлениям (DIR_LEFT, DIR_RIGHT, DIR_UP, DIR_DOWN).
+ *
+ * Используются во всех функциях, нуждающихся только в смещении (-1/0/+1) по dx/dy:
+ * move_bug, process_man, process_missile (полёт), erase_trail, gnaw.
+ * Хранятся как глобальная таблица, чтобы избежать дублирования локальных
+ * static const структур в каждой функции.
  */
-uint8_t background[H_MAX][W_MAX];
+static const int8_t dir_dx[4] = { -1,  1,  0,  0 };
+static const int8_t dir_dy[4] = {  0,  0, -1,  1 };
+
+/**
+ * @brief Поле состояний ячеек фона.
+ *
+ * Внутренняя размерность дополнена до 16 (W_MAX=15 + 1 байт), чтобы
+ * индексация background[y][x] компилировалась как (y<<4)+x вместо вызова
+ * __mulhi3 на умножение строки на 15.
+ */
+uint8_t background[H_MAX][16];
 
 /**
  * @brief Поле состояний монеток. Установленный бит означает наличие монетки
@@ -332,20 +354,46 @@ int check_collision_4_15(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
 }
 
 /**
- * @brief Получение ячейки уровня по заданным координатам
+ * @brief Конверсия графической координаты X в логическую (номер клетки).
+ *
+ * Вынесено в не-inline функцию: при -Os компилятор реализует деление на 16
+ * (POS_Y_STEP) циклом из 4 ROR — каждый call-site стоит ~14 байт. Замена
+ * на jsr делает каждый сайт ~6 байт за счёт общего тела ~14 байт.
  */
-enum level_symbols getLevelSymbol(uint8_t y_log, uint8_t x_log)
+static uint8_t graph_to_x_log(uint16_t x_graph)
 {
-    uint8_t byte_no = 0;
-    uint8_t rem = x_log;
+    return (x_graph - FIELD_X_OFFSET) / POS_X_STEP;
+}
 
-    while (rem >= 5)
-    {
-        rem -= 5;
-        byte_no++;
-    }
+static uint8_t graph_to_y_log(uint16_t y_graph)
+{
+    return (y_graph - FIELD_Y_OFFSET) / POS_Y_STEP;
+}
 
-    return (level[level_no][y_log][byte_no] >> (rem * 3)) & 7;
+/**
+ * @brief Обёртка над sp_put для спрайтов 4x15 с маской.
+ *
+ * Все спрайты mешка/перевёрнутого Диггера имеют размер 4x15. Вынос двух
+ * константных аргументов в помощник убирает их push-и из 9 мест вызова.
+ */
+static void sp_4_15_mask(uint16_t x, uint16_t y, const uint8_t *image, const uint8_t *outline)
+{
+    sp_put(x, y, 4, 15, (uint8_t*)image, (uint8_t*)outline);
+}
+
+/**
+ * @brief Получение ячейки уровня по заданным координатам.
+ *
+ * Таблицы заменяют деление x_log на CELLS_PER_WORD=5 и умножение остатка на 3.
+ * static inline, чтобы при вызове в цикле init_level gcc вынес общее
+ * вычисление &level[level_no] из тела цикла.
+ */
+static inline enum level_symbols getLevelSymbol(uint8_t y_log, uint8_t x_log)
+{
+    static const uint8_t word_no_tbl[W_MAX] = { 0,0,0,0,0, 1,1,1,1,1, 2,2,2,2,2 };
+    static const uint8_t shift_tbl[W_MAX]   = { 0,3,6,9,12, 0,3,6,9,12, 0,3,6,9,12 };
+
+    return (level[level_no][y_log][word_no_tbl[x_log]] >> shift_tbl[x_log]) & 7;
 }
 
 void bonus_indicator(uint16_t color);
@@ -380,7 +428,7 @@ void init_level_state()
         if (bag->state == BAG_INACTIVE) continue; // Пропустить неактивные мешки
         if ((bag->state == BAG_STATIONARY) && (bag->dir == DIR_STOP)) continue; // Пропустить стационарные мешки
 
-        sp_put(bag->x_graph, bag->y_graph, sizeof(image_bag[0]), sizeof(image_bag) / sizeof(image_bag[0]), 0, (uint8_t *)outline_bag); // Стереть мешок
+        sp_4_15_mask(bag->x_graph, bag->y_graph, nullptr, outline_bag[0]); // Стереть мешок
         // erase_4_15(bag->x_graph, bag->y_graph); // Стереть мешок
         bag->state = BAG_INACTIVE;
     }
@@ -524,7 +572,7 @@ void init_level()
                 bag->dir = DIR_STOP;         // Мешок стоит на месте
 
                 // Нарисовать мешок с золотом
-                sp_put(bag->x_graph, bag->y_graph, sizeof(image_bag[0]), sizeof(image_bag) / sizeof(image_bag[0]), (uint8_t *)image_bag, (uint8_t *)outline_bag);
+                sp_4_15_mask(bag->x_graph, bag->y_graph, image_bag[0], outline_bag[0]);
             }
             else if (ls == LEV_H || ls == LEV_S)
             {
@@ -589,10 +637,8 @@ uint16_t full_bite(uint8_t byte)
  */
 uint8_t check_path(enum direction dir, uint8_t x_graph, uint8_t y_graph)
 {
-    const uint8_t abs_x_pos = x_graph - FIELD_X_OFFSET;
-    const uint8_t abs_y_pos = y_graph - FIELD_Y_OFFSET;
-    uint8_t x_log = abs_x_pos / POS_X_STEP;
-    uint8_t y_log = abs_y_pos / POS_Y_STEP;
+    uint8_t x_log = graph_to_x_log(x_graph);
+    uint8_t y_log = graph_to_y_log(y_graph);
     const uint8_t current_cell = background[y_log][x_log]; // Состояние текущей клетки
 
     static const struct
@@ -839,11 +885,6 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
 
     if (!rv)
     {
-        uint8_t bag_abs_x_pos = bag_x_graph - FIELD_X_OFFSET;
-        uint8_t bag_abs_y_pos = bag_y_graph - FIELD_Y_OFFSET;
-        uint8_t bag_x_log = bag_abs_x_pos / POS_X_STEP;
-        uint8_t bag_y_log = bag_abs_y_pos / POS_Y_STEP;
-
         // Стирание мешка по старым координатам
         sp_put(bag->x_graph, bag->y_graph, 4, 15, nullptr, (uint8_t *)outline_bag);
 
@@ -851,7 +892,8 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
         sp_put(bag_x_graph, bag_y_graph, 4, 15, (uint8_t *)image_bag, (uint8_t *)outline_bag);
 
         set_background_bits(bag_x_graph, bag_y_graph, dir); // Сбросить биты матрицы фона
-        remove_coin(bag_x_log, bag_y_log); // Удалить монеты уничтоженные мешком
+        // Удалить монеты уничтоженные мешком
+        remove_coin(graph_to_x_log(bag_x_graph), graph_to_y_log(bag_y_graph));
 
         // Установить новые координаты мешка
         bag->dir = dir;
@@ -871,23 +913,14 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
  */
 void erase_trail(enum direction dir, uint16_t x_graph, uint16_t y_graph)
 {
-    static const struct
-    {
-        int16_t x;
-        int16_t y;
-        uint8_t x_size;
-        uint8_t y_size;
-    } dir_matrix[4] = {
-        { 4, 0, MOVE_X_STEP, 15            },
-        { -MOVE_X_STEP, 0, MOVE_X_STEP, 15 },
-        { 0, 15, 4, MOVE_Y_STEP            },
-        { 0, -MOVE_Y_STEP, 4, MOVE_Y_STEP  }
-    } ;
+    // Смещение и размер прямоугольника-следа не выводятся напрямую из dir_d*.
+    // Сжато до int8_t, чтобы каждая запись занимала 4 байта вместо 6.
+    static const int8_t trail_dx[4]   = {  4, -MOVE_X_STEP,  0,            0 };
+    static const int8_t trail_dy[4]   = {  0,            0, 15, -MOVE_Y_STEP };
+    static const uint8_t trail_w[4]   = { MOVE_X_STEP, MOVE_X_STEP, 4, 4 };
+    static const uint8_t trail_h[4]   = { 15, 15, MOVE_Y_STEP, MOVE_Y_STEP };
 
-    x_graph += dir_matrix[dir].x;
-    y_graph += dir_matrix[dir].y;
-
-    sp_clear_brick(x_graph, y_graph, dir_matrix[dir].x_size, dir_matrix[dir].y_size);
+    sp_clear_brick(x_graph + trail_dx[dir], y_graph + trail_dy[dir], trail_w[dir], trail_h[dir]);
 }
 
 /**
@@ -1020,10 +1053,7 @@ void move_bug(struct bug_info *bug)
         // Стерерь кусочек фона на экране в соответствии с направлением движения и текущим положением
         gnaw(bug->dir, bug_x_graph, bug_y_graph);
 
-        uint8_t bug_x_log = bug_abs_x_pos / POS_X_STEP;
-        uint8_t bug_y_log = bug_abs_y_pos / POS_Y_STEP;
-
-        remove_coin(bug_x_log, bug_y_log);
+        remove_coin(graph_to_x_log(bug_x_graph), graph_to_y_log(bug_y_graph));
     }
 
     if (man_state == CREATURE_ALIVE) // Если Диггер жив
@@ -1036,20 +1066,10 @@ void move_bug(struct bug_info *bug)
         }
         else
         {
-            // Переместить врага на шаг в выбранном направлении
-            static const struct
-            {
-                int8_t  x;
-                int8_t  y;
-            } dir_matrix[4] = {
-                { -MOVE_X_STEP, 0 },
-                {  MOVE_X_STEP, 0 },
-                { 0, -MOVE_Y_STEP },
-                { 0,  MOVE_Y_STEP }
-            } ;
-
-            bug->x_graph += dir_matrix[bug->dir].x;
-            bug->y_graph += dir_matrix[bug->dir].y;
+            // Переместить врага на шаг в выбранном направлении.
+            // MOVE_X_STEP=1, MOVE_Y_STEP=4 — складываются с шагом dir_dx/dir_dy.
+            bug->x_graph += dir_dx[bug->dir] * MOVE_X_STEP;
+            bug->y_graph += dir_dy[bug->dir] * MOVE_Y_STEP;
         }
     }
 
@@ -1115,7 +1135,7 @@ void move_bug(struct bug_info *bug)
                     bag->state = BAG_INACTIVE; // Деактивировать мешок
 
                     // Стереть съеденный мешок или золото
-                    sp_put(bag->x_graph, bag->y_graph, sizeof(outline_bag_fall[0]), sizeof(outline_bag_fall) / sizeof(outline_bag_fall[0]), nullptr, (uint8_t *)outline_bag_fall);
+                    sp_4_15_mask(bag->x_graph, bag->y_graph, nullptr, outline_bag_fall[0]);
 
                     bug->wait++; // Задержать врага перед мешком
                 }
@@ -1665,7 +1685,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                         uint8_t *bag_outline = bag_outlines[count_rem]; // Указатель на маску
 
                         // Нарисовать спрайт раскачивающегося мешка (используя маску)
-                        sp_put(bag_x_graph, bag_y_graph, sizeof(image_bag[0]), sizeof(image_bag) / sizeof(image_bag[0]), bag_image, bag_outline);
+                        sp_4_15_mask(bag_x_graph, bag_y_graph, bag_image, bag_outline);
                     }
                 }
                 else
@@ -1698,7 +1718,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                 else
                 {
                     // В начале полёта стираем при помощи маски
-                    sp_put(bag->x_graph, bag->y_graph, sizeof(outline_bag_fall[0]), sizeof(outline_bag_fall) / sizeof(outline_bag_fall[0]), nullptr, (uint8_t *)outline_bag_fall);
+                    sp_4_15_mask(bag->x_graph, bag->y_graph, nullptr, outline_bag_fall[0]);
                 }
 
                 // Перемещаем мешок в новое положение по оси Y
@@ -1739,13 +1759,11 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                     if (bug->state != CREATURE_ALIVE) continue; // Пропустить неживых врагов
 
                     uint8_t bug_x_graph = bug->x_graph;
-                    uint8_t bug_abs_x_pos = bug_x_graph - FIELD_X_OFFSET;
-                    uint8_t bug_x_log = bug_abs_x_pos / POS_X_STEP;
 
                     // Сделать чтобы враги пытались убежать от летящего мешка
                     // Если враг находится на одной вертикальной линии с мешком и
                     // движется вверх, то изменить направление движения на движение вниз
-                    if (bug_x_log == bag_x_log && bug->dir == DIR_UP) bug->dir = DIR_DOWN;
+                    if (graph_to_x_log(bug_x_graph) == bag_x_log && bug->dir == DIR_UP) bug->dir = DIR_DOWN;
 
                     // Проверить, что враг попал под падающий мешок
                     if (check_collision_4_15(bug->x_graph, bug->y_graph, bag_x_graph, bag_y_graph + 8))
@@ -1881,20 +1899,10 @@ void process_missile()
             // sp_put(mis_x_graph, mis_y_graph, missile_x_size, missile_y_size, nullptr, (uint8_t *)outline_missile);
             sp_clear_brick(mis_x_graph, mis_y_graph, missile_x_size, missile_y_size);
 
-            // Переместить выстрел на один шаг в заданном направлении
-            static const struct
-            {
-                int8_t  x;
-                int8_t  y;
-            } dir_matrix[4] = {
-                { -2 * MOVE_X_STEP, 0  },
-                {  2 * MOVE_X_STEP, 0  },
-                {  0, -2 * MOVE_Y_STEP },
-                {  0,  2 * MOVE_Y_STEP }
-            } ;
-
-            mis_x_graph += dir_matrix[mis_dir].x;
-            mis_y_graph += dir_matrix[mis_dir].y;
+            // Переместить выстрел на один шаг в заданном направлении.
+            // Скорость выстрела вдвое выше скорости перемещения врагов и Диггера.
+            mis_x_graph += dir_dx[mis_dir] * (2 * MOVE_X_STEP);
+            mis_y_graph += dir_dy[mis_dir] * (2 * MOVE_Y_STEP);
 
             uint8_t explode = 0;
 
@@ -1957,20 +1965,14 @@ void process_missile()
                     mis_dir = man_dir;
 
                     // Определить начальное положение выстрела в зависимости от
-                    // координат Диггера и его направления движения
-                    static const struct
-                    {
-                        int16_t  x;
-                        int16_t  y;
-                    } dir_matrix[4] = {
-                        { -MOVE_X_STEP, MOVE_Y_STEP },
-                        {  4,  MOVE_Y_STEP },
-                        {  1, -MOVE_Y_STEP },
-                        {  1,  15 + MOVE_Y_STEP }
-                    } ;
+                    // координат Диггера и его направления движения.
+                    // Смещения нерегулярные (специфичные точки рождения снаряда
+                    // относительно спрайта Диггера), общую таблицу dir_d* не используем.
+                    static const int8_t fire_dx[4] = { -MOVE_X_STEP, 4, 1, 1 };
+                    static const int8_t fire_dy[4] = { MOVE_Y_STEP, MOVE_Y_STEP, -MOVE_Y_STEP, 15 + MOVE_Y_STEP };
 
-                    mis_x_graph = man_x_graph + dir_matrix[mis_dir].x;
-                    mis_y_graph = man_y_graph + dir_matrix[mis_dir].y;
+                    mis_x_graph = man_x_graph + fire_dx[mis_dir];
+                    mis_y_graph = man_y_graph + fire_dy[mis_dir];
 
                     // Вывести начальное положение спрайта выстрела
                     sp_put(mis_x_graph, mis_y_graph, missile_x_size, missile_y_size, (uint8_t *)image_missile[mis_image_phase], nullptr);
@@ -1989,7 +1991,7 @@ void man_rip();
 /**
  * @brief Съесть монету (драгоценный камень)
  */
-inline void eat_coin()
+static inline void eat_coin()
 {
     coin_snd = 7;  // Включить звук съедения монеты
     coin_time = 9; // Взвести таймер до последующего съедения монеты
@@ -2129,19 +2131,8 @@ void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
             if (man_dir != DIR_STOP)
             {
                 // Переместить Диггера на один шаг в заданном направлении
-                static const struct
-                {
-                    int16_t  x;
-                    int16_t  y;
-                } dir_matrix[4] = {
-                    { -MOVE_X_STEP, 0 },
-                    {  MOVE_X_STEP, 0 },
-                    { 0, -MOVE_Y_STEP },
-                    { 0,  MOVE_Y_STEP }
-                } ;
-
-                man_x_graph += dir_matrix[man_dir].x;
-                man_y_graph += dir_matrix[man_dir].y;
+                man_x_graph += dir_dx[man_dir] * MOVE_X_STEP;
+                man_y_graph += dir_dy[man_dir] * MOVE_Y_STEP;
             }
             else man_dir = man_prev_dir;
 
@@ -2213,12 +2204,7 @@ void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
                     gnaw(man_dir, prev_man_x_graph, prev_man_y_graph);
 
                     // Удалить монеты съеденные Диггером
-                    const uint8_t man_abs_x_pos = man_x_graph - FIELD_X_OFFSET;
-                    const uint8_t man_abs_y_pos = man_y_graph - FIELD_Y_OFFSET;
-                    const uint8_t man_x_log = man_abs_x_pos / POS_X_STEP;
-                    const uint8_t man_y_log = man_abs_y_pos / POS_Y_STEP;
-
-                    if (remove_coin(man_x_log, man_y_log))
+                    if (remove_coin(graph_to_x_log(man_x_graph), graph_to_y_log(man_y_graph)))
                     {
                         eat_coin();
                     }
@@ -2274,8 +2260,7 @@ void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
             }
 
             // Нарисовать перевёрнутого Диггера
-            sp_put(man_x_graph, man_y_graph, sizeof(image_digger_turned_over[0]), sizeof(image_digger_turned_over) / sizeof(image_digger_turned_over[0]),
-                   (uint8_t *)image_digger_turned_over, (uint8_t *)outline_digger_turned_over);
+            sp_4_15_mask(man_x_graph, man_y_graph, image_digger_turned_over[0], outline_digger_turned_over[0]);
 
             if (man_dead_bag->dir == DIR_STOP)
             {
@@ -2308,12 +2293,10 @@ void man_rip()
             // Анимация подпрыгивающего перевёрнутого Диггера
             if (prev_y_graph)
             {
-                sp_put(man_x_graph, prev_y_graph, sizeof(outline_digger_turned_over[0]), sizeof(outline_digger_turned_over) / sizeof(outline_digger_turned_over[0]),
-                    0, (uint8_t *)outline_digger_turned_over);
+                sp_4_15_mask(man_x_graph, prev_y_graph, nullptr, outline_digger_turned_over[0]);
             }
 
-            sp_put(man_x_graph, y_graph, sizeof(image_digger_turned_over[0]), sizeof(image_digger_turned_over) / sizeof(image_digger_turned_over[0]),
-                (uint8_t *)image_digger_turned_over, (uint8_t *)outline_digger_turned_over);
+            sp_4_15_mask(man_x_graph, y_graph, image_digger_turned_over[0], outline_digger_turned_over[0]);
 
             prev_y_graph = y_graph;
         }

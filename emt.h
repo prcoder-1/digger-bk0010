@@ -9,7 +9,7 @@
  * устанавливается режим передачи кодов по запросам рабочей программы,
  * устанавливается режим передачи кода 012 при нажатии клавиши "ввод".
   */
-inline void EMT_4()
+static inline void EMT_4()
 {
     asm volatile (
         "emt 04\n"
@@ -24,7 +24,7 @@ inline void EMT_4()
  *
  * @return код символа введённого с клавиатуры
 */
-inline char EMT_6()
+static inline char EMT_6()
 {
     char rv;
     asm volatile (
@@ -45,7 +45,7 @@ inline char EMT_6()
  * @param len_delim - ограничивающее условие (младший байт - максимальная длина строки,\
  * старший - ограничиваюший символ, который будет записан в строку последним)
  */
-inline void EMT_10(char *ptr, uint16_t len_delim)
+static inline void EMT_10(char *ptr, uint16_t len_delim)
 {
     asm volatile (
         "mov %0, r1\n\t"
@@ -65,7 +65,7 @@ inline void EMT_10(char *ptr, uint16_t len_delim)
  * @param key_num - номер ключа для программирования
  * @param ptr - указатель на строку, которой будет запрограммирован ключ
  */
-inline void EMT_12(uint8_t key_num, char *ptr)
+static inline void EMT_12(uint8_t key_num, char *ptr)
 {
     asm volatile (
         "mov %0, r0\n\t"
@@ -84,7 +84,7 @@ inline void EMT_12(uint8_t key_num, char *ptr)
  * установку системного порта в исходное состояние, установку скорости обмена
  * по линии 9600 бод. Стек в исходное состояние не устанавливается.
  */
-inline void EMT_14()
+static inline void EMT_14()
 {
     asm volatile (
         "emt 014\n"
@@ -100,7 +100,7 @@ inline void EMT_14()
  *
  * @param c - код символа или управляющий код
  */
-inline void EMT_16(char c)
+static inline void EMT_16(char c)
 {
     asm volatile (
         "mov %0, r0\n\t"
@@ -118,7 +118,7 @@ inline void EMT_16(char c)
  *
  * @param ptr - адрес последовательности (строки)
  */
-inline void EMT_20(const char *ptr)
+static inline void EMT_20(const char *ptr)
 {
     asm volatile (
         "mov %0, r1\n\t"
@@ -140,7 +140,7 @@ inline void EMT_20(const char *ptr)
  * @param ptr - адрес последовательности (строки)
  * @param len_delim - максимальная длина строки (младший байт) и символ-ограничитель (старший байт)
  */
-inline void EMT_20_l(const char *ptr, uint16_t len_delim)
+static inline void EMT_20_l(const char *ptr, uint16_t len_delim)
 {
     asm volatile (
         "mov %0, r1\n\t"
@@ -164,7 +164,7 @@ inline void EMT_20_l(const char *ptr, uint16_t len_delim)
  * @param c - код символа
  * @param pos - позиция символа
  */
-inline void EMT_22(char c, uint8_t pos)
+static inline void EMT_22(char c, uint8_t pos)
 {
     asm volatile (
         "mov %0, r0\n\t"
@@ -186,7 +186,7 @@ inline void EMT_22(char c, uint8_t pos)
  * @param x - координата X
  * @param y - координата Y
  */
-inline void EMT_24(uint8_t x, uint8_t y)
+static inline void EMT_24(uint8_t x, uint8_t y)
 {
     asm volatile (
         "mov %0, r1\n\t"
@@ -207,7 +207,7 @@ inline void EMT_24(uint8_t x, uint8_t y)
  * @param - адрес переменной для записи координаты X
  * @param - адрес переменной для записи координаты Y
  */
-inline void EMT_26(uint8_t *x, uint8_t *y)
+static inline void EMT_26(uint8_t *x, uint8_t *y)
 {
     asm volatile (
         "emt 026\n"
@@ -234,7 +234,7 @@ inline void EMT_26(uint8_t *x, uint8_t *y)
  * @param x - координата X
  * @param y - координата Y
  */
-inline void EMT_30(uint8_t w_e, uint8_t x, uint8_t y)
+static inline void EMT_30(uint8_t w_e, uint8_t x, uint8_t y)
 {
     asm volatile (
         "mov %0, r0\n\t"
@@ -264,7 +264,7 @@ inline void EMT_30(uint8_t w_e, uint8_t x, uint8_t y)
  * @param x - координата X
  * @param y - координата Y
  */
-inline void EMT_32(uint8_t w_e, uint8_t x, uint8_t y)
+static inline void EMT_32(uint8_t w_e, uint8_t x, uint8_t y)
 {
     asm volatile (
         "mov %0, r0\n\t"
@@ -316,7 +316,7 @@ union SSD
  *
  * @return SSD - слово состояния дисплея
  */
-inline union SSD EMT_34()
+static inline union SSD EMT_34()
 {
     union SSD rv;
     asm volatile (
@@ -349,7 +349,7 @@ inline union SSD EMT_34()
  *
  * @param ptr - указаьель на блок параметров драйвера магнитофона
  */
-inline void EMT_36(const char *ptr)
+static inline void EMT_36(const char *ptr)
 {
     asm volatile (
         "mov %0, r1\n\t"
@@ -422,7 +422,7 @@ enum EMT_40_speeds : uint8_t
  *
  * @param speed - Номер скорости обмена информацией
  */
-inline void EMT_40(enum EMT_40_speeds speed)
+static inline void EMT_40(enum EMT_40_speeds speed)
 {
     asm volatile (
         "mov %0, r0\n\t"
@@ -447,7 +447,7 @@ inline void EMT_40(enum EMT_40_speeds speed)
  *
  * @param byte - байт для передачи по линии
  */
-inline void EMT_42(uint8_t byte)
+static inline void EMT_42(uint8_t byte)
 {
     asm volatile (
         "mov %0, r0\n\t"
@@ -474,7 +474,7 @@ inline void EMT_42(uint8_t byte)
  *
  * @return uint8_t - байт принятый с линии
  */
-inline uint8_t EMT_44()
+static inline uint8_t EMT_44()
 {
     uint8_t rv;
     asm volatile (
@@ -496,7 +496,7 @@ inline uint8_t EMT_44()
  * @param len - длина массива
  *
  */
-inline void EMT_46(const uint8_t *ptr, uint16_t len)
+static inline void EMT_46(const uint8_t *ptr, uint16_t len)
 {
     asm volatile (
         "mov %0, r1\n\t"
@@ -515,7 +515,7 @@ inline void EMT_46(const uint8_t *ptr, uint16_t len)
  * @param ptr - указатель на память, куда будет приням массив с линии
  * @param len - длина массива
  */
-inline void EMT_50(uint8_t *ptr, uint16_t len)
+static inline void EMT_50(uint8_t *ptr, uint16_t len)
 {
     asm volatile (
         "mov %0, r1\n\t"
