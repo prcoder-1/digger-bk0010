@@ -131,21 +131,12 @@ struct bug_info
 
 /**
  * @brief Единичные шаги по направлениям (DIR_LEFT, DIR_RIGHT, DIR_UP, DIR_DOWN).
- *
- * Используются во всех функциях, нуждающихся только в смещении (-1/0/+1) по dx/dy:
- * move_bug, process_man, process_missile (полёт), erase_trail, gnaw.
- * Хранятся как глобальная таблица, чтобы избежать дублирования локальных
- * static const структур в каждой функции.
  */
 static const int8_t dir_dx[4] = { -1,  1,  0,  0 };
 static const int8_t dir_dy[4] = {  0,  0, -1,  1 };
 
 /**
  * @brief Поле состояний ячеек фона.
- *
- * Внутренняя размерность дополнена до 16 (W_MAX=15 + 1 байт), чтобы
- * индексация background[y][x] компилировалась как (y<<4)+x вместо вызова
- * __mulhi3 на умножение строки на 15.
  */
 uint8_t background[H_MAX][16];
 
@@ -344,7 +335,6 @@ void erase_4_15(uint16_t x_graph, uint16_t y_graph)
     }
 }
 
-
 /**
  * @brief Проверка соприкосновения (по расстояниям) по оси X и по оси Y
  */
@@ -354,11 +344,7 @@ int check_collision_4_15(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
 }
 
 /**
- * @brief Конверсия графической координаты X в логическую (номер клетки).
- *
- * Вынесено в не-inline функцию: при -Os компилятор реализует деление на 16
- * (POS_Y_STEP) циклом из 4 ROR — каждый call-site стоит ~14 байт. Замена
- * на jsr делает каждый сайт ~6 байт за счёт общего тела ~14 байт.
+ * @brief Преобразование графической координаты X в логическую (номер клетки).
  */
 static uint8_t graph_to_x_log(uint16_t x_graph)
 {
@@ -371,10 +357,7 @@ static uint8_t graph_to_y_log(uint16_t y_graph)
 }
 
 /**
- * @brief Обёртка над sp_put для спрайтов 4x15 с маской.
- *
- * Все спрайты mешка/перевёрнутого Диггера имеют размер 4x15. Вынос двух
- * константных аргументов в помощник убирает их push-и из 9 мест вызова.
+ * @brief Вызов sp_put для спрайтов 4x15 с маской.
  */
 static void sp_4_15_mask(uint16_t x, uint16_t y, const uint8_t *image, const uint8_t *outline)
 {
@@ -403,6 +386,7 @@ void bonus_indicator(uint16_t color);
  */
 void init_level_state()
 {
+    // Отключить бонус-режим
     bonus_state = BONUS_OFF;
 
     // Стереть вишенку
@@ -913,8 +897,6 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
  */
 void erase_trail(enum direction dir, uint16_t x_graph, uint16_t y_graph)
 {
-    // Смещение и размер прямоугольника-следа не выводятся напрямую из dir_d*.
-    // Сжато до int8_t, чтобы каждая запись занимала 4 байта вместо 6.
     static const int8_t trail_dx[4]   = {  4, -MOVE_X_STEP,  0,            0 };
     static const int8_t trail_dy[4]   = {  0,            0, 15, -MOVE_Y_STEP };
     static const uint8_t trail_w[4]   = { MOVE_X_STEP, MOVE_X_STEP, 4, 4 };
@@ -1093,7 +1075,6 @@ void move_bug(struct bug_info *bug)
                 else
                 {
                     // Если Ноббин коснулся мешка
-
                     switch (bag->state)
                     {
                         case BAG_STATIONARY: //  Если мешок стоит на месте
@@ -2318,18 +2299,18 @@ void man_rip()
     delay_ms(500);
 
     // TODO: Удалить врагов с которыми коллизия
-    // for (uint8_t i = 0; i < bugs_max; ++i)
-    // {
-    //     struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
-    //     if (!bugs_active) continue; // Пропустить неактивных врагов
-    //
-    //     // Проверить, что враг оказался рядом с могилкой
-    //     if (check_collision_4_15(man_x_graph, man_y_graph, bug->x_graph, bug->y_graph))
-    //     {
-    //         bug->count = 1;
-    //         bug->state = CREATURE_RIP; // Враг был убит выстрелом
-    //     }
-    // }
+    for (uint8_t i = 0; i < bugs_max; ++i)
+    {
+        struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
+        if (!bugs_active) continue; // Пропустить неактивных врагов
+
+        // Проверить, что враг оказался рядом с могилкой
+        if (check_collision_4_15(man_x_graph, man_y_graph, bug->x_graph, bug->y_graph))
+        {
+            bug->count = 1;
+            bug->state = CREATURE_RIP; // Враг был убит выстрелом
+        }
+    }
 
     // Траурный марш
     static const uint8_t music_dead_periods[]   = { C4 / NV, C4 / NV, C4 / NV, C4 / NV, DS4 / NV, D4 / NV, D4 / NV, C4 / NV, C4 / NV, B3 / NV, C4 / NV  };
@@ -2435,7 +2416,6 @@ void process_game_state()
         }
         else
         {
-#if !defined(DEBUG)
             constexpr uint16_t go_width = sizeof(game_over[0]);
             constexpr uint16_t go_height = sizeof(game_over) / go_width;
             constexpr uint16_t go_x = (SCREEN_BYTE_WIDTH - go_width) / 2;
@@ -2443,10 +2423,11 @@ void process_game_state()
 
             // Вывести надпись "Game Over"
             sp_clear_brick(go_x - 2 * MOVE_X_STEP, go_y - 2 * MOVE_Y_STEP, go_width + 4 * MOVE_X_STEP, go_height + 4 * MOVE_Y_STEP);
-//            sp_clear_brick(go_x - MOVE_X_STEP, go_y - MOVE_Y_STEP, go_width + 2 * MOVE_X_STEP, go_height + 2 * MOVE_Y_STEP);
             sp_put(go_x, go_y, go_width, go_height, (uint8_t *)game_over, 0);
-            delay_ms(5000);
-#endif
+            // delay_ms(500);
+
+            while(((union EXT_DEV *)REG_EXT_DEV)->bits.MAG_KEY);
+
             init_game(); // Установить игру в начальное состояние
         }
     }
