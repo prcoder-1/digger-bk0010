@@ -335,11 +335,12 @@ void erase_4_15(uint16_t x_graph, uint16_t y_graph)
 }
 
 /**
- * @brief Проверка соприкосновения (по расстояниям) по оси X и по оси Y
+ * @brief Проверка соприкосновения двух 4x15-спрайтов по их левым-верхним углам.
  */
 int check_collision_4_15(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
 {
-    return (abs16(x2 - x1) < 4) && (abs16(y2 - y1) < 15);
+    return ((uint16_t)((int)x2 - (int)x1 + 3) < 7u)
+        && ((uint16_t)((int)y2 - (int)y1 + 14) < 29u);
 }
 
 /**
@@ -1880,40 +1881,42 @@ void process_missile()
 
             // Проверить если координаты выходят за рамки игрового поля или впереди нету прохода
 
+            // Проверить попал ли выстрел во врага. Делается ДО check_path,
+            // иначе если снаряд достиг последней клетки тоннеля одновременно с врагом
+            // (стена впереди), check_path фейлит и враг остаётся живым.
+            for (uint8_t i = 0; i < bugs_max; ++i)
+            {
+                struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
+                if (bug->state != CREATURE_ALIVE) continue; //  Пропустить неживых врагов
+
+                // Проверить, что выстрел попал во врага
+                if (check_collision_4_15(mis_x_graph, mis_y_graph, bug->x_graph, bug->y_graph))
+                {
+                    explode = 1; // Взорвать выстрел
+                    bug->count = 1; // Чтобы CREATURE_RIP стёр врага на следующем тике, а не ждал старого счётчика
+                    bug->state = CREATURE_RIP; // Враг был убит выстрелом
+                    add_score_250(); // Добавить 250 очков за убитого врага
+
+                    // В бонус-режиме увеличить количество создаваемых врагов компенсируя убитых мешками
+                    if (bonus_state == BONUS_ON)
+                    {
+                        bugs_total++; // Увеличить количество создаваемых врагов
+                        bugs_active--; // Уменьшить количество активных врагов
+                    }
+                }
+            }
+
             if (!check_path(mis_dir, mis_x_graph, mis_y_graph))
             {
-                explode = 1; // Взорвать выстрел
+                explode = 1; // Взорвать выстрел - впереди стена/край
             }
-            else
+            else if (!explode)
             {
                 // Циклически менять фазу анимации выстрела
                 if (++mis_image_phase >= missile_phases_no) mis_image_phase = 0;
 
                 // Вывести новое изображение выстрела
                 sp_put(mis_x_graph, mis_y_graph, missile_x_size, missile_y_size, (uint8_t *)image_missile[mis_image_phase], nullptr);
-
-                // Проверить попал ли выстрел во врага
-                for (uint8_t i = 0; i < bugs_max; ++i)
-                {
-                    struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
-                    if (bug->state != CREATURE_ALIVE) continue; //  Пропустить неживых врагов
-
-                    // Проверить, что выстрел попал во врага
-                    if (check_collision_4_15(mis_x_graph, mis_y_graph, bug->x_graph, bug->y_graph))
-                    {
-                        explode = 1; // Взорвать выстрел
-                        bug->count = 1; // Чтобы CREATURE_RIP стёр врага на следующем тике, а не ждал старого счётчика
-                        bug->state = CREATURE_RIP; // Враг был убит выстрелом
-                        add_score_250(); // Добавить 250 очков за убитого врага
-
-                        // В бонус-режиме увеличить количество создаваемых врагов компенсируя убитых мешками
-                        if (bonus_state == BONUS_ON)
-                        {
-                            bugs_total++; // Увеличить количество создаваемых врагов
-                            bugs_active--; // Уменьшить количество активных врагов
-                        }
-                    }
-                }
             }
 
             if (explode)
