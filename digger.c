@@ -2261,9 +2261,7 @@ void man_rip()
         // Проверить, что враг оказался рядом с могилкой
         if (check_collision_4_15(man_x_graph, man_y_graph, bug->x_graph, bug->y_graph))
         {
-            bug->count = 1;
             bug->state = CREATURE_INACTIVE; // Декативировать врага убившего Диггера
-//            bug->state = CREATURE_RIP; // Враг был убит выстрелом
             erase_4_15(bug->x_graph, bug->y_graph); // Стереть деактивированного врага
         }
     }
