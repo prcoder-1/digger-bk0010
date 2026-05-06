@@ -326,12 +326,11 @@ void add_score_250()
  */
 void erase_4_15(uint16_t x_graph, uint16_t y_graph)
 {
-    uint16_t *ptr = (uint16_t *)MEM_VIDEO;
-    ptr += SCREEN_WORD_WIDTH * y_graph + x_graph / 2;
+    uint8_t *ptr = (uint8_t *)MEM_VIDEO + SCREEN_BYTE_WIDTH * y_graph + x_graph;
     for (uint16_t i = 0; i < 15; ++i)
     {
-        *(ptr + 1) = *ptr = 0;
-        ptr += SCREEN_WORD_WIDTH;
+        ptr[0] = ptr[1] = ptr[2] = ptr[3] = 0;
+        ptr += SCREEN_BYTE_WIDTH;
     }
 }
 
@@ -1911,6 +1910,7 @@ void process_missile()
                     if (check_collision_4_15(mis_x_graph, mis_y_graph, bug->x_graph, bug->y_graph))
                     {
                         explode = 1; // Взорвать выстрел
+                        bug->count = 1; // Чтобы CREATURE_RIP стёр врага на следующем тике, а не ждал старого счётчика
                         bug->state = CREATURE_RIP; // Враг был убит выстрелом
                         add_score_250(); // Добавить 250 очков за убитого врага
 
