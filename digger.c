@@ -412,7 +412,6 @@ void init_level_state()
         if ((bag->state == BAG_STATIONARY) && (bag->dir == DIR_STOP)) continue; // Пропустить стационарные мешки
 
         sp_4_15_mask(bag->x_graph, bag->y_graph, nullptr, outline_bag[0]); // Стереть мешок
-        // erase_4_15(bag->x_graph, bag->y_graph); // Стереть мешок
         bag->state = BAG_INACTIVE;
     }
 
@@ -1145,22 +1144,15 @@ void move_bug(struct bug_info *bug)
     // Отрисовка спрайта врага
     if (bug->type == BUG_NOBBIN)
     {
-        // Для Ноббина
         sp_4_15_put(bug->x_graph, bug->y_graph, (uint8_t *)image_nobbin[bug->image_phase]);
+    }
+    else if (bug->dir == DIR_RIGHT)
+    {
+        sp_4_15_put(bug->x_graph, bug->y_graph, (uint8_t *)image_hobbin_right[bug->image_phase]);
     }
     else
     {
-        // Для Хоббина
-        if (bug->dir == DIR_RIGHT)
-        {
-            // Смотрит вправо
-            sp_4_15_put(bug->x_graph, bug->y_graph, (uint8_t *)image_hobbin_right[bug->image_phase]);
-        }
-        else
-        {
-            // Смотрит влево (отзеркаленный правый)
-            sp_4_15_h_mirror_put(bug->x_graph, bug->y_graph, (uint8_t *)image_hobbin_right[bug->image_phase]);
-        }
+        sp_4_15_h_mirror_put(bug->x_graph, bug->y_graph, (uint8_t *)image_hobbin_right[bug->image_phase]);
     }
 }
 
@@ -2257,6 +2249,22 @@ void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
  */
 void man_rip()
 {
+    // TODO: Удалить врагов с которыми коллизия
+    for (uint8_t i = 0; i < bugs_max; ++i)
+    {
+        struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
+        if (!bugs_active) continue; // Пропустить неактивных врагов
+
+        // Проверить, что враг оказался рядом с могилкой
+        if (check_collision_4_15(man_x_graph, man_y_graph, bug->x_graph, bug->y_graph))
+        {
+            bug->count = 1;
+            bug->state = CREATURE_INACTIVE; // Декативировать врага убившего Диггера
+//            bug->state = CREATURE_RIP; // Враг был убит выстрелом
+            erase_4_15(bug->x_graph, bug->y_graph); // Стереть деактивированного врага
+        }
+    }
+
     // Последовательность высоты на которую подпрыгивает перевёрнутый Диггер
     static uint8_t bounce[8] = { 3, 5, 6, 6, 5, 4, 3, 0 };
 
@@ -2297,20 +2305,6 @@ void man_rip()
     }
 
     delay_ms(500);
-
-    // TODO: Удалить врагов с которыми коллизия
-    for (uint8_t i = 0; i < bugs_max; ++i)
-    {
-        struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
-        if (!bugs_active) continue; // Пропустить неактивных врагов
-
-        // Проверить, что враг оказался рядом с могилкой
-        if (check_collision_4_15(man_x_graph, man_y_graph, bug->x_graph, bug->y_graph))
-        {
-            bug->count = 1;
-            bug->state = CREATURE_RIP; // Враг был убит выстрелом
-        }
-    }
 
     // Траурный марш
     static const uint8_t music_dead_periods[]   = { C4 / NV, C4 / NV, C4 / NV, C4 / NV, DS4 / NV, D4 / NV, D4 / NV, C4 / NV, C4 / NV, B3 / NV, C4 / NV  };
