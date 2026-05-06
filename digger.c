@@ -1344,7 +1344,7 @@ void sound_effect()
 
     if (done_snd) // Звук завершения уровня
     {
-        static const uint8_t done_periods[] = { C5 / NV, E5 / NV, G5 / NV, D5 / NV, F5 / NV, A5 / NV, E5 / NV, G5 / NV, B5 / NV, C5 / 2 / NV};
+        static const uint8_t done_periods[] = { C5, E5, G5, D5, F5, A5, E5, G5, B5, C6 };
 
         for (uint16_t i = 0; i < sizeof(done_periods) / sizeof(done_periods[0]); ++i)
         {
@@ -2308,7 +2308,7 @@ void man_rip()
     delay_ms(500);
 
     // Траурный марш
-    static const uint8_t music_dead_periods[]   = { C4 / NV, C4 / NV, C4 / NV, C4 / NV, DS4 / NV, D4 / NV, D4 / NV, C4 / NV, C4 / NV, B3 / NV, C4 / NV  };
+    static const uint8_t music_dead_periods[]   = { C4, C4, C4, C4, DS4, D4, D4, C4, C4, B3, C4 };
     static const uint16_t music_dead_durations[] = { N6, NQ, NE, N6, NQ, NE, NQ, NE, NQ, NE, N12 };
 
     for (uint16_t i = 0; i < sizeof(music_dead_periods)/ sizeof(music_dead_periods[0]); ++i)
