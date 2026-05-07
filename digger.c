@@ -2311,21 +2311,33 @@ void man_rip()
     static const uint8_t music_dead_periods[]   = { C4, C4, C4, C4, DS4, D4, D4, C4, C4, B3, C4 };
     static const uint16_t music_dead_durations[] = { N6, NQ, NE, N6, NQ, NE, NQ, NE, NQ, NE, N12 };
 
+    // Фазы орисовки надгробного камня
+    static const uint8_t rip_frames[5][2] = {
+        { 10,  4 }, // верхушка надгробия только показалась
+        {  8,  6 },
+        {  6,  8 },
+        {  3, 11 },
+        {  1, 14 }, // полный надгробный камень
+    };
+
     for (uint16_t i = 0; i < sizeof(music_dead_periods)/ sizeof(music_dead_periods[0]); ++i)
     {
         uint8_t period = music_dead_periods[i];
         uint16_t duration = music_dead_durations[i];
         if (snd_effects) sound_vibrato(period, duration);
 
-        if (i < sizeof(image_rip) / sizeof(image_rip[0]))
+        if (i < sizeof(rip_frames) / sizeof(rip_frames[0]))
         {
-            sp_4_15_put(man_x_graph, man_y_graph, (uint8_t *)image_rip[i]);
+            sp_put(man_x_graph, man_y_graph + rip_frames[i][0], 4, rip_frames[i][1],
+                   (uint8_t *)image_rip, nullptr);
         }
 
         delay_ms(30);
     }
 
     erase_4_15(man_x_graph, man_y_graph); // Стереть надгробный камень
+
+    (void)*(volatile uint8_t *)REG_KEY_DATA;
 
     man_state = CREATURE_RIP;
 }
@@ -2422,6 +2434,7 @@ void process_game_state()
             // delay_ms(500);
 
             while(((union EXT_DEV *)REG_EXT_DEV)->bits.MAG_KEY);
+            (void)*(volatile uint8_t *)REG_KEY_DATA;
 
             init_game(); // Установить игру в начальное состояние
         }

@@ -93,10 +93,11 @@ extern const uint8_t image_bag_broke[3][15][4];
 // extern const uint8_t outline_bag_broke[3][15][4];
 
 /**
- * @brief Надгробный камень
+ * @brief Надгробный камень (полное изображение, 14 строк).
+ * Фазы восстания получаются выводом верхних K строк с y-смещением
+ * через sp_put - см. rip_frames в digger.c.
  */
-extern const uint8_t image_rip[5][15][4];
-// extern const uint8_t outline_rip[5][15][4];
+extern const uint8_t image_rip[14][4];
 
 /**
  * @brief Перевёрнутый Диггер
