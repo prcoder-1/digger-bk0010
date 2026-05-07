@@ -85,6 +85,25 @@ static inline void TRAP(const uint8_t trap_no)
 }
 
 /**
+ * @brief Очищает непрерывный блок памяти длиной words 16-битных слов нулями.
+ * Без вызова memset - компилируется в один короткий цикл (clr (r)+ / sob).
+ *
+ * @param ptr   - указатель на начало блока
+ * @param words - количество слов (>= 1, ноль превратит цикл в 65536 итераций)
+ */
+static inline void clr_words(void *ptr, uint16_t words)
+{
+    asm volatile (
+        "1:\n\t"
+        "clr (%[ptr])+\n\t"
+        "sob %[words], 1b\n"
+        : [ptr]"+r"(ptr), [words]"+r"(words)
+        :
+        : "cc", "memory"
+    );
+}
+
+/**
  * @brief Возвращает абсолютное значение 16-битного целого
  *
  * @param x - 16-битное целок
