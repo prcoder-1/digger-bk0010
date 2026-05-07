@@ -264,8 +264,6 @@ void print_dec(uint16_t number, uint16_t x_graph, uint16_t y_graph)
     char *ptr = &buf[sizeof(buf)];
     uint_to_str(number, &ptr);
 
-    // Распаковка цифры: для каждой строки берём 3 байт из digit_rows по индексу
-    // из digit_indices, складываем в локальный 36-байтовый буфер и отдаём sp_put.
     uint8_t digit_buf[row_n * row_w];
     for (uint8_t i = 0; i < sizeof(buf); ++i)
     {
