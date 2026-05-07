@@ -257,16 +257,29 @@ int remove_coin(uint8_t x_log, uint8_t y_log);
 void print_dec(uint16_t number, uint16_t x_graph, uint16_t y_graph)
 {
     constexpr char zero = '0';
+    constexpr uint16_t row_w = sizeof(digit_rows[0]);                 // 3 байта на строку
+    constexpr uint16_t row_n = sizeof(digit_indices[0]) / sizeof(digit_indices[0][0]); // 12 строк на цифру
     char buf[5] = { zero, zero, zero, zero, zero }; // Буфер для 5 десятичных знаков
 
     char *ptr = &buf[sizeof(buf)];
     uint_to_str(number, &ptr);
 
+    // Распаковка цифры: для каждой строки берём 3 байт из digit_rows по индексу
+    // из digit_indices, складываем в локальный 36-байтовый буфер и отдаём sp_put.
+    uint8_t digit_buf[row_n * row_w];
     for (uint8_t i = 0; i < sizeof(buf); ++i)
     {
-        uint16_t index = buf[i] - zero;
-        sp_put(x_graph, y_graph, sizeof(ch_digits[0][0]), sizeof(ch_digits[0]) / sizeof(ch_digits[0][0]), (uint8_t *)ch_digits[index], nullptr); // Вывести спрайт цифры
-        x_graph += sizeof(ch_digits[0][0]);
+        const uint8_t *idx_row = digit_indices[buf[i] - zero];
+        uint8_t *dst = digit_buf;
+        for (uint8_t r = 0; r < row_n; ++r)
+        {
+            const uint8_t *src = digit_rows[idx_row[r]];
+            *dst++ = *src++;
+            *dst++ = *src++;
+            *dst++ = *src;
+        }
+        sp_put(x_graph, y_graph, row_w, row_n, digit_buf, nullptr);
+        x_graph += row_w;
     }
 }
 
@@ -275,7 +288,7 @@ void print_dec(uint16_t number, uint16_t x_graph, uint16_t y_graph)
  */
 void print_lives()
 {
-    uint16_t man_x_offset = sizeof(ch_digits[0][0]) * 5 + 1; // Смещение шириной в пять символов '0' плюс один байт (4 пикселя)
+    uint16_t man_x_offset = sizeof(digit_rows[0]) * 5 + 1; // Смещение шириной в пять символов '0' плюс один байт (4 пикселя)
     constexpr uint16_t man_y_offset = SCREEN_Y_OFFSET + 2; // Смещение спрайта Диггера по оси Y
     constexpr uint16_t one_pos_width = sizeof(image_digger_right[1][0]) + 1; // Ширина спрайта Диггера плюс один байт
     constexpr uint16_t height = sizeof(image_digger_right[1]) / sizeof(image_digger_right[1][0]); // Высота спрайта Диггера
