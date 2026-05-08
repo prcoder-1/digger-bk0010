@@ -263,11 +263,11 @@ void init_demo()
 }
 
 // Длительность одного «кадра» демо в тактах таймера (23438 Гц).
-// 1200 тактов ≈ 51 мс кадра (≈20 fps). Бюджет должен с запасом покрыть
-// тяжёлую 3-спрайтовую фазу (Диггер с зеркалированием), чтобы во всех
-// случаях оставалось время ожидания и кадры были одинаковой длительности
-// независимо от количества спрайтов на экране.
-constexpr uint16_t FRAME_TICKS = 1200;
+// 400 тактов ≈ 17 мс (≈60 fps). Все спрайты теперь рисуются быстрым
+// sp_4_15_put (Диггер использует предзеркалированный image_digger_left
+// из ROM), поэтому даже 3-спрайтовая фаза укладывается в этот бюджет
+// с большим запасом, и кадры идут одинаковой длительности.
+constexpr uint16_t FRAME_TICKS = 400;
 
 uint16_t demo_time = 0;
 uint16_t nobbin_x = 0, nobbin_y = 0;
@@ -489,7 +489,10 @@ void process_demo_state()
         music_tick();
         sp_paint_brick_long(digger_x + image_width, digger_y, 1, image_height, 0);
         music_tick();
-        if (digger_mirror) sp_4_15_h_mirror_put(digger_x, digger_y, (uint8_t *)image_digger_right[image_phase]);
+        // Готовый зеркальный спрайт image_digger_left уже лежит в ROM —
+        // используем быстрый sp_4_15_put вместо sp_4_15_h_mirror_put,
+        // чтобы выкинуть `jsr pc, .l_mirror` из горячего цикла.
+        if (digger_mirror) sp_4_15_put(digger_x, digger_y, (uint8_t *)image_digger_left[image_phase]);
         else sp_4_15_put(digger_x, digger_y, (uint8_t *)image_digger_right[image_phase]);
     }
 

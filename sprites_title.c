@@ -114,99 +114,10 @@ void sp_4_15_put(uint16_t x, uint16_t y, const uint8_t *image)
     );
 }
 
-void sp_4_15_h_mirror_put(uint16_t x, uint16_t y, const uint8_t *image)
-{
-    asm(
-        "mov $040000, r4\n\t"
-        "mov %[y], r0\n\t"
-        "asl r0\n\t"
-        "asl r0\n\t"
-        "asl r0\n\t"
-        "asl r0\n\t"
-        "asl r0\n\t"
-        "asl r0\n\t"
-        "add r0, r4\n\t"
-        "add %[x], r4\n\t"
-        "add $4, r4\n\t"
-
-        "mov %[image], r3\n\t"
-        "mov $15, r2\n\t"
-
-        "bit r4, $1\n\t"
-        "beq .l2_%=\n"
-
-".l1_%=:\n\t"
-        "tstb @#0177712\n\t"
-        "bpl .l_mt1_%=\n\t"
-        "jsr pc, _music_service\n"
-".l_mt1_%=:\n\t"
-        "mov (r3)+, r0\n\t"
-        "jsr pc, .l_mirror_%=\n\t"
-        "movb r0, -(r4)\n\t"
-        "swab r0\n\t"
-        "movb r0, -(r4)\n\t"
-
-        "mov (r3)+, r0\n\t"
-        "jsr pc, .l_mirror_%=\n\t"
-        "movb r0, -(r4)\n\t"
-        "swab r0\n\t"
-        "movb r0, -(r4)\n\t"
-
-        "add $68, r4\n\t"
-        "sob r2, .l1_%=\n\t"
-        "br .lq_%=\n"
-
-".l2_%=:\n\t"
-        "tstb @#0177712\n\t"
-        "bpl .l_mt2_%=\n\t"
-        "jsr pc, _music_service\n"
-".l_mt2_%=:\n\t"
-        "mov (r3)+, r0\n\t"
-        "jsr pc, .l_mirror_%=\n\t"
-        "swab r0\n\t"
-        "mov r0, -(r4)\n\t"
-
-        "mov (r3)+, r0\n\t"
-        "jsr pc, .l_mirror_%=\n\t"
-        "swab r0\n\t"
-        "mov r0, -(r4)\n\t"
-
-        "add $68, r4\n\t"
-        "sob r2, .l2_%=\n\t"
-        "br .lq_%=\n"
-
-".l_mirror_%=:\n\t"
-        // 16-bit word mirror
-        "mov r0, r1\n\t"
-        "bic $0x3333, r1\n\t"
-        "bic r1, r0\n\t"
-        "asl r0\n\t"
-        "asl r0\n\t"
-        "clc\n\t"
-        "ror r1\n\t"
-        "ror r1\n\t"
-        "bis r1, r0\n\t"
-        "mov r0, r1\n\t"
-        "bic $0xF0F0, r1\n\t"
-        "bic r1, r0\n\t"
-        "asl r1\n\t"
-        "asl r1\n\t"
-        "asl r1\n\t"
-        "asl r1\n\t"
-        "clc\n\t"
-        "ror r0\n\t"
-        "ror r0\n\t"
-        "ror r0\n\t"
-        "ror r0\n\t"
-        "bis r1, r0\n\t"
-        "rts pc\n"
-
-".lq_%=:\n\t"
-        :
-        : [x]"g"(x), [y]"g"(y), [image]"m"(image)
-        : "r0", "r1", "r2", "r3", "r4", "cc", "memory"
-    );
-}
+// sp_4_15_h_mirror_put в title-сборке не нужен: Диггер рисуется через
+// предзеркалированные данные image_digger_left из ROM, поэтому
+// горячий цикл всегда использует быстрый sp_4_15_put. Версия из
+// sprites.c (для диггерной сборки) остаётся нетронутой.
 
 void sp_put(uint16_t x, uint16_t y, uint16_t x_width, uint16_t y_width, const uint8_t *image, const uint8_t *outline)
 {
