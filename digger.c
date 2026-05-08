@@ -379,10 +379,6 @@ static void sp_4_15_mask(uint16_t x, uint16_t y, const uint8_t *image, const uin
 
 /**
  * @brief Получение ячейки уровня по заданным координатам.
- *
- * Таблицы заменяют деление x_log на CELLS_PER_WORD=5 и умножение остатка на 3.
- * static inline, чтобы при вызове в цикле init_level gcc вынес общее
- * вычисление &level[level_no] из тела цикла.
  */
 static inline enum level_symbols getLevelSymbol(uint8_t y_log, uint8_t x_log)
 {
