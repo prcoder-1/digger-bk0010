@@ -32,7 +32,7 @@
 //   NW (d=16) → 2304 + 288·16 = 6912 тактов ≈ 295 мс
 // Это на ~20% медленнее «оригинального» темпа, что даёт более спокойный звук.
 #define SND_NOTE_BASE_CYCLES   2560u
-#define SND_NOTE_PER_DURATION  320u
+#define SND_NOTE_PER_DURATION  512u
 #define SND_GAP_CYCLES         1170u
 #define SND_END_PAUSE_CYCLES   30000u  // ~1.3 c паузы перед повтором мелодии
 
