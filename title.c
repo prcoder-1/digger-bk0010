@@ -10,36 +10,119 @@
 
 #define COIN_Y_OFFSET 3 // Смещение спрайта монетки в ячейке по оси Y
 
-void sound_tmr(uint16_t period, uint8_t durance, uint16_t count)
+// =====================================================================
+// Музыкальный движок «R5-полл» (звук одновременно с графикой).
+// Таймер БК настроен на полупериод текущей ноты; флаг FL служит триггером
+// смены состояния динамика. Опрос FL рассыпан по графическому коду (см.
+// music_tick), поэтому процессор одновременно рисует и формирует меандр.
+// =====================================================================
+
+#define SND_TIMER_MODE ((1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN)) // без предделителей: тик = 1/23438 c
+#define SND_DURATION_SCALE 4u   // полупериодов на единицу длительности из popcorn_durations
+#define SND_GAP            6u   // микропауза между нотами (тиков таймера)
+#define SND_END_PAUSE      512u // пауза после окончания мелодии перед повтором
+
+uint16_t snd_note_idx        = 0; // индекс текущей ноты в popcorn_periods/durations
+uint16_t snd_half_left       = 0; // сколько полупериодов остаётся для текущей ноты
+uint16_t snd_silence_left    = 0; // тиков таймера ещё длится тишина
+uint16_t snd_speaker         = 0; // текущее состояние бита динамика (0 или 0100)
+uint16_t snd_frame_ticks     = 0; // счётчик тиков таймера для тайминга кадров демо
+
+/**
+ * @brief Полный сервис одного события таймера.
+ *
+ * Вызывается из music_tick() только когда FL уже взведён.
+ * Снимает FL (повторной записью CSR), переключает динамик и продвигает
+ * состояние мелодии. Не возвращает признаков — состояние мелодии глобально.
+ *
+ * Не помечена static, чтобы её можно было вызывать из ассемблерных
+ * вставок в других файлах (sprites_title.c) по имени `_music_service`.
+ */
+__attribute__((noinline)) void music_service()
 {
+    volatile union TVE_CSR *csr = (volatile union TVE_CSR *)REG_TVE_CSR;
+    volatile uint16_t      *lim = (volatile uint16_t *)REG_TVE_LIMIT;
+    volatile uint16_t      *spk = (volatile uint16_t *)REG_EXT_DEV;
+
+    csr->reg = SND_TIMER_MODE; // снять FL и перезапустить отсчёт
+    snd_frame_ticks++;
+
+    if (snd_silence_left)
+    {
+        // Тишина между нотами / в конце мелодии — динамик не трогаем
+        snd_silence_left--;
+        return;
+    }
+
+    // Переключение динамика — собственно формирование меандра
+    snd_speaker ^= 0100;
+    *spk = snd_speaker;
+
+    if (--snd_half_left) return;
+
+    // Полупериоды текущей ноты исчерпаны — переход к следующей
+    uint8_t period = popcorn_periods[snd_note_idx];
+    if (!period)
+    {
+        // Конец мелодии — длинная пауза, потом начнём с нуля
+        snd_note_idx     = 0;
+        snd_silence_left = SND_END_PAUSE;
+        // Период держим прежний, чтобы тики продолжали приходить
+        return;
+    }
+
+    uint8_t duration = popcorn_durations[snd_note_idx];
+    snd_note_idx++;
+    snd_half_left    = (uint16_t)duration * SND_DURATION_SCALE;
+    snd_silence_left = SND_GAP;
+
+    *lim = period;             // новый полупериод тона
+    csr->reg = SND_TIMER_MODE; // перезапуск с новой LIMIT-уставкой
+}
+
+/**
+ * @brief Лёгкий тик музыки — основной способ опроса таймера.
+ *
+ * Если событие таймера ещё не пришло — три инструкции (tstb / bpl) и выход.
+ * Если пришло — переход на music_service. Дёшево, чтобы вызывать из тела
+ * любого графического цикла.
+ */
+static inline void music_tick()
+{
+    // Clobbers — только r0, r1: PDP-11 GCC ABI считает r2–r5 callee-save,
+    // а music_service сама сохраняет r2 в прологе. Без этого gcc выгружал
+    // r2–r5 в стек даже на быстром пути «нет события».
     asm volatile (
-        "movb %[durance], @%[REG_TVE_LIMIT]\n\t"
-        "mov %[TIMER_MODE], @%[REG_TVE_CSR]\n"
-        "mov %[period], r1\n\t"
-        "mov $0100, r2\n\t"
-        "clr r0\n\t"
-".l1_%=:\n\t"
-        "mov r1, r3\n\t"
-        "mov r0, @$-062\n"
-
-//         "bit $0100, r0\n\t"
-//         "beq .l2_%=\n\t"
-//         "sub %[count], r4\n\t"
-//         "br .l3_%=\n\t"
-// ".l2_%=:\n\t"
-//         "add %[count], r4\n\t"
-
-".l3_%=:\n\t"
-        "sob r3, .l3_%=\n\t"
-        "xor r2, r0\n\t"
-        "movb @%[REG_TVE_CSR], r3\n\t"
-        "tstb r3\n\t"
-        "bge .l1_%=\n\t"
+        "tstb @%[csr]\n\t"     // FL — старший бит CSR
+        "bpl .l_skip_%=\n\t"
+        "jsr pc, _music_service\n"
+".l_skip_%=:\n\t"
         :
-        : [period]"g"(period), [durance]"g"(durance), [count]"g"(count), [REG_TVE_LIMIT]"i"(REG_TVE_LIMIT), [REG_TVE_CSR]"i"(REG_TVE_CSR),
-          [TIMER_MODE]"i"((1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN) | (1 << TVE_CSR_D16) /*| (1 << TVE_CSR_D4)*/)
-        : "r0", "r1", "r2", "r3", "cc", "memory"
+        : [csr]"i"(REG_TVE_CSR)
+        : "r0", "r1", "cc", "memory"
     );
+}
+
+/**
+ * @brief Старт музыкального движка с первой ноты.
+ */
+void music_start()
+{
+    volatile union TVE_CSR *csr = (volatile union TVE_CSR *)REG_TVE_CSR;
+    volatile uint16_t      *lim = (volatile uint16_t *)REG_TVE_LIMIT;
+
+    snd_note_idx     = 0;
+    snd_silence_left = 0;
+    snd_speaker      = 0;
+    snd_frame_ticks  = 0;
+
+    uint8_t period   = popcorn_periods[0];
+    uint8_t duration = popcorn_durations[0];
+    snd_note_idx     = 1;
+    snd_half_left    = (uint16_t)duration * SND_DURATION_SCALE;
+
+    *lim = period;
+    csr->reg = SND_TIMER_MODE;
 }
 
 /**
@@ -60,6 +143,7 @@ void print_dec(uint16_t number, uint16_t x_graph, uint16_t y_graph)
     for (uint8_t i = 0; i < sizeof(buf); ++i)
     {
         uint16_t index = buf[i] - zero;
+        music_tick();
         sp_put(x_graph, y_graph, sizeof(ch_digits[0][0]), sizeof(ch_digits[0]) / sizeof(ch_digits[0][0]), (uint8_t *)ch_digits[index], nullptr); // Вывести спрайт цифры
         x_graph += sizeof(ch_digits[0][0]);
     }
@@ -80,6 +164,7 @@ void print_str(const char *str, uint16_t x_graph, uint16_t y_graph)
         if (c != ' ')
         {
             uint16_t index = c - 'A';
+            music_tick();
             sp_put(x_graph, y_graph, sizeof(ch_alpha[0][0]), sizeof(ch_alpha[0]) / sizeof(ch_alpha[0][0]), (uint8_t *)ch_alpha[index], nullptr); // Вывести спрайт буквы
         }
 
@@ -144,9 +229,10 @@ void init_demo()
     sp_paint_brick_long(0, y_pos, SCREEN_BYTE_WIDTH, 2, 0b01010101);
 }
 
-constexpr uint16_t note_duration = 10;
-constexpr uint16_t inter_note_delay = 1;
-constexpr uint16_t inter_music_delay = 512;
+// Длительность одного «кадра» демо в тиках музыкального таймера.
+// Тик = 1 полупериод текущей ноты, поэтому реальная wall-time длительность
+// слегка плавает с высотой тона, но это незаметно на анимации.
+constexpr uint16_t FRAME_TICKS = 8;
 
 uint16_t demo_time = 0;
 uint16_t nobbin_x = 0, nobbin_y = 0;
@@ -158,9 +244,6 @@ uint16_t cherry_x = 0, cherry_y = 0;
 bool hobbin_mirror, digger_mirror;
 uint8_t image_phase;        ///< Фаза анимации при выводе спрайта
 int8_t image_phase_inc = 1; ///< Направление изменения фазы анимации при выводе спрайта (+1 или -1)
-uint16_t *cur_music_ptr = nullptr;
-uint16_t note_duration_count = note_duration;
-uint16_t silence_count = 0;
 
 /**
  * @brief Обработка общего состояния игры (переход на новый уровень, Game Over и т.д.)
@@ -213,13 +296,10 @@ void process_demo_state()
     // Время до повтора демо
     constexpr uint16_t demo_restart_time = cherry_print_time + 256;
 
-    volatile uint16_t *t_limit = (volatile uint16_t *)REG_TVE_LIMIT;
-    volatile union TVE_CSR *tve_csr = (volatile union TVE_CSR *)REG_TVE_CSR;
-
-    uint16_t duration = popcorn_durations[note_index];
-
-    *t_limit = 48 - duration << 1;
-    tve_csr->reg = (1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN) | (1 << TVE_CSR_D4);
+    // Зафиксировать целевое значение счётчика тиков музыкального таймера —
+    // ровно через FRAME_TICKS событий FL мы выйдем из ожидания и считаем
+    // кадр сыгранным. Музыка тикает сама из music_tick().
+    uint16_t frame_target = snd_frame_ticks + FRAME_TICKS;
 
     switch (demo_time)
     {
@@ -354,20 +434,26 @@ void process_demo_state()
 
     if (nobbin_x)
     {
+        music_tick();
         sp_paint_brick_long(nobbin_x + image_width, nobbin_y, 1, image_height, 0);
+        music_tick();
         sp_4_15_put(nobbin_x, nobbin_y, (uint8_t *)image_nobbin[image_phase]);
     }
 
     if (hobbin_x)
     {
+        music_tick();
         sp_paint_brick_long(hobbin_x + image_width, hobbin_y, 1, image_height, 0);
+        music_tick();
         if (hobbin_mirror) sp_4_15_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_left[image_phase]);
         else sp_4_15_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_right[image_phase]);
     }
 
     if (digger_x)
     {
+        music_tick();
         sp_paint_brick_long(digger_x + image_width, digger_y, 1, image_height, 0);
+        music_tick();
         if (digger_mirror) sp_4_15_h_mirror_put(digger_x, digger_y, (uint8_t *)image_digger_right[image_phase]);
         else sp_4_15_put(digger_x, digger_y, (uint8_t *)image_digger_right[image_phase]);
     }
@@ -387,31 +473,9 @@ void process_demo_state()
         demo_time = 0;
     }
 
-    while ((tve_csr->reg & (1 << TVE_CSR_FL)) == 0); // Ожидать срабатывания таймера.
-
-    if (silence_count > 0)
-    {
-        silence_count--;
-        return;
-    }
-
-    if (--note_duration_count == 0)
-    {
-        note_duration_count = note_duration;
-        note_index++;
-        silence_count = inter_note_delay;
-        return;
-    }
-
-    uint8_t period = popcorn_periods[note_index];
-    if (!period)
-    {
-        note_index = 0;
-        silence_count = inter_music_delay;
-        return;
-    }
-
-    sound_tmr(period, duration << 3, note_duration_count);
+    // Кадровый тайминг: пока не накопилось FRAME_TICKS событий таймера —
+    // крутим music_tick(). Так в простое тоже звучит музыка, без блокировки.
+    while ((int16_t)(snd_frame_ticks - frame_target) < 0) music_tick();
 }
 
 extern void start();
@@ -432,6 +496,7 @@ void main()
     set_PSW(1 << PSW_I); // Замаскировать прерывания IRQ
     ((union KEY_STATE *)REG_KEY_STATE)->bits.INT_MASK = 1; // Отключить прерывание от клавиатуры
 
-    init_demo(); // Начальная инициализация игры
+    music_start(); // Запустить музыкальный движок (таймер и первая нота) — должен быть до init_demo, чтобы music_tick из print_str работал
+    init_demo();   // Начальная инициализация игры
     for (;;) process_demo_state(); // Основной бесконечный цикл демо
 }
