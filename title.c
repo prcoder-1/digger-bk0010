@@ -11,32 +11,44 @@
 #define COIN_Y_OFFSET 3 // Смещение спрайта монетки в ячейке по оси Y
 
 // =====================================================================
-// Музыкальный движок «R5-полл» (звук одновременно с графикой).
-// Таймер БК настроен на полупериод текущей ноты; флаг FL служит триггером
-// смены состояния динамика. Опрос FL рассыпан по графическому коду (см.
-// music_tick), поэтому процессор одновременно рисует и формирует меандр.
+// Музыкальный движок: аппаратное переключение динамика по FL + поллинг.
+//
+// LIMIT = полупериод текущей ноты, режим непрерывный с автоперезагрузкой.
+// Таймер сам выдерживает полупериод и выставляет FL — software только
+// успевает поймать FL и сделать XOR динамика. Это даёт чистый меандр.
+//
+// Чтобы за один длинный блиттер не накапливалось несколько FL-событий
+// (FL — однобитный, лишние события «теряются»), опрос music_tick встроен
+// прямо во внутренние циклы спрайтовых блиттеров (sprites.c, sprites_title.c).
+// Таким образом события ловятся не реже, чем раз в ≈30 тактов, и тайминг
+// мелодии не отстаёт от реального времени.
 // =====================================================================
 
-#define SND_TIMER_MODE ((1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN)) // без предделителей: тик = 1/23438 c
-#define SND_DURATION_SCALE 4u   // полупериодов на единицу длительности из popcorn_durations
-#define SND_GAP            6u   // микропауза между нотами (тиков таймера)
-#define SND_END_PAUSE      512u // пауза после окончания мелодии перед повтором
+#define SND_TIMER_MODE         ((1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN)) // без предделителей: 1 такт = 1/23438 c
+// Длительность ноты в тактах таймера (23438 Гц) — формула 1:1 с оригиналом.
+// `10 * (48 + 6*duration)` D4-тактов = (1920 + 240*duration) базовых тактов:
+// NE≈102 мс, NQ≈123 мс, NW≈246 мс — независимо от высоты ноты.
+#define SND_NOTE_BASE_CYCLES   1920u
+#define SND_NOTE_PER_DURATION  240u
+#define SND_GAP_CYCLES         400u    // ~17 мс паузы между нотами
+#define SND_END_PAUSE_CYCLES   30000u  // ~1.3 c паузы перед повтором мелодии
 
-uint16_t snd_note_idx        = 0; // индекс текущей ноты в popcorn_periods/durations
-uint16_t snd_half_left       = 0; // сколько полупериодов остаётся для текущей ноты
-uint16_t snd_silence_left    = 0; // тиков таймера ещё длится тишина
-uint16_t snd_speaker         = 0; // текущее состояние бита динамика (0 или 0100)
-uint16_t snd_frame_ticks     = 0; // счётчик тиков таймера для тайминга кадров демо
+uint16_t snd_note_idx       = 0; // индекс текущей ноты в popcorn_periods/durations
+uint16_t snd_period         = 1; // полупериод текущей ноты в тактах таймера (= LIMIT)
+uint16_t snd_cycles_left    = 0; // тактов до конца текущей ноты
+uint16_t snd_silence_cycles = 0; // тактов до конца межнотной паузы
+uint16_t snd_speaker        = 0; // текущее состояние бита динамика (0 или 0100)
+uint16_t snd_frame_ticks    = 0; // абсолютная wall-time-метка в тактах для пейсинга кадров демо
 
 /**
- * @brief Полный сервис одного события таймера.
+ * @brief Сервис одного события таймера.
  *
- * Вызывается из music_tick() только когда FL уже взведён.
- * Снимает FL (повторной записью CSR), переключает динамик и продвигает
- * состояние мелодии. Не возвращает признаков — состояние мелодии глобально.
+ * Вызывается из music_tick() только когда FL уже взведён. Снимает FL
+ * (повторной записью CSR), переключает динамик и продвигает состояние
+ * мелодии на один полупериод.
  *
- * Не помечена static, чтобы её можно было вызывать из ассемблерных
- * вставок в других файлах (sprites_title.c) по имени `_music_service`.
+ * Не помечена static, чтобы её можно было вызывать из ассемблерных вставок
+ * в других файлах (sprites.c, sprites_title.c) по имени `_music_service`.
  */
 __attribute__((noinline)) void music_service()
 {
@@ -44,54 +56,53 @@ __attribute__((noinline)) void music_service()
     volatile uint16_t      *lim = (volatile uint16_t *)REG_TVE_LIMIT;
     volatile uint16_t      *spk = (volatile uint16_t *)REG_EXT_DEV;
 
-    csr->reg = SND_TIMER_MODE; // снять FL и перезапустить отсчёт
-    snd_frame_ticks++;
+    csr->reg = SND_TIMER_MODE; // снять FL, перезапустить отсчёт
+    snd_frame_ticks += snd_period;
 
-    if (snd_silence_left)
+    if (snd_cycles_left)
     {
-        // Тишина между нотами / в конце мелодии — динамик не трогаем
-        snd_silence_left--;
+        // Активная нота — щёлкаем динамик аппаратно-точно (на каждое FL)
+        snd_speaker ^= 0100;
+        *spk = snd_speaker;
+        if (snd_cycles_left > snd_period) { snd_cycles_left -= snd_period; return; }
+        // Нота закончилась — заглушить динамик и уйти в межнотную паузу
+        snd_cycles_left    = 0;
+        snd_speaker        = 0;
+        *spk               = 0;
+        snd_silence_cycles = SND_GAP_CYCLES;
         return;
     }
 
-    // Переключение динамика — собственно формирование меандра
-    snd_speaker ^= 0100;
-    *spk = snd_speaker;
+    if (snd_silence_cycles > snd_period) { snd_silence_cycles -= snd_period; return; }
+    snd_silence_cycles = 0;
 
-    if (--snd_half_left) return;
-
-    // Полупериоды текущей ноты исчерпаны — переход к следующей
-    uint8_t period = popcorn_periods[snd_note_idx];
-    if (!period)
+    // Загрузить следующую ноту
+    uint8_t next_period = popcorn_periods[snd_note_idx];
+    if (!next_period)
     {
-        // Конец мелодии — длинная пауза, потом начнём с нуля
-        snd_note_idx     = 0;
-        snd_silence_left = SND_END_PAUSE;
-        // Период держим прежний, чтобы тики продолжали приходить
+        // Конец мелодии — длинная пауза, потом начнём сначала
+        snd_note_idx       = 0;
+        snd_silence_cycles = SND_END_PAUSE_CYCLES;
         return;
     }
 
-    uint8_t duration = popcorn_durations[snd_note_idx];
+    uint8_t duration   = popcorn_durations[snd_note_idx];
     snd_note_idx++;
-    snd_half_left    = (uint16_t)duration * SND_DURATION_SCALE;
-    snd_silence_left = SND_GAP;
+    snd_cycles_left    = SND_NOTE_BASE_CYCLES + (uint16_t)duration * SND_NOTE_PER_DURATION;
+    snd_period         = next_period;
 
-    *lim = period;             // новый полупериод тона
-    csr->reg = SND_TIMER_MODE; // перезапуск с новой LIMIT-уставкой
+    *lim = next_period;
+    csr->reg = SND_TIMER_MODE;
 }
 
 /**
- * @brief Лёгкий тик музыки — основной способ опроса таймера.
+ * @brief Лёгкий тик музыки. Быстрый путь — две инструкции (tstb / bpl).
  *
- * Если событие таймера ещё не пришло — три инструкции (tstb / bpl) и выход.
- * Если пришло — переход на music_service. Дёшево, чтобы вызывать из тела
- * любого графического цикла.
+ * Если FL не взведён — три такта и выход. Если взведён — переход на
+ * music_service. Дёшево, чтобы вызывать из тела любого графического цикла.
  */
 static inline void music_tick()
 {
-    // Clobbers — только r0, r1: PDP-11 GCC ABI считает r2–r5 callee-save,
-    // а music_service сама сохраняет r2 в прологе. Без этого gcc выгружал
-    // r2–r5 в стек даже на быстром пути «нет события».
     asm volatile (
         "tstb @%[csr]\n\t"     // FL — старший бит CSR
         "bpl .l_skip_%=\n\t"
@@ -110,18 +121,21 @@ void music_start()
 {
     volatile union TVE_CSR *csr = (volatile union TVE_CSR *)REG_TVE_CSR;
     volatile uint16_t      *lim = (volatile uint16_t *)REG_TVE_LIMIT;
+    volatile uint16_t      *spk = (volatile uint16_t *)REG_EXT_DEV;
 
-    snd_note_idx     = 0;
-    snd_silence_left = 0;
-    snd_speaker      = 0;
-    snd_frame_ticks  = 0;
+    *spk = 0;
 
-    uint8_t period   = popcorn_periods[0];
-    uint8_t duration = popcorn_durations[0];
-    snd_note_idx     = 1;
-    snd_half_left    = (uint16_t)duration * SND_DURATION_SCALE;
+    snd_silence_cycles = 0;
+    snd_speaker        = 0;
+    snd_frame_ticks    = 0;
 
-    *lim = period;
+    uint8_t period     = popcorn_periods[0];
+    uint8_t duration   = popcorn_durations[0];
+    snd_note_idx       = 1;
+    snd_period         = period;
+    snd_cycles_left    = SND_NOTE_BASE_CYCLES + (uint16_t)duration * SND_NOTE_PER_DURATION;
+
+    *lim     = period;
     csr->reg = SND_TIMER_MODE;
 }
 
@@ -229,10 +243,9 @@ void init_demo()
     sp_paint_brick_long(0, y_pos, SCREEN_BYTE_WIDTH, 2, 0b01010101);
 }
 
-// Длительность одного «кадра» демо в тиках музыкального таймера.
-// Тик = 1 полупериод текущей ноты, поэтому реальная wall-time длительность
-// слегка плавает с высотой тона, но это незаметно на анимации.
-constexpr uint16_t FRAME_TICKS = 8;
+// Длительность одного «кадра» демо в тактах таймера (23438 Гц).
+// 400 тактов ≈ 17 мс — близко к среднему кадру оригинала.
+constexpr uint16_t FRAME_TICKS = 400;
 
 uint16_t demo_time = 0;
 uint16_t nobbin_x = 0, nobbin_y = 0;
@@ -296,9 +309,9 @@ void process_demo_state()
     // Время до повтора демо
     constexpr uint16_t demo_restart_time = cherry_print_time + 256;
 
-    // Зафиксировать целевое значение счётчика тиков музыкального таймера —
-    // ровно через FRAME_TICKS событий FL мы выйдем из ожидания и считаем
-    // кадр сыгранным. Музыка тикает сама из music_tick().
+    // Зафиксировать целевое значение счётчика — snd_frame_ticks набегает по
+    // snd_period за каждое FL-событие; через FRAME_TICKS «тактов таймера»
+    // выйдем из ожидания и считаем кадр сыгранным.
     uint16_t frame_target = snd_frame_ticks + FRAME_TICKS;
 
     switch (demo_time)
@@ -473,7 +486,7 @@ void process_demo_state()
         demo_time = 0;
     }
 
-    // Кадровый тайминг: пока не накопилось FRAME_TICKS событий таймера —
+    // Кадровый тайминг: пока snd_frame_ticks не дошёл до frame_target —
     // крутим music_tick(). Так в простое тоже звучит музыка, без блокировки.
     while ((int16_t)(snd_frame_ticks - frame_target) < 0) music_tick();
 }
