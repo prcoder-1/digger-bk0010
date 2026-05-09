@@ -61,7 +61,7 @@ const uint8_t popcorn_durations[] = {
         0
 };
 
- // Музыка для режима "Бонус"
+// Музыка для режима "Бонус"
 const uint8_t bonus_periods[] = {
     C4, C4, C4, C4, C4, C4, C4, C4, F4, G4, A4,
     C4, C4, C4, C4, C4, C4, F4, A4, G4, E4, C4,

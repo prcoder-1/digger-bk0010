@@ -2,7 +2,6 @@
 #include <stdint.h>
 
 #define N 83u // Делитель периодов нот
-#define NV 4u // Дополнительный делитель для звуковой процедуры "вибрато"
 
 // Периоды нот
 #define	C3	(9122u / N)
@@ -66,4 +65,4 @@ extern const uint8_t popcorn_durations[];
 
 // Музыка для режима "Бонус"
 extern const uint8_t bonus_periods[];
-extern const uint8_t popcorn_durations[];
+extern const uint8_t bonus_durations[];
