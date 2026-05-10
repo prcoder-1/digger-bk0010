@@ -60,9 +60,16 @@ void music_service()
     {
         uint16_t progress = snd_cycles_total - snd_cycles_left;
         uint16_t env_raw  = (progress < snd_cycles_left) ? progress : snd_cycles_left;
-        uint16_t on_dur   = env_raw >> 6;
-        if (on_dur > snd_period) on_dur = snd_period;
-        if (on_dur < 1)          on_dur = 1;
+        // Огибающая на 16 уровней. Шаг env_step меняется каждые 128 тактов
+        // прогресса (~5.5 мс). on_dur = snd_period × env_step / 32, что даёт
+        // максимальную скважность 25 % (= half-square). Выход на «полный
+        // квадрат» 50 % исключён — это и был источник металлической резкости
+        // в плато ноты. На 1-битном динамике это самое мягкое, что возможно
+        // без аппаратного ЦАП.
+        uint16_t env_step = env_raw >> 7;
+        if (env_step > 16) env_step = 16;
+        uint16_t on_dur = (snd_period * env_step) >> 5;
+        if (on_dur < 1) on_dur = 1;
 
         snd_speaker ^= 0100;
         *spk = snd_speaker;
