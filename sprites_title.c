@@ -34,6 +34,12 @@ void title_sp_clear_strip(uint16_t x, uint16_t y, uint16_t height)
 ".loop_%=:\n\t"
         "clrb (r4)+\n\t"
         "add $63, r4\n\t"
+        // Подкладка nop-ами: цикл шире (~30 циклов) ближе к остальным
+        // полленг-точкам, чтобы дисперсия задержки FL→service была одинаковой
+        // во всех фазах работы (с/без спрайтов на экране).
+        "nop\n\t"
+        "nop\n\t"
+        "nop\n\t"
         POLL_FL
         "sob r2, .loop_%=\n\t"
         :

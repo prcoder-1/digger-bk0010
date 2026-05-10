@@ -11,12 +11,16 @@
 
 #define SND_TIMER_MODE         ((1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN)) // без предделителей: 1 такт = 1/23438 c
 // Длительность ноты в тактах таймера (23438 Гц).
-#define SND_GAP_CYCLES         2344u
+// Короткая «пауза» между нотами — 12 мс. Совместно с PWM-огибающей даёт
+// плавный лигато: конец предыдущей ноты затухает, динамик коротко молчит,
+// следующая нота нарастает.
+#define SND_GAP_CYCLES         280u
 #define SND_END_PAUSE_CYCLES   (2 * 23438u)
 
 uint16_t snd_note_idx       = 0; // индекс текущей ноты в popcorn_periods/durations
 uint16_t snd_period         = 1; // средний полупериод текущей ноты в тактах таймера
 uint16_t snd_cycles_left    = 0; // тактов до конца текущей ноты
+uint16_t snd_cycles_total   = 0; // полная длительность текущей ноты (для расчёта огибающей)
 uint16_t snd_silence_cycles = 0; // тактов до конца межнотной паузы
 uint16_t snd_speaker        = 0; // текущее состояние бита динамика (0 или 0100)
 uint16_t snd_frame_ticks    = 0; // абсолютная wall-time-метка в тактах для пейсинга кадров демо
@@ -41,15 +45,31 @@ void music_service()
     volatile uint16_t      *spk = (volatile uint16_t *)REG_EXT_DEV;
 
     // === HOT PATH: активная нота продолжается ===
-    // В режиме "непрерывный счёт с перезагрузкой" (OS=0) счётчик сам идёт
-    // и перезаряжается из LIMIT при переполнении. LIMIT уже выставлен в
-    // ветке загрузки ноты и за время ноты не меняется, поэтому здесь его
-    // не трогаем — ровно как и счётчик. Делаем минимум: щелчок динамика и
-    // снятие FL через bicb (ни один другой бит CSR не задеваем).
+    // PWM-огибающая: на 1-битном динамике "громкость" задаётся не амплитудой
+    // (она всегда +V/-V), а скважностью прямоугольника. При duty=50% (ON_dur =
+    // OFF_dur = snd_period) — максимум фундаментальной гармоники. Сужая ON_dur
+    // до 1 такта, фундаментальная амплитуда падает до ~sin(pi/(2·snd_period)),
+    // что слышится как тихий звук. Период = ON+OFF держим равным 2·snd_period,
+    // так что высота ноты не уплывает.
+    //
+    // Огибающая — треугольник: env_raw = min(progress, remaining) растёт от 0
+    // до cycles_total/2 в середине ноты и убывает обратно к 0 в конце.
+    // Сдвигаем на 5 (делим на 32) и клампим до snd_period — получается:
+    // короткая атака → плато на полной громкости → симметричный спад.
     if (snd_cycles_left > snd_period)
     {
+        uint16_t progress = snd_cycles_total - snd_cycles_left;
+        uint16_t env_raw  = (progress < snd_cycles_left) ? progress : snd_cycles_left;
+        uint16_t on_dur   = env_raw >> 5;
+        if (on_dur > snd_period) on_dur = snd_period;
+        if (on_dur < 1)          on_dur = 1;
+
         snd_speaker ^= 0100;
         *spk = snd_speaker;
+        // Длина текущей полупериода зависит от того, ON это или OFF.
+        // Для ON-фазы — on_dur, для OFF-фазы — (2·snd_period − on_dur).
+        // Сумма всегда 2·snd_period, поэтому фундаментальная частота не меняется.
+        *lim = (snd_speaker & 0100) ? on_dur : ((snd_period << 1) - on_dur);
         asm volatile ("bicb $0200, @%[csr]" : : [csr]"i"(REG_TVE_CSR) : "cc", "memory");
         snd_cycles_left -= snd_period;
         snd_frame_ticks += snd_period;
@@ -63,6 +83,13 @@ void music_service()
     {
         snd_speaker        = 0;
         *spk               = 0;             // погасить динамик одной записью
+        // Восстанавливаем LIMIT = snd_period: в горячем пути PWM мы пишем
+        // в *lim значение on_dur / (2·snd_period − on_dur), которое почти
+        // никогда не равно snd_period. Если уйти в silence-фазу с этим
+        // «случайным» LIMIT, csr->reg = SND_TIMER_MODE рестартит счётчик
+        // с ним — и пауза идёт на чужой частоте (часто во много раз быстрее).
+        // Это и звучит как «выплёвывание» нот.
+        *lim               = snd_period;
         csr->reg           = SND_TIMER_MODE;
         snd_cycles_left    = 0;
         snd_silence_cycles = SND_GAP_CYCLES;
@@ -91,8 +118,9 @@ void music_service()
 
     uint8_t duration = popcorn_durations[snd_note_idx];
     snd_note_idx++;
-    snd_cycles_left = (uint16_t)duration << 11;
-    snd_period      = next_period;
+    snd_cycles_left  = (uint16_t)duration << 11;
+    snd_cycles_total = snd_cycles_left;             // запомнили полную длительность для огибающей
+    snd_period       = next_period;
 
     // Единственный рестарт таймера в этой ветке — с новым LIMIT.
     *lim     = next_period;
