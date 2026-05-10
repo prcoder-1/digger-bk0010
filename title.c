@@ -60,7 +60,7 @@ void music_service()
     {
         uint16_t progress = snd_cycles_total - snd_cycles_left;
         uint16_t env_raw  = (progress < snd_cycles_left) ? progress : snd_cycles_left;
-        uint16_t on_dur   = env_raw >> 5;
+        uint16_t on_dur   = env_raw >> 6;
         if (on_dur > snd_period) on_dur = snd_period;
         if (on_dur < 1)          on_dur = 1;
 
