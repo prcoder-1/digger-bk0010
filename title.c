@@ -455,7 +455,16 @@ void process_demo_state()
         demo_time = 0;
     }
 
-    while ((int16_t)(snd_frame_ticks - frame_target) < 0) MUSIC_TICK();
+    // Подгонка интервала между MUSIC_TICK в этом цикле к интервалам внутри
+    // спрайтовых рутин (~25-30 циклов). Без этого polling-loop поллит таймер
+    // плотнее, чем рисование, и средняя полленг-задержка отличается между
+    // фазой "только polling-loop" (нет спрайтов на экране) и фазой "рисование +
+    // polling-loop" (есть спрайты), что проявляется как разница в дрожании.
+    while ((int16_t)(snd_frame_ticks - frame_target) < 0)
+    {
+        MUSIC_TICK();
+        asm volatile ("nop\n\tnop\n\tnop\n\tnop");
+    }
 }
 
 extern void start();
