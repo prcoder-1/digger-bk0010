@@ -23,6 +23,16 @@ uint16_t snd_frame_ticks    = 0; // абсолютная wall-time-метка в
 
 /**
  * @brief Сервис одного события таймера.
+ *
+ * Горячий путь (активная нота продолжается) идёт первой ветвью без
+ * предварительных операций над глобалами — щелчок и рестарт таймера
+ * выполняются в первые ~10 инструкций после входа, чтобы джиттер
+ * полупериода зависел только от полленг-задержки на стороне вызова.
+ *
+ * На смене ноты — ровно один csr->reg = SND_TIMER_MODE с уже новым
+ * LIMIT (раньше было два: первый в начале функции с *старым* LIMIT,
+ * через ~80 циклов второй с новым; это давало одну заметно
+ * растянутую полуволну в момент каждой смены ноты).
  */
 void music_service()
 {
@@ -30,53 +40,64 @@ void music_service()
     volatile uint16_t      *lim = (volatile uint16_t *)REG_TVE_LIMIT;
     volatile uint16_t      *spk = (volatile uint16_t *)REG_EXT_DEV;
 
-    csr->reg = SND_TIMER_MODE; // снять FL, перезапустить отсчёт
-    snd_frame_ticks += snd_period;
+    // === HOT PATH: активная нота продолжается ===
+    if (snd_cycles_left > snd_period)
+    {
+        snd_speaker ^= 0100;
+        *spk          = snd_speaker;
+        *lim          = snd_period;         // обновляем LIMIT (используется при следующей авто-перезагрузке)
+        // Снимаем ТОЛЬКО бит FL, не трогая остальные биты CSR. В режиме
+        // "непрерывный счёт с перезагрузкой" (OS=0) счётчик продолжает идти
+        // и сам перезаряжается из LIMIT при переполнении — ручной рестарт
+        // через `csr->reg = …` не нужен и вреден: он сбрасывает счётчик в
+        // момент сервиса и делает реальный полупериод равным
+        // snd_period + полленг_задержка, что и слышалось как «фальшь».
+        asm volatile ("bicb $0200, @%[csr]" : : [csr]"i"(REG_TVE_CSR) : "cc", "memory");
+        snd_cycles_left -= snd_period;
+        snd_frame_ticks += snd_period;
+        return;
+    }
 
+    snd_frame_ticks += snd_period;          // учли только что прошедший отсчёт
+
+    // === Активная нота кончается на этом тике ===
     if (snd_cycles_left)
     {
-        // Активная нота — щёлкаем динамик аппаратно-точно (на каждое FL)
-        snd_speaker ^= 0100;
-        *spk = snd_speaker;
-        *lim = snd_period; // - SND_VIB_AMP + (snd_vib_phase & SND_VIB_MASK);
-
-        if (snd_cycles_left > snd_period)
-        {
-            snd_cycles_left -= snd_period;
-            return;
-        }
-
-        // Нота закончилась — заглушить динамик и уйти в межнотную паузу
-        snd_cycles_left    = 0;
         snd_speaker        = 0;
-        *spk               = 0;
+        *spk               = 0;             // погасить динамик одной записью
+        csr->reg           = SND_TIMER_MODE;
+        snd_cycles_left    = 0;
         snd_silence_cycles = SND_GAP_CYCLES;
         return;
     }
 
+    // === Межнотная пауза ===
     if (snd_silence_cycles > snd_period)
     {
+        csr->reg            = SND_TIMER_MODE;
         snd_silence_cycles -= snd_period;
         return;
     }
-
     snd_silence_cycles = 0;
 
-    // Загрузить следующую ноту
+    // === Загрузка следующей ноты ===
     uint8_t next_period = popcorn_periods[snd_note_idx];
     if (!next_period)
     {
+        // Конец мелодии — длинная пауза, потом сначала
         snd_note_idx       = 0;
         snd_silence_cycles = SND_END_PAUSE_CYCLES;
+        csr->reg           = SND_TIMER_MODE;
         return;
     }
 
-    uint8_t duration   = popcorn_durations[snd_note_idx];
+    uint8_t duration = popcorn_durations[snd_note_idx];
     snd_note_idx++;
-    snd_cycles_left    = (uint16_t)duration << 11;
-    snd_period         = next_period;
+    snd_cycles_left = (uint16_t)duration << 11;
+    snd_period      = next_period;
 
-    *lim = next_period;
+    // Единственный рестарт таймера в этой ветке — с новым LIMIT.
+    *lim     = next_period;
     csr->reg = SND_TIMER_MODE;
 }
 
@@ -382,22 +403,28 @@ void process_demo_state()
     if (nobbin_x)
     {
         title_sp_paint_brick_long(nobbin_x + image_width, nobbin_y, 1, image_height, 0);
+        music_tick();
         title_sp_4_15_put(nobbin_x, nobbin_y, (uint8_t *)image_nobbin[image_phase]);
     }
+    music_tick();
 
     if (hobbin_x)
     {
         title_sp_paint_brick_long(hobbin_x + image_width, hobbin_y, 1, image_height, 0);
+        music_tick();
         if (hobbin_mirror) title_sp_4_15_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_left[image_phase]);
         else title_sp_4_15_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_right[image_phase]);
     }
+    music_tick();
 
     if (digger_x)
     {
         title_sp_paint_brick_long(digger_x + image_width, digger_y, 1, image_height, 0);
+        music_tick();
         if (digger_mirror) title_sp_4_15_put(digger_x, digger_y, (uint8_t *)image_digger_left[image_phase]);
         else title_sp_4_15_put(digger_x, digger_y, (uint8_t *)image_digger_right[image_phase]);
     }
+    music_tick();
 
     if (!(demo_time & 7))
     {
