@@ -100,7 +100,26 @@ void music_service()
 }
 
 /**
- * @brief Вызов тика музыки
+ * @brief Инлайновая проверка FL и вызов music_service.
+ *
+ * Используется как макрос на всех вызывающих сайтах в title.c, чтобы убрать
+ * jsr+rts накладные (~15 циклов) на каждый поллинг. Это и сокращает общую
+ * нагрузку на CPU за кадр (~30 мкс с шести межблочных вызовов плюс
+ * сотни мкс с финального polling-loop), и зажимает максимальный
+ * полленг-интервал — отчего напрямую уменьшается дрожание частоты нот.
+ */
+#define MUSIC_TICK() do { \
+    asm volatile ( \
+        "tstb @%[csr]\n\t" \
+        "bpl 1f\n\t" \
+        "jsr pc, _music_service\n" \
+        "1:\n\t" \
+        : : [csr]"i"(REG_TVE_CSR) : "r0", "r1", "cc", "memory" \
+    ); \
+} while (0)
+
+/**
+ * @brief Вызов тика музыки (внешний символ для asm-блоков, оставлен для совместимости)
  */
 __attribute__((noinline)) void music_tick()
 {
@@ -403,7 +422,7 @@ void process_demo_state()
         title_sp_clear_strip(nobbin_x + image_width, nobbin_y, image_height);
         title_sp_4_15_put(nobbin_x, nobbin_y, (uint8_t *)image_nobbin[image_phase]);
     }
-    music_tick();
+    MUSIC_TICK();
 
     if (hobbin_x)
     {
@@ -411,7 +430,7 @@ void process_demo_state()
         if (hobbin_mirror) title_sp_4_15_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_left[image_phase]);
         else title_sp_4_15_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_right[image_phase]);
     }
-    music_tick();
+    MUSIC_TICK();
 
     if (digger_x)
     {
@@ -419,7 +438,7 @@ void process_demo_state()
         if (digger_mirror) title_sp_4_15_put(digger_x, digger_y, (uint8_t *)image_digger_left[image_phase]);
         else title_sp_4_15_put(digger_x, digger_y, (uint8_t *)image_digger_right[image_phase]);
     }
-    music_tick();
+    MUSIC_TICK();
 
     if (!(demo_time & 7))
     {
@@ -436,7 +455,7 @@ void process_demo_state()
         demo_time = 0;
     }
 
-    while ((int16_t)(snd_frame_ticks - frame_target) < 0) music_tick();
+    while ((int16_t)(snd_frame_ticks - frame_target) < 0) MUSIC_TICK();
 }
 
 extern void start();

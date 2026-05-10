@@ -2,13 +2,23 @@
 #include "memory.h"
 
 extern void music_tick();
+extern void music_service();
+
+// Инлайновая проверка FL: тестируем старший бит CSR таймера и, если взведён,
+// вызываем music_service напрямую — без обёртки music_tick (минус 15 циклов
+// jsr+rts на каждый поллинг). Используется внутри спрайтовых asm-блоков,
+// где мы и так вынуждены сохранять/перечитывать нужные регистры.
+#define POLL_FL                              \
+    "tstb @%[csr]\n\t"                        \
+    "bpl 1f\n\t"                              \
+    "jsr pc, _music_service\n"                \
+    "1:\n\t"
 
 void title_sp_clear_strip(uint16_t x, uint16_t y, uint16_t height)
 {
     // Очистка полосы шириной 1 байт. Используются только r2 (callee-saved счётчик)
-    // и r4 (callee-saved указатель), поэтому music_tick можно вызывать без
-    // сохранения каких-либо регистров — что и даёт в 2-3 раза более плотный
-    // поллинг по сравнению с paint_brick_long.
+    // и r4 (callee-saved указатель), поэтому music_service можно вызывать без
+    // сохранения каких-либо регистров.
     asm(
         "mov $040000, r4\n\t"
         "mov %[y], r0\n\t"
@@ -24,11 +34,12 @@ void title_sp_clear_strip(uint16_t x, uint16_t y, uint16_t height)
 ".loop_%=:\n\t"
         "clrb (r4)+\n\t"
         "add $63, r4\n\t"
-        "jsr pc, _music_tick\n\t"
+        POLL_FL
         "sob r2, .loop_%=\n\t"
         :
-        : [x]"g"(x), [y]"g"(y), [height]"g"(height)
-        : "r0", "r2", "r4", "cc", "memory"
+        : [x]"g"(x), [y]"g"(y), [height]"g"(height),
+          [csr]"i"(REG_TVE_CSR)
+        : "r0", "r1", "r2", "r4", "cc", "memory"
     );
 }
 
@@ -94,27 +105,28 @@ void title_sp_4_15_put(uint16_t x, uint16_t y, const uint8_t *image)
         "movb r0, (r4)+\n\t"
         "swab r0\n\t"
         "movb r0, (r4)+\n\t"
-        "jsr pc, _music_tick\n\t"
+        POLL_FL
         "mov (r3)+, r0\n\t"
         "movb r0, (r4)+\n\t"
         "swab r0\n\t"
         "movb r0, (r4)\n\t"
         "add $61, r4\n\t"
-        "jsr pc, _music_tick\n"
+        POLL_FL
         "sob r2, .l1_%=\n\t"
         "br .l4_%=\n"
 
 ".l2_%=:\n\t"
         "mov (r3)+, (r4)+\n\t"
-        "jsr pc, _music_tick\n\t"
+        POLL_FL
         "mov (r3)+, (r4)\n\t"
         "add $62, r4\n\t"
-        "jsr pc, _music_tick\n"
+        POLL_FL
         "sob r2, .l2_%=\n"
 ".l4_%=:\n\t"
         :
-        : [x]"g"(x), [y]"g"(y), [image]"m"(image)
-        : "r0", "r2", "r3", "r4", "cc", "memory"
+        : [x]"g"(x), [y]"g"(y), [image]"m"(image),
+          [csr]"i"(REG_TVE_CSR)
+        : "r0", "r1", "r2", "r3", "r4", "cc", "memory"
     );
 }
 
