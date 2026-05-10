@@ -65,6 +65,7 @@ void title_sp_4_15_put(uint16_t x, uint16_t y, const uint8_t *image)
         "movb r0, (r4)+\n\t"
         "swab r0\n\t"
         "movb r0, (r4)+\n\t"
+        "jsr pc, _music_tick\n\t"
         "mov (r3)+, r0\n\t"
         "movb r0, (r4)+\n\t"
         "swab r0\n\t"
@@ -76,6 +77,7 @@ void title_sp_4_15_put(uint16_t x, uint16_t y, const uint8_t *image)
 
 ".l2_%=:\n\t"
         "mov (r3)+, (r4)+\n\t"
+        "jsr pc, _music_tick\n\t"
         "mov (r3)+, (r4)\n\t"
         "add $62, r4\n\t"
         "jsr pc, _music_tick\n"
