@@ -1,51 +1,55 @@
 #pragma once
 #include <stdint.h>
 
-#define N 83u // Делитель периодов нот
+// Значения LIMIT для таймера БК-0010 (TMR_FREQ = f/128 = 3 МГц / 128 = 23437.5 Гц).
+// Рассчитаны как round(TMR_FREQ / (2 * f_note)), где f_note — равномерно
+// темперированный строй с A4 = 440 Гц.
+// Реальная частота на динамике = TMR_FREQ / (2 * LIMIT).
+// Точность ограничена целочисленным LIMIT: для нижнего регистра ~0.2 %, для C5+ — до 1.8 %.
 
-// Периоды нот
-#define	C3	(9122u / N)
-#define	CS3	(8610u / N)
-#define	D3	(8127u / N)
-#define	DS3	(7671u / N)
-#define	E3	(7240u / N)
-#define	F3	(6834u / N)
-#define	FS3	(6450u / N)
-#define	G3	(6088u / N)
-#define	GS3	(5747u / N)
-#define	A3	(5424u / N)
-#define	AS3	(5120u / N)
-#define	B3	(4832u / N)
+// Периоды нот (LIMIT в тактах таймера 23437.5 Гц)
+#define	C3	90u   // 130.21 Гц (ном. 130.81)
+#define	CS3	85u   // 137.87 Гц (ном. 138.59)
+#define	D3	80u   // 146.48 Гц (ном. 146.83)
+#define	DS3	75u   // 156.25 Гц (ном. 155.56)
+#define	E3	71u   // 165.05 Гц (ном. 164.81)
+#define	F3	67u   // 174.91 Гц (ном. 174.61)
+#define	FS3	63u   // 186.01 Гц (ном. 185.00)
+#define	G3	60u   // 195.31 Гц (ном. 196.00)
+#define	GS3	56u   // 209.26 Гц (ном. 207.65)
+#define	A3	53u   // 221.11 Гц (ном. 220.00)
+#define	AS3	50u   // 234.38 Гц (ном. 233.08)
+#define	B3	47u   // 249.33 Гц (ном. 246.94)
 
-#define	C4	(4561u / N)
-#define	CS4	(4305u / N)
-#define	D4	(4063u / N)
-#define	DS4	(3835u / N)
-#define	E4	(3620u / N)
-#define	F4	(3417u / N)
-#define	FS4	(3225u / N)
-#define	G4	(3044u / N)
-#define	GS4	(2873u / N)
-#define	A4	(2712u / N)
-#define	AS4	(2560u / N)
-#define	B4	(2416u / N)
+#define	C4	45u   // 260.42 Гц (ном. 261.63)
+#define	CS4	42u   // 279.02 Гц (ном. 277.18)
+#define	D4	40u   // 292.97 Гц (ном. 293.66)
+#define	DS4	38u   // 308.39 Гц (ном. 311.13)
+#define	E4	36u   // 325.52 Гц (ном. 329.63)
+#define	F4	34u   // 344.67 Гц (ном. 349.23)
+#define	FS4	32u   // 366.21 Гц (ном. 369.99)
+#define	G4	30u   // 390.63 Гц (ном. 392.00)
+#define	GS4	28u   // 418.53 Гц (ном. 415.30)
+#define	A4	27u   // 433.95 Гц (ном. 440.00)
+#define	AS4	25u   // 468.75 Гц (ном. 466.16)
+#define	B4	24u   // 488.28 Гц (ном. 493.88)
 
-#define	C5	(2280u / N)
-#define	CS5	(2152u / N)
-#define	D5	(2032u / N)
-#define	DS5	(1918u / N)
-#define	E5	(1810u / N)
-#define	F5	(1708u / N)
-#define	FS5	(1612u / N)
-#define	G5	(1522u / N)
-#define	GS5	(1437u / N)
-#define	A5	(1356u / N)
-#define	AS5	(1280u / N)
-#define	B5	(1208u / N)
+#define	C5	22u   // 532.67 Гц (ном. 523.25)
+#define	CS5	21u   // 558.04 Гц (ном. 554.37)
+#define	D5	20u   // 585.94 Гц (ном. 587.33)
+#define	DS5	19u   // 616.78 Гц (ном. 622.25)
+#define	E5	18u   // 651.04 Гц (ном. 659.26)
+#define	F5	17u   // 689.34 Гц (ном. 698.46)
+#define	FS5	16u   // 732.42 Гц (ном. 739.99)
+#define	G5	15u   // 781.25 Гц (ном. 783.99)
+#define	GS5	14u   // 837.05 Гц (ном. 830.61)
+#define	A5	13u   // 901.44 Гц (ном. 880.00)
+#define	AS5	13u   // 901.44 Гц (ном. 932.33) — на пределе разрешения, совпадает с A5
+#define	B5	12u   // 976.56 Гц (ном. 987.77)
 
-#define	C6	(1140u / N)
-#define	CS6	(1076u / N)
-#define	D6	(1016u / N)
+#define	C6	11u   // 1065.34 Гц (ном. 1046.50)
+#define	CS6	11u   // 1065.34 Гц (ном. 1108.73) — совпадает с C6
+#define	D6	10u   // 1171.88 Гц (ном. 1174.66)
 
 #define REST 0xFFu // Специальное значение - пауза (без звука)
 
