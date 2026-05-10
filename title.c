@@ -400,16 +400,14 @@ void process_demo_state()
 
     if (nobbin_x)
     {
-        title_sp_paint_brick_long(nobbin_x + image_width, nobbin_y, 1, image_height, 0);
-        music_tick();
+        title_sp_clear_strip(nobbin_x + image_width, nobbin_y, image_height);
         title_sp_4_15_put(nobbin_x, nobbin_y, (uint8_t *)image_nobbin[image_phase]);
     }
     music_tick();
 
     if (hobbin_x)
     {
-        title_sp_paint_brick_long(hobbin_x + image_width, hobbin_y, 1, image_height, 0);
-        music_tick();
+        title_sp_clear_strip(hobbin_x + image_width, hobbin_y, image_height);
         if (hobbin_mirror) title_sp_4_15_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_left[image_phase]);
         else title_sp_4_15_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_right[image_phase]);
     }
@@ -417,8 +415,7 @@ void process_demo_state()
 
     if (digger_x)
     {
-        title_sp_paint_brick_long(digger_x + image_width, digger_y, 1, image_height, 0);
-        music_tick();
+        title_sp_clear_strip(digger_x + image_width, digger_y, image_height);
         if (digger_mirror) title_sp_4_15_put(digger_x, digger_y, (uint8_t *)image_digger_left[image_phase]);
         else title_sp_4_15_put(digger_x, digger_y, (uint8_t *)image_digger_right[image_phase]);
     }

@@ -3,6 +3,35 @@
 
 extern void music_tick();
 
+void title_sp_clear_strip(uint16_t x, uint16_t y, uint16_t height)
+{
+    // Очистка полосы шириной 1 байт. Используются только r2 (callee-saved счётчик)
+    // и r4 (callee-saved указатель), поэтому music_tick можно вызывать без
+    // сохранения каких-либо регистров — что и даёт в 2-3 раза более плотный
+    // поллинг по сравнению с paint_brick_long.
+    asm(
+        "mov $040000, r4\n\t"
+        "mov %[y], r0\n\t"
+        "asl r0\n\t"
+        "asl r0\n\t"
+        "asl r0\n\t"
+        "asl r0\n\t"
+        "asl r0\n\t"
+        "asl r0\n\t"
+        "add r0, r4\n\t"
+        "add %[x], r4\n\t"
+        "mov %[height], r2\n\t"
+".loop_%=:\n\t"
+        "clrb (r4)+\n\t"
+        "add $63, r4\n\t"
+        "jsr pc, _music_tick\n\t"
+        "sob r2, .loop_%=\n\t"
+        :
+        : [x]"g"(x), [y]"g"(y), [height]"g"(height)
+        : "r0", "r2", "r4", "cc", "memory"
+    );
+}
+
 void title_sp_paint_brick_long(uint16_t x, uint16_t y, uint16_t x_width, uint16_t y_width, uint8_t color)
 {
     asm(
