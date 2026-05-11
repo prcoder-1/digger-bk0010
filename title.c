@@ -279,7 +279,7 @@ void process_demo_state()
     constexpr uint16_t cherry_print_time = cherry_display_time + end_to_print;
 
     // Время до повтора демо
-    constexpr uint16_t demo_restart_time = cherry_print_time + 350;
+    constexpr uint16_t demo_restart_time = cherry_print_time + 320;
 
     uint16_t frame_target = snd_frame_ticks + FRAME_TICKS;
 
