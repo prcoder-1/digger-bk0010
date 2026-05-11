@@ -434,12 +434,7 @@ void process_demo_state()
     }
     MUSIC_TICK();
 
-    // Компенсация за отсутствующие анимационные спрайты. Один реальный
-    // спрайт (clear_strip + sp_4_15_put) — это примерно 30 поллингов с
-    // интервалом ~30 циклов между ними. Чтобы темп и распределение
-    // полленг-задержки L не зависели от количества спрайтов на экране,
-    // выполняем эквивалентное количество "пустых" поллингов за каждый
-    // недостающий спрайт.
+    // Компенсация за отсутствующие анимационные спрайты.
     {
         uint8_t missing_sprites = 0;
         if (!nobbin_x) missing_sprites++;
@@ -448,15 +443,17 @@ void process_demo_state()
 
         while (missing_sprites--)
         {
-            // 30 поллингов с задержкой ~20 циклов между ними — эквивалент
-            // примерно одного цикла рисования спрайта (clear_strip 15 строк +
-            // sp_4_15_put 15 строк × 2 поллинга/строка = ~45 поллингов, но
-            // часть их короче — берём усреднённо ~30).
-            uint8_t i = 30;
+            // 45 поллингов = 15 (clear_strip) + 30 (sp_4_15_put 15 строк × 2).
+            // Каждая итерация: MUSIC_TICK (~15 циклов) + 12 nop (24 цикла) =
+            // ~39 циклов. На спрайт ~1750 циклов — близко к реальной
+            // длительности отрисовки sp_4_15_put + clear_strip (~1245-1500
+            // циклов с учётом байт-операций и POLL_FL).
+            uint8_t i = 45;
             while (i--)
             {
                 MUSIC_TICK();
                 asm volatile (
+                    "nop\n\tnop\n\tnop\n\tnop\n\t"
                     "nop\n\tnop\n\tnop\n\tnop\n\t"
                     "nop\n\tnop\n\tnop\n\tnop"
                 );
@@ -489,6 +486,10 @@ void process_demo_state()
     {
         MUSIC_TICK();
         asm volatile (
+            "nop\n\tnop\n\tnop\n\tnop\n\t"
+            "nop\n\tnop\n\tnop\n\tnop\n\t"
+            "nop\n\tnop\n\tnop\n\tnop\n\t"
+            "nop\n\tnop\n\tnop\n\tnop\n\t"
             "nop\n\tnop\n\tnop\n\tnop\n\t"
             "nop\n\tnop\n\tnop\n\tnop\n\t"
             "nop\n\tnop\n\tnop\n\tnop"
