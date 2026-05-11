@@ -214,7 +214,7 @@ void init_demo()
 }
 
 // Длительность одного «кадра» демо в тактах таймера (23438 Гц).
-constexpr uint16_t FRAME_TICKS = 200;
+constexpr uint16_t FRAME_TICKS = 150;
 
 uint16_t demo_time = 0;
 uint16_t nobbin_x = 0, nobbin_y = 0;
