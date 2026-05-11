@@ -1,7 +1,6 @@
 #include "sprites.h"
 #include "memory.h"
 
-extern void music_tick();
 extern void music_service();
 
 // Инлайновая проверка FL: тестируем старший бит CSR таймера и, если взведён,
@@ -196,7 +195,10 @@ void title_sp_put(uint16_t x, uint16_t y, uint16_t x_width, uint16_t y_width, co
         "bicb (r2)+, r0\n\t"
         "bisb (r1)+, r0\n\t"
         "movb r0, (r5)+\n\t"
-        "jsr pc, _music_tick\n"
+        "tstb @%[csr]\n\t" \
+        "bpl 1f\n\t" \
+        "jsr pc, _music_service\n" \
+"1:\n\t" \
         "sob r3, .L_b_x_%=\n\t"
         "add $64, r5\n\t"
         "sob r4, .L_b_y_%=\n\t"

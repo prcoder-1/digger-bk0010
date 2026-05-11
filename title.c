@@ -128,22 +128,6 @@ void music_service()
 } while (0)
 
 /**
- * @brief Вызов тика музыки (внешний символ для asm-блоков, оставлен для совместимости)
- */
-__attribute__((noinline)) void music_tick()
-{
-    asm volatile (
-        "tstb @%[csr]\n\t"     // FL — старший бит CSR
-        "bpl .l_skip_%=\n\t"
-        "jsr pc, _music_service\n"
-".l_skip_%=:\n\t"
-        :
-        : [csr]"i"(REG_TVE_CSR)
-        : "r0", "r1", "cc", "memory"
-    );
-}
-
-/**
  * @brief Вывод строки
  *
  * @param str - строка для вывода
