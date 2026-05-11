@@ -105,17 +105,8 @@ void music_service()
     snd_period       = next_period;
 
     // Расчёт огибающей.
-    // Сдвиг >> 10 даёт максимум скважности 3.125 % (на пике sin=64, on_ticks =
-    // snd_period / 16 при полном периоде 2·snd_period). Очень узкие импульсы —
-    // фундаментальная амплитуда ~sin(π/32) ≈ 0.10 от полного меандра, и при
-    // таком тонком импульсе механика пьезодинамика работает как естественный
-    // НЧ-фильтр: высокие гармоники просто не успевают возбудить мембрану.
-    // Звук получается заметно мягче, без острых обертонов меандра.
-    //
-    // Минимум 1 такт нужен, чтобы высокие ноты (snd_period < 16) вообще
-    // звучали — без этого они бы дали on_ticks=0 и просто молчали.
     for (uint8_t i = 0; i < 17; i++) {
-        uint16_t on_ticks   = ((uint16_t)snd_sin_table[i] * (uint16_t)next_period) >> 10;
+        uint16_t on_ticks   = ((uint16_t)snd_sin_table[i] * (uint16_t)next_period) >> 9;
         if (snd_sin_table[i] > 0 && on_ticks == 0) on_ticks = 1;
         snd_on_dur_ticks[i] = on_ticks;
         snd_on_dur_iters[i] = on_ticks * SND_DELAY_ITERS_PER_TICK;
@@ -288,7 +279,7 @@ void process_demo_state()
     constexpr uint16_t cherry_print_time = cherry_display_time + end_to_print;
 
     // Время до повтора демо
-    constexpr uint16_t demo_restart_time = cherry_print_time + 256;
+    constexpr uint16_t demo_restart_time = cherry_print_time + 350;
 
     uint16_t frame_target = snd_frame_ticks + FRAME_TICKS;
 
