@@ -144,8 +144,12 @@ void music_service()
     //   on_ticks  — длительность ON-полуволны в тактах таймера (для off_ticks).
     //   on_iters  — количество итераций sob в CPU-loop для выдержки ON-полуволны
     //              ровно on_ticks тактов. 1 такт ≈ 21 итерация sob.
+    //
+    // Сдвиг >> 8 даёт максимум скважности 12.5 % (на пике sin=64, on_ticks =
+    // snd_period / 4 при полном периоде 2·snd_period). Узкие импульсы дают
+    // более мягкий тон с меньшим количеством высоких гармоник.
     for (uint8_t i = 0; i < 17; i++) {
-        uint16_t on_ticks   = ((uint16_t)snd_sin_table[i] * (uint16_t)next_period) >> 7;
+        uint16_t on_ticks   = ((uint16_t)snd_sin_table[i] * (uint16_t)next_period) >> 8;
         snd_on_dur_ticks[i] = on_ticks;
         snd_on_dur_iters[i] = on_ticks * SND_DELAY_ITERS_PER_TICK;
     }
