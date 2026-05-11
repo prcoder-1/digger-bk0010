@@ -10,8 +10,6 @@
 #define COIN_Y_OFFSET 3 // Смещение спрайта монетки в ячейке по оси Y
 
 #define SND_TIMER_MODE         ((1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN)) // без предделителей: 1 такт = 1/23438 c
-// Длительность ноты в тактах таймера (23438 Гц).
-// Очень короткая пауза между нотами (~3 мс) — лёгкое подвижное лигато.
 #define SND_GAP_CYCLES         64u
 #define SND_END_PAUSE_CYCLES   (2 * 23438u)
 
@@ -29,11 +27,18 @@ static const uint8_t snd_sin_table[17] = {
     0, 12, 24, 36, 45, 53, 59, 63, 64, 63, 59, 53, 45, 36, 24, 12, 0
 };
 
-// Таблица on_dur для текущей ноты, заполняется при загрузке ноты как
-// snd_sin_table[i] · snd_period / 128, что даёт максимум скважности 25 %
-// (на пике sin = 64, on_dur = snd_period / 2 при полном периоде 2·snd_period).
-// В горячем пути остаётся только лукап — никаких умножений.
-static uint16_t snd_on_dur_table[17];
+// Таблица on_ticks (в тактах таймера) для огибающей текущей ноты.
+// snd_on_dur_ticks[i] = snd_sin_table[i] · snd_period / 128, что даёт максимум
+// скважности 25 % (на пике sin = 64, on_ticks = snd_period / 2 при полном
+// периоде 2·snd_period).
+static uint16_t snd_on_dur_ticks[17];
+
+// Соответствующее количество итераций sob в CPU-loop'е для выдержки ON-полуволны.
+// 1 такт таймера = 128 CPU-циклов (при f/128). sob занимает ~6 циклов,
+// поэтому 1 такт ≈ 21 итерация. Множитель можно подстроить, если на реальном
+// железе sob идёт быстрее/медленнее.
+static uint16_t snd_on_dur_iters[17];
+#define SND_DELAY_ITERS_PER_TICK 10u
 
 /**
  * @brief Сервис одного события таймера.
@@ -54,53 +59,46 @@ void music_service()
     volatile uint16_t      *lim = (volatile uint16_t *)REG_TVE_LIMIT;
     volatile uint16_t      *spk = (volatile uint16_t *)REG_EXT_DEV;
 
-    // === HOT PATH: активная нота продолжается ===
-    // PWM-огибающая: на 1-битном динамике "громкость" задаётся не амплитудой
-    // (она всегда +V/-V), а скважностью прямоугольника. При duty=50% (ON_dur =
-    // OFF_dur = snd_period) — максимум фундаментальной гармоники. Сужая ON_dur
-    // до 1 такта, фундаментальная амплитуда падает до ~sin(pi/(2·snd_period)),
-    // что слышится как тихий звук. Период = ON+OFF держим равным 2·snd_period,
-    // так что высота ноты не уплывает.
-    //
-    // Огибающая — треугольник: env_raw = min(progress, remaining) растёт от 0
-    // до cycles_total/2 в середине ноты и убывает обратно к 0 в конце.
-    // Сдвигаем на 5 (делим на 32) и клампим до snd_period — получается:
-    // короткая атака → плато на полной громкости → симметричный спад.
-    if (snd_cycles_left > snd_period)
+    // === HOT PATH: активная нота, один сервис = одна полная фаза меандра ===
+    // ON-полуволна тактуется CPU-loop'ом (точно on_ticks тактов таймера, без
+    // зависимости от полленг-задержки). OFF-полуволна — таймером: LIMIT
+    // выставляется в off_ticks, и следующий FL придёт строго через off_ticks.
+    if (snd_cycles_left > (snd_period << 1))
     {
-        // Огибающая по форме синуса через предвычисленную таблицу.
-        // env_raw = min(progress, remaining) — пилообразный треугольник 0..N..0
-        // по длительности ноты. Индекс idx = env_raw >> 7 даёт 0..16 для NE
-        // (cycles_total = 4096), на NQ и длиннее остаётся плато в середине.
         uint16_t progress = snd_cycles_total - snd_cycles_left;
         uint16_t env_raw  = (progress < snd_cycles_left) ? progress : snd_cycles_left;
         uint16_t idx      = env_raw >> 7;
         if (idx > 16) idx = 16;
-        uint16_t on_dur = snd_on_dur_table[idx];
-        if (on_dur < 1) on_dur = 1;
+        uint16_t on_ticks    = snd_on_dur_ticks[idx];
+        uint16_t delay_count = snd_on_dur_iters[idx];
+        uint16_t off_ticks   = (snd_period << 1) - on_ticks;
+        if (off_ticks < 1) off_ticks = 1;
 
-        snd_speaker ^= 0100;
-        *spk = snd_speaker;
-        *lim = (snd_speaker & 0100) ? on_dur : ((snd_period << 1) - on_dur);
-        asm volatile ("bicb $0200, @%[csr]" : : [csr]"i"(REG_TVE_CSR) : "cc", "memory");
-        snd_cycles_left -= snd_period;
-        snd_frame_ticks += snd_period;
+        *spk = 0100;                       // динамик ON
+        if (delay_count) {
+            asm volatile (
+                "mov %0, r0\n\t"
+                "1: sob r0, 1b\n\t"
+                : : "r"(delay_count) : "r0", "cc"
+            );
+        }
+        *spk = 0;                          // динамик OFF
+        *lim = off_ticks;
+        csr->reg = SND_TIMER_MODE;          // рестарт таймера на off_ticks
+
+        snd_cycles_left -= snd_period << 1;
+        snd_frame_ticks += snd_period << 1;
         return;
     }
 
-    snd_frame_ticks += snd_period;          // учли только что прошедший отсчёт
+    snd_frame_ticks += snd_period << 1;     // учли только что прошедший период
 
     // === Активная нота кончается на этом тике ===
     if (snd_cycles_left)
     {
         snd_speaker        = 0;
         *spk               = 0;             // погасить динамик одной записью
-        // Восстанавливаем LIMIT = snd_period: в горячем пути PWM мы пишем
-        // в *lim значение on_dur / (2·snd_period − on_dur), которое почти
-        // никогда не равно snd_period. Если уйти в silence-фазу с этим
-        // «случайным» LIMIT, csr->reg = SND_TIMER_MODE рестартит счётчик
-        // с ним — и пауза идёт на чужой частоте (часто во много раз быстрее).
-        // Это и звучит как «выплёвывание» нот.
+        // Восстанавливаем LIMIT = snd_period для silence-фазы.
         *lim               = snd_period;
         csr->reg           = SND_TIMER_MODE;
         snd_cycles_left    = 0;
@@ -130,22 +128,23 @@ void music_service()
 
     uint8_t duration = popcorn_durations[snd_note_idx];
     snd_note_idx++;
-    snd_cycles_left  = (uint16_t)duration << 11;
-    snd_cycles_total = snd_cycles_left;             // запомнили полную длительность для огибающей
+    snd_cycles_left  = (uint16_t)duration << 10;    // было << 11 — ускорено вдвое
+    snd_cycles_total = snd_cycles_left;             // полная длительность для огибающей
     snd_period       = next_period;
 
-    // Предвычисляем таблицу on_dur для огибающей по форме синуса.
-    // snd_on_dur_table[i] = snd_sin_table[i] · snd_period / 128
-    // На пике (i=8, sin=64): on_dur = snd_period / 2 — скважность 25 %.
-    // На краях (i=0 или 16, sin=0): on_dur = 0 (потом клампится до 1 в hot path).
-    // Эти 17 умножений делаем только ОДИН раз за ноту, в hot path остаётся
-    // только табличный лукап без умножения.
+    // Предвычисляем огибающую:
+    //   on_ticks  — длительность ON-полуволны в тактах таймера (для off_ticks).
+    //   on_iters  — количество итераций sob в CPU-loop для выдержки ON-полуволны
+    //              ровно on_ticks тактов. 1 такт ≈ 21 итерация sob.
     for (uint8_t i = 0; i < 17; i++) {
-        snd_on_dur_table[i] = ((uint16_t)snd_sin_table[i] * next_period) >> 7;
+        uint16_t on_ticks   = ((uint16_t)snd_sin_table[i] * (uint16_t)next_period) >> 7;
+        snd_on_dur_ticks[i] = on_ticks;
+        snd_on_dur_iters[i] = on_ticks * SND_DELAY_ITERS_PER_TICK;
     }
 
-    // Единственный рестарт таймера в этой ветке — с новым LIMIT.
-    *lim     = next_period;
+    // Запускаем таймер на полный период (2·snd_period). Первый FL придёт через
+    // полный период, тогда стартует первый сервис ноты.
+    *lim     = (uint16_t)next_period << 1;
     csr->reg = SND_TIMER_MODE;
 }
 
@@ -203,6 +202,7 @@ void print_str(const char *str, uint16_t x_graph, uint16_t y_graph)
         }
 
         x_graph += sizeof(ch_alpha[0][0]);
+        MUSIC_TICK();
     }
 }
 
