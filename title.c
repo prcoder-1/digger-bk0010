@@ -40,16 +40,6 @@ static uint16_t snd_on_dur_iters[17];
 
 /**
  * @brief Сервис одного события таймера.
- *
- * Горячий путь (активная нота продолжается) идёт первой ветвью без
- * предварительных операций над глобалами — щелчок и рестарт таймера
- * выполняются в первые ~10 инструкций после входа, чтобы джиттер
- * полупериода зависел только от полленг-задержки на стороне вызова.
- *
- * На смене ноты — ровно один csr->reg = SND_TIMER_MODE с уже новым
- * LIMIT (раньше было два: первый в начале функции с *старым* LIMIT,
- * через ~80 циклов второй с новым; это давало одну заметно
- * растянутую полуволну в момент каждой смены ноты).
  */
 void music_service()
 {
@@ -57,25 +47,11 @@ void music_service()
     volatile uint16_t      *lim = (volatile uint16_t *)REG_TVE_LIMIT;
     volatile uint16_t      *spk = (volatile uint16_t *)REG_EXT_DEV;
 
-    // === HOT PATH: активная нота, один сервис = одна полная фаза меандра ===
-    // ON-полуволна тактуется CPU-loop'ом (точно on_ticks тактов таймера, без
-    // зависимости от полленг-задержки). OFF-полуволна — таймером: LIMIT
-    // выставляется в off_ticks, и следующий FL придёт строго через off_ticks.
     if (snd_cycles_left > (snd_period << 1))
     {
         uint16_t progress = snd_cycles_total - snd_cycles_left;
         uint16_t env_raw  = (progress < snd_cycles_left) ? progress : snd_cycles_left;
-        // Сдвиг >> 8 (а не >> 7) удваивает время атаки/спада. idx меняется
-        // каждые 256 единиц env_raw вместо 128. Для длинных нот это даёт
-        // более плавное нарастание/затухание. Короткие ноты (NE) пик не
-        // достигают — играют на пониженной максимальной громкости, что
-        // звучит даже мягче.
         uint16_t idx      = env_raw >> 8;
-        // Клампим на пике (idx=8), а не на конце LUT (idx=16). snd_sin_table
-        // симметричная: [0]=0, [8]=64 (пик), [16]=0. env_raw сам по себе уже
-        // пилообразный (0→max→0 за длительность ноты), и если пускать idx
-        // дальше пика в LUT, в середине ноты получаются ДВА пика с провалом
-        // (тишиной) между ними.
         if (idx > 8) idx = 8;
         uint16_t on_ticks    = snd_on_dur_ticks[idx];
         uint16_t delay_count = snd_on_dur_iters[idx];
@@ -105,19 +81,16 @@ void music_service()
     if (snd_cycles_left)
     {
         snd_speaker        = 0;
-        *spk               = 0;             // погасить динамик одной записью
-        // Восстанавливаем LIMIT = snd_period для silence-фазы.
+        *spk               = 0;             // динамик OFF
         *lim               = snd_period;
         csr->reg           = SND_TIMER_MODE;
         snd_cycles_left    = 0;
         return;
     }
 
-    // === Загрузка следующей ноты ===
     uint8_t next_period = popcorn_periods[snd_note_idx];
     if (!next_period)
     {
-        // Конец мелодии — длинная пауза, потом сначала
         snd_note_idx       = 0;
         csr->reg           = SND_TIMER_MODE;
         return;
@@ -125,40 +98,24 @@ void music_service()
 
     uint8_t duration = popcorn_durations[snd_note_idx];
     snd_note_idx++;
-    // Промежуточный темп: duration × 1472 = duration × (1024 + 512 − 64).
-    // 71.9 % от исходного << 11. Три сдвига + сложение + вычитание.
     snd_cycles_left  = ((uint16_t)duration << 10) + ((uint16_t)duration << 9) - ((uint16_t)duration << 6);
     snd_cycles_total = snd_cycles_left;             // полная длительность для огибающей
     snd_period       = next_period;
 
-    // Предвычисляем огибающую:
-    //   on_ticks  — длительность ON-полуволны в тактах таймера (для off_ticks).
-    //   on_iters  — количество итераций sob в CPU-loop для выдержки ON-полуволны
-    //              ровно on_ticks тактов. 1 такт ≈ 21 итерация sob.
-    //
-    // Сдвиг >> 8 даёт максимум скважности 12.5 % (на пике sin=64, on_ticks =
-    // snd_period / 4 при полном периоде 2·snd_period). Узкие импульсы дают
-    // более мягкий тон с меньшим количеством высоких гармоник.
+    // Расчёт огибающей
     for (uint8_t i = 0; i < 17; i++) {
         uint16_t on_ticks   = ((uint16_t)snd_sin_table[i] * (uint16_t)next_period) >> 8;
         snd_on_dur_ticks[i] = on_ticks;
         snd_on_dur_iters[i] = on_ticks * SND_DELAY_ITERS_PER_TICK;
     }
 
-    // Запускаем таймер на полный период (2·snd_period). Первый FL придёт через
-    // полный период, тогда стартует первый сервис ноты.
+    // Запускаем таймер на полный период (2·snd_period).
     *lim     = (uint16_t)next_period << 1;
     csr->reg = SND_TIMER_MODE;
 }
 
 /**
  * @brief Инлайновая проверка FL и вызов music_service.
- *
- * Используется как макрос на всех вызывающих сайтах в title.c, чтобы убрать
- * jsr+rts накладные (~15 циклов) на каждый поллинг. Это и сокращает общую
- * нагрузку на CPU за кадр (~30 мкс с шести межблочных вызовов плюс
- * сотни мкс с финального polling-loop), и зажимает максимальный
- * полленг-интервал — отчего напрямую уменьшается дрожание частоты нот.
  */
 #define MUSIC_TICK() do { \
     asm volatile ( \
