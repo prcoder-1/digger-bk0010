@@ -511,11 +511,16 @@ void process_demo_state()
     // спрайтовых рутин (~25-30 циклов). Без этого polling-loop поллит таймер
     // плотнее, чем рисование, и средняя полленг-задержка отличается между
     // фазой "только polling-loop" (нет спрайтов на экране) и фазой "рисование +
-    // polling-loop" (есть спрайты), что проявляется как разница в дрожании.
+    // polling-loop" (есть спрайты), что проявляется как разница в темпе и
+    // дрожании звука.
     while ((int16_t)(snd_frame_ticks - frame_target) < 0)
     {
         MUSIC_TICK();
-        asm volatile ("nop\n\tnop\n\tnop\n\tnop");
+        asm volatile (
+            "nop\n\tnop\n\tnop\n\tnop\n\t"
+            "nop\n\tnop\n\tnop\n\tnop\n\t"
+            "nop\n\tnop\n\tnop\n\tnop"
+        );
     }
 }
 

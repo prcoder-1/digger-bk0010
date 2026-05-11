@@ -108,6 +108,6 @@ void writeBMP(const char* filename, int width, int height, const unsigned char *
 }
 
 int main() {
-    writeBMP("sprite.bmp", 8, 7, (unsigned char *)image_missile[0]);
+    writeBMP("sprite.bmp", 16, 15, (unsigned char *)image_hobbin_right[2]);
     return 0;
 }
