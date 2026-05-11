@@ -11,10 +11,8 @@
 
 #define SND_TIMER_MODE         ((1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN)) // без предделителей: 1 такт = 1/23438 c
 // Длительность ноты в тактах таймера (23438 Гц).
-// Короткая «пауза» между нотами — 12 мс. Совместно с PWM-огибающей даёт
-// плавный лигато: конец предыдущей ноты затухает, динамик коротко молчит,
-// следующая нота нарастает.
-#define SND_GAP_CYCLES         280u
+// Очень короткая пауза между нотами (~3 мс) — лёгкое подвижное лигато.
+#define SND_GAP_CYCLES         64u
 #define SND_END_PAUSE_CYCLES   (2 * 23438u)
 
 uint16_t snd_note_idx       = 0; // индекс текущей ноты в popcorn_periods/durations
@@ -58,24 +56,19 @@ void music_service()
     // короткая атака → плато на полной громкости → симметричный спад.
     if (snd_cycles_left > snd_period)
     {
+        // Огибающая через сдвиг (без умножения, чтобы music_service быстро
+        // укладывался в один такт таймера и не пропускал FL-события).
+        // env_raw = min(progress, remaining) — треугольник 0..N..0 по длительности
+        // ноты. on_dur = env_raw >> 6, клампится до snd_period — это даёт плато
+        // на полной 50 % скважности в середине ноты с симметричной атакой/спадом.
         uint16_t progress = snd_cycles_total - snd_cycles_left;
         uint16_t env_raw  = (progress < snd_cycles_left) ? progress : snd_cycles_left;
-        // Огибающая на 16 уровней. Шаг env_step меняется каждые 128 тактов
-        // прогресса (~5.5 мс). on_dur = snd_period × env_step / 32, что даёт
-        // максимальную скважность 25 % (= half-square). Выход на «полный
-        // квадрат» 50 % исключён — это и был источник металлической резкости
-        // в плато ноты. На 1-битном динамике это самое мягкое, что возможно
-        // без аппаратного ЦАП.
-        uint16_t env_step = env_raw >> 7;
-        if (env_step > 16) env_step = 16;
-        uint16_t on_dur = (snd_period * env_step) >> 5;
-        if (on_dur < 1) on_dur = 1;
+        uint16_t on_dur   = env_raw >> 6;
+        if (on_dur > snd_period) on_dur = snd_period;
+        if (on_dur < 1)          on_dur = 1;
 
         snd_speaker ^= 0100;
         *spk = snd_speaker;
-        // Длина текущей полупериода зависит от того, ON это или OFF.
-        // Для ON-фазы — on_dur, для OFF-фазы — (2·snd_period − on_dur).
-        // Сумма всегда 2·snd_period, поэтому фундаментальная частота не меняется.
         *lim = (snd_speaker & 0100) ? on_dur : ((snd_period << 1) - on_dur);
         asm volatile ("bicb $0200, @%[csr]" : : [csr]"i"(REG_TVE_CSR) : "cc", "memory");
         snd_cycles_left -= snd_period;
