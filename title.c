@@ -68,7 +68,13 @@ void music_service()
         uint16_t progress = snd_cycles_total - snd_cycles_left;
         uint16_t env_raw  = (progress < snd_cycles_left) ? progress : snd_cycles_left;
         uint16_t idx      = env_raw >> 7;
-        if (idx > 16) idx = 16;
+        // Клампим на пике (idx=8), а не на конце LUT (idx=16). snd_sin_table
+        // симметричная: [0]=0, [8]=64 (пик), [16]=0. env_raw сам по себе уже
+        // пилообразный (0→max→0 за длительность ноты), и если пускать idx
+        // дальше пика в LUT, в середине ноты получаются ДВА пика с провалом
+        // (тишиной) между ними. Клампя на 8, после атаки получаем плато на
+        // полной громкости до тех пор, пока env_raw не начнёт убывать.
+        if (idx > 8) idx = 8;
         uint16_t on_ticks    = snd_on_dur_ticks[idx];
         uint16_t delay_count = snd_on_dur_iters[idx];
         uint16_t off_ticks   = (snd_period << 1) - on_ticks;
@@ -491,6 +497,36 @@ void process_demo_state()
         else title_sp_4_15_put(digger_x, digger_y, (uint8_t *)image_digger_right[image_phase]);
     }
     MUSIC_TICK();
+
+    // Компенсация за отсутствующие анимационные спрайты. Один реальный
+    // спрайт (clear_strip + sp_4_15_put) — это примерно 30 поллингов с
+    // интервалом ~30 циклов между ними. Чтобы темп и распределение
+    // полленг-задержки L не зависели от количества спрайтов на экране,
+    // выполняем эквивалентное количество "пустых" поллингов за каждый
+    // недостающий спрайт.
+    {
+        uint8_t missing_sprites = 0;
+        if (!nobbin_x) missing_sprites++;
+        if (!hobbin_x) missing_sprites++;
+        if (!digger_x) missing_sprites++;
+
+        while (missing_sprites--)
+        {
+            // 30 поллингов с задержкой ~20 циклов между ними — эквивалент
+            // примерно одного цикла рисования спрайта (clear_strip 15 строк +
+            // sp_4_15_put 15 строк × 2 поллинга/строка = ~45 поллингов, но
+            // часть их короче — берём усреднённо ~30).
+            uint8_t i = 30;
+            while (i--)
+            {
+                MUSIC_TICK();
+                asm volatile (
+                    "nop\n\tnop\n\tnop\n\tnop\n\t"
+                    "nop\n\tnop\n\tnop\n\tnop"
+                );
+            }
+        }
+    }
 
     if (!(demo_time & 7))
     {
