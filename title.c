@@ -12,7 +12,7 @@
 #define SND_TIMER_MODE         ((1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN)) // без предделителей: 1 такт = 1/23438 c
 #define SND_END_PAUSE_CYCLES   (2 * 23438u)
 
-uint16_t snd_note_idx       = 0; // индекс текущей ноты в popcorn_periods/durations
+uint16_t snd_note_idx       = -1; // индекс текущей ноты в popcorn_periods/durations
 uint16_t snd_period         = 1; // средний полупериод текущей ноты в тактах таймера
 uint16_t snd_cycles_left    = 0; // тактов до конца текущей ноты
 uint16_t snd_cycles_total   = 0; // полная длительность текущей ноты (для расчёта огибающей)
@@ -88,10 +88,12 @@ void music_service()
         return;
     }
 
+    if (snd_note_idx == -1) return;
+
     uint8_t next_period = popcorn_periods[snd_note_idx];
     if (!next_period)
     {
-        snd_note_idx       = 0;
+        snd_note_idx       = -1;
         csr->reg           = SND_TIMER_MODE;
         return;
     }
@@ -239,9 +241,9 @@ void process_demo_state()
 
     constexpr uint16_t start_time = 0;
     constexpr uint16_t start_delay = 128;
-    constexpr uint16_t move_durance = 184; // 176
+    constexpr uint16_t move_durance = 184;
     constexpr uint16_t end_to_print = 16;
-    constexpr uint16_t print_to_next = 16;
+    constexpr uint16_t print_to_next = 128;
 
     // Тайминги отображения Ноббина в демо
     constexpr uint16_t nobbin_start_time = start_time + start_delay;
@@ -284,6 +286,7 @@ void process_demo_state()
     {
         case start_time:
         {
+            snd_note_idx = 0;
             // Очистка области Demo
             nobbin_x = hobbin_x = digger_x = 0;
             constexpr uint16_t demo_height = table_height - (str_height + y_space * 2) * 2;
