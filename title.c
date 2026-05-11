@@ -128,7 +128,9 @@ void music_service()
 
     uint8_t duration = popcorn_durations[snd_note_idx];
     snd_note_idx++;
-    snd_cycles_left  = (uint16_t)duration << 10;    // было << 11 — ускорено вдвое
+    // Промежуточный темп: duration × 1472 = duration × (1024 + 512 − 64).
+    // 71.9 % от исходного << 11. Три сдвига + сложение + вычитание.
+    snd_cycles_left  = ((uint16_t)duration << 10) + ((uint16_t)duration << 9) - ((uint16_t)duration << 6);
     snd_cycles_total = snd_cycles_left;             // полная длительность для огибающей
     snd_period       = next_period;
 
