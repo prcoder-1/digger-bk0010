@@ -10,14 +10,12 @@
 #define COIN_Y_OFFSET 3 // Смещение спрайта монетки в ячейке по оси Y
 
 #define SND_TIMER_MODE         ((1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN)) // без предделителей: 1 такт = 1/23438 c
-#define SND_GAP_CYCLES         64u
 #define SND_END_PAUSE_CYCLES   (2 * 23438u)
 
 uint16_t snd_note_idx       = 0; // индекс текущей ноты в popcorn_periods/durations
 uint16_t snd_period         = 1; // средний полупериод текущей ноты в тактах таймера
 uint16_t snd_cycles_left    = 0; // тактов до конца текущей ноты
 uint16_t snd_cycles_total   = 0; // полная длительность текущей ноты (для расчёта огибающей)
-uint16_t snd_silence_cycles = 0; // тактов до конца межнотной паузы
 uint16_t snd_speaker        = 0; // текущее состояние бита динамика (0 или 0100)
 uint16_t snd_frame_ticks    = 0; // абсолютная wall-time-метка в тактах для пейсинга кадров демо
 
@@ -112,18 +110,8 @@ void music_service()
         *lim               = snd_period;
         csr->reg           = SND_TIMER_MODE;
         snd_cycles_left    = 0;
-        snd_silence_cycles = SND_GAP_CYCLES;
         return;
     }
-
-    // === Межнотная пауза ===
-    if (snd_silence_cycles > snd_period)
-    {
-        csr->reg            = SND_TIMER_MODE;
-        snd_silence_cycles -= snd_period;
-        return;
-    }
-    snd_silence_cycles = 0;
 
     // === Загрузка следующей ноты ===
     uint8_t next_period = popcorn_periods[snd_note_idx];
@@ -131,7 +119,6 @@ void music_service()
     {
         // Конец мелодии — длинная пауза, потом сначала
         snd_note_idx       = 0;
-        snd_silence_cycles = SND_END_PAUSE_CYCLES;
         csr->reg           = SND_TIMER_MODE;
         return;
     }
