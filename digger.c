@@ -2339,11 +2339,11 @@ void man_rip()
 
 void bonus_indicator(uint16_t color)
 {
-    volatile uint16_t *ptr = (uint16_t *)MEM_VIDEO;
+    volatile uint16_t *ptr_up = (uint16_t *)MEM_VIDEO;
+    volatile uint16_t *ptr_down = (uint16_t *)MEM_VIDEO + SCREEN_WORD_WIDTH * SCREEN_PIX_HEIGHT - 1;
     for (uint16_t i = 0; i < SCREEN_WORD_WIDTH * SCREEN_Y_OFFSET; ++i)
     {
-        *(ptr + i) = color;
-        *(ptr + SCREEN_WORD_WIDTH * SCREEN_PIX_HEIGHT - 1 - i) = color;
+        *ptr_down-- = *ptr_up++ = color;
     }
 }
 
