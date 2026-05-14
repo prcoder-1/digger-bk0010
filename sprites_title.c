@@ -171,31 +171,14 @@ void title_sp_put(uint16_t x, uint16_t y, uint16_t x_width, uint16_t y_width, co
         "mov %[outline], r2\n\t"
         "mov %[y_width], r4\n\t"
 
-        "tst r1\n\t"
-        "beq .L_no_img_%=\n\t"
+        // Все вызовы из title.c идут с outline=null → .L_img_only_.
+        // Случай image+outline здесь не встречается; если когда-нибудь появится,
+        // он корректно (но медленнее) обработается через .L_generic_.
         "tst r2\n\t"
-        "bne .L_both_%=\n\t"
+        "bne .L_generic_%=\n\t"   // outline присутствует → generic
+        "tst r1\n\t"
+        "beq .L_generic_%=\n\t"   // оба null → generic (стирание clr-ом)
         "br  .L_img_only_%=\n"
-".L_no_img_%=:\n\t"
-        "br  .L_generic_%=\n"
-
-".L_both_%=:\n"
-".L_b_y_%=:\n\t"
-        "mov %[x_width], r3\n\t"
-        "sub r3, r5\n"
-".L_b_x_%=:\n\t"
-        "movb (r5), r0\n\t"
-        "bicb (r2)+, r0\n\t"
-        "bisb (r1)+, r0\n\t"
-        "movb r0, (r5)+\n\t"
-        "tstb @%[csr]\n\t" \
-        "bpl 1f\n\t" \
-        "jsr pc, _music_service\n" \
-"1:\n\t" \
-        "sob r3, .L_b_x_%=\n\t"
-        "add $64, r5\n\t"
-        "sob r4, .L_b_y_%=\n\t"
-        "br .L_done_%=\n"
 
 ".L_img_only_%=:\n\t"
         "mov r1, r2\n"

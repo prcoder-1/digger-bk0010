@@ -228,7 +228,7 @@ uint16_t fire_snd_period;    /// Период звука выстрела
 /**
  * @brief Отладочная процедура отображения мини-карты состояния фона
  */
-void draw_bg_minimap()
+static void draw_bg_minimap()
 {
     sp_put(48, SCREEN_Y_OFFSET + MOVE_Y_STEP + 2, sizeof(background[0]), sizeof(background) / sizeof(background[0]), (uint8_t*)background, 0);
 }
@@ -236,7 +236,7 @@ void draw_bg_minimap()
 /**
  * @brief Отладочная процедура отображения мини-карты состояния монеток (драгоценных камней)
  */
-void draw_coin_minimap()
+static void draw_coin_minimap()
 {
     sp_put(45, SCREEN_Y_OFFSET + MOVE_Y_STEP + 2, sizeof(coins[0]), sizeof(coins) / sizeof(coins[0]), (uint8_t*)coins, 0);
 }
@@ -245,7 +245,7 @@ void draw_coin_minimap()
 #define draw_coin_minimap() ;
 #endif
 
-int remove_coin(uint8_t x_log, uint8_t y_log);
+static int remove_coin(uint8_t x_log, uint8_t y_log);
 
 /**
  * @brief Вывод 16-битного десятичного числа
@@ -254,7 +254,7 @@ int remove_coin(uint8_t x_log, uint8_t y_log);
  * @param x_graph - координата X по которой будет осуществлён вывод числа
  * @param y_graph - координата Y по которой будет осуществлён вывод числа
  */
-void print_dec(uint16_t number, uint16_t x_graph, uint16_t y_graph)
+static void print_dec(uint16_t number, uint16_t x_graph, uint16_t y_graph)
 {
     constexpr char zero = '0';
     constexpr uint16_t row_w = sizeof(digit_rows[0]);                 // 3 байта на строку
@@ -284,7 +284,7 @@ void print_dec(uint16_t number, uint16_t x_graph, uint16_t y_graph)
 /**
  * @brief Вывод количества жизней в виде спрайтов Диггера рядом с количеством очков
  */
-void print_lives()
+static void print_lives()
 {
     uint16_t man_x_offset = sizeof(digit_rows[0]) * 5 + 1; // Смещение шириной в пять символов '0' плюс один байт (4 пикселя)
     constexpr uint16_t man_y_offset = SCREEN_Y_OFFSET + 2; // Смещение спрайта Диггера по оси Y
@@ -308,7 +308,7 @@ void print_lives()
 /**
  * @brief Добавление заданного количества очков и вывод очков в левом верхнем углу экрана
  */
-void add_score(uint16_t score_add)
+static void add_score(uint16_t score_add)
 {
     score += score_add;
     print_dec(score, 0, SCREEN_Y_OFFSET + MOVE_Y_STEP);
@@ -326,7 +326,7 @@ void add_score(uint16_t score_add)
 /**
  * @brief Добавление очков за убитого врага
  */
-void add_score_250()
+static void add_score_250()
 {
     add_score(250); // 250 очков за убитого врага
 }
@@ -334,7 +334,7 @@ void add_score_250()
 /**
  * @brief Проверка соприкосновения двух 4x15-спрайтов по их левым-верхним углам.
  */
-int check_collision_4_15(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
+static int check_collision_4_15(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
 {
     return ((uint16_t)((int)x2 - (int)x1 + 3) < 7u)
         && ((uint16_t)((int)y2 - (int)y1 + 14) < 29u);
@@ -375,12 +375,12 @@ static inline enum level_symbols getLevelSymbol(uint8_t y_log, uint8_t x_log)
     return (level[level_no][y_log][word_no_tbl[x_log]] >> shift_tbl[x_log]) & 7;
 }
 
-void bonus_indicator(uint16_t color);
+static void bonus_indicator(uint16_t color);
 
 /**
  * @brief Инициализация переменных состояния перед старом уровня
  */
-void init_level_state()
+static void init_level_state()
 {
     // Отключить бонус-режим
     bonus_state = BONUS_OFF;
@@ -456,7 +456,7 @@ void init_level_state()
  * @param x_graph - графическая координата по оси X
  * @param y_graph - графическая координата по оси Y
  */
-void gnaw(enum direction dir, uint16_t x_graph, uint16_t y_graph)
+static void gnaw(enum direction dir, uint16_t x_graph, uint16_t y_graph)
 {
     static const struct
     {
@@ -478,7 +478,7 @@ void gnaw(enum direction dir, uint16_t x_graph, uint16_t y_graph)
 /**
  * @brief Инициализация уровня (отрисовка фона, расстановка монеток и мешков, отрисовка прогрызенных проходов)
  */
-void init_level()
+static void init_level()
 {
     clr_words(bags, sizeof(bags) / 2); // Деактивировать все мешки
     clr_words(bugs, sizeof(bugs) / 2); // Деактивировать всех врагов
@@ -571,7 +571,7 @@ void init_level()
  *
  * @return - 1 - клетка полностью проедена, 0 - клетка не проедена полностью
  */
-uint16_t full_bite(uint8_t byte)
+static uint16_t full_bite(uint8_t byte)
 {
     if (((byte & 0xF0) == 0xF0) || ((byte & 0xF) == 0xF)) return 1;
 
@@ -595,7 +595,7 @@ uint16_t full_bite(uint8_t byte)
  *
  * @return - 1 - движение в заданном направлении возможно, 0 - движение в заданном направлении невозможно
  */
-uint8_t check_path(enum direction dir, uint8_t x_graph, uint8_t y_graph)
+static uint8_t check_path(enum direction dir, uint8_t x_graph, uint8_t y_graph)
 {
     uint8_t x_log = graph_to_x_log(x_graph);
     uint8_t y_log = graph_to_y_log(y_graph);
@@ -632,7 +632,7 @@ uint8_t check_path(enum direction dir, uint8_t x_graph, uint8_t y_graph)
  * @param y_graph - графическая координата по оси Y
  * @param dir - направлкние движения
  */
-void set_background_bits(uint16_t x_graph, uint16_t y_graph, enum direction dir)
+static void set_background_bits(uint16_t x_graph, uint16_t y_graph, enum direction dir)
 {
     const uint16_t abs_x_pos = x_graph - FIELD_X_OFFSET;
     const uint16_t abs_y_pos = y_graph - FIELD_Y_OFFSET;
@@ -718,7 +718,7 @@ void set_background_bits(uint16_t x_graph, uint16_t y_graph, enum direction dir)
 /**
  * @brief Проверка на выход за пределы игрового поля
  */
-int check_out_of_range(enum direction dir, uint16_t x_graph, uint16_t y_graph)
+static int check_out_of_range(enum direction dir, uint16_t x_graph, uint16_t y_graph)
 {
     return (
         (dir == DIR_RIGHT && x_graph >= MAX_X_POS) ||
@@ -735,7 +735,7 @@ int check_out_of_range(enum direction dir, uint16_t x_graph, uint16_t y_graph)
  * @param x_graph - координата X перемещаемого объекта
  * @param object_x_graph - координата X объекта на который возможно перемещение
  */
-int move_to_object(enum direction dir, uint16_t x_graph, uint16_t object_x_graph)
+static int move_to_object(enum direction dir, uint16_t x_graph, uint16_t object_x_graph)
 {
     // Если направление перемещения вправо и объект находится правее
     // или направление перемещения влево и объект находтся левее
@@ -751,7 +751,7 @@ int move_to_object(enum direction dir, uint16_t x_graph, uint16_t object_x_graph
  * @param dir - направление перемещения мешка
  * @return 0 - мешок был перемещён, 1 - мешок не был перемещён
  */
-uint8_t move_bag(struct bag_info *bag, enum direction dir)
+static uint8_t move_bag(struct bag_info *bag, enum direction dir)
 {
     uint8_t rv = 0;
 
@@ -871,7 +871,7 @@ uint8_t move_bag(struct bag_info *bag, enum direction dir)
  * @param x_graph - графическая координата по оси X
  * @param y_graph - графическая координата по оси Y
  */
-void erase_trail(enum direction dir, uint16_t x_graph, uint16_t y_graph)
+static void erase_trail(enum direction dir, uint16_t x_graph, uint16_t y_graph)
 {
     static const int8_t trail_dx[4]   = {  4, -MOVE_X_STEP,  0,            0 };
     static const int8_t trail_dy[4]   = {  0,            0, 15, -MOVE_Y_STEP };
@@ -886,7 +886,7 @@ void erase_trail(enum direction dir, uint16_t x_graph, uint16_t y_graph)
  *
  * @param bug - указатель на структуру с информацией о враге
  */
-void move_bug(struct bug_info *bug)
+static void move_bug(struct bug_info *bug)
 {
     enum direction dir_1, dir_2, dir_3, dir_4;
 
@@ -1139,7 +1139,7 @@ void move_bug(struct bug_info *bug)
  *
  * @param bag - указатель на структуру с информацией о мешке
  */
-void stop_bag(struct bag_info *bag)
+static void stop_bag(struct bag_info *bag)
 {
     // Если мешок пролетел больше одного этажа, то он будет разбит
     bag->state = (bag->count > 1) ? BAG_BREAKS : BAG_STATIONARY;
@@ -1165,7 +1165,7 @@ void stop_bag(struct bag_info *bag)
 /**
  * @brief Подпрограмма отрисовки Диггера
  */
-void draw_man()
+static void draw_man()
 {
     uint8_t cab = !mis_flying && !mis_wait; // Флаг наличия "башенки"
 
@@ -1202,7 +1202,7 @@ void draw_man()
  *
  * @return 1 - монета по заданным координатам удалена, 0 - монета по заданным координатам отсутствует
  */
-int remove_coin(uint8_t x_log, uint8_t y_log)
+static int remove_coin(uint8_t x_log, uint8_t y_log)
 {
     if ((x_log >= W_MAX) || (y_log >= H_MAX)) return 0;
 
@@ -1233,7 +1233,7 @@ int remove_coin(uint8_t x_log, uint8_t y_log)
 /**
  * @brief Подпрограмма обработки звуковых эффектов
  */
-void sound_effect()
+static void sound_effect()
 {
     if (snd.coin) // Звук съедания монеты (драгоценного камня)
     {
@@ -1371,7 +1371,7 @@ void sound_effect()
 /**
  * @brief Инициализация игры
  */
-void init_game()
+static void init_game()
 {
     difficulty = 0; // Начальный уровень сложности
     level_no = 0;   // Начальный уровень
@@ -1387,7 +1387,7 @@ void init_game()
 /**
  * @brief Обработка появления и перемещения врагов (Ноббинов и Хоббинов)
  */
-void process_bugs()
+static void process_bugs()
 {
     // Обработка появления врагов
     if (bugs_delay_counter > 0) --bugs_delay_counter; // Отсчёт времени до появления нового врага
@@ -1534,7 +1534,7 @@ void process_bugs()
 /**
  * @brief Обработка мешков
  */
-void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
+static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
 {
     // Обработка мешков
     uint8_t bags_fall = 0;  // Флаг, показывающий, что присутствуют падающие мешки
@@ -1812,7 +1812,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
 /**
  * @brief Обработка выстрела
  */
-void process_missile()
+static void process_missile()
 {
     // Размеры и количество фаз анимации выстрела
     constexpr uint16_t missile_x_size = sizeof(image_missile[0][0]);
@@ -1939,7 +1939,7 @@ void process_missile()
     }
 }
 
-void man_rip();
+static void man_rip();
 
 /**
  * @brief Съесть монету (драгоценный камень)
@@ -1959,7 +1959,7 @@ static inline void eat_coin()
 /**
  * @brief Обработка Диггера
  */
-void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
+static void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
 {
     // Обработка перемещения Диггера
     if (man_state == CREATURE_ALIVE) // Если Диггер жив
@@ -2233,7 +2233,7 @@ void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
  * @brief Подпрограмма анимации гибели Диггера, отрисовки надгробного камня и
  *        воспроизведения музыкального сопровождения
  */
-void man_rip()
+static void man_rip()
 {
     // Последовательность высоты на которую подпрыгивает перевёрнутый Диггер
     static uint8_t bounce[8] = { 3, 5, 6, 6, 5, 4, 3, 0 };
@@ -2324,7 +2324,7 @@ void man_rip()
     man_state = CREATURE_RIP;
 }
 
-void bonus_indicator(uint16_t color)
+static void bonus_indicator(uint16_t color)
 {
     volatile uint16_t *ptr_up = (uint16_t *)MEM_VIDEO;
     volatile uint16_t *ptr_down = (uint16_t *)MEM_VIDEO + SCREEN_WORD_WIDTH * SCREEN_PIX_HEIGHT - 1;
@@ -2337,7 +2337,7 @@ void bonus_indicator(uint16_t color)
 /**
  * @brief Обработка бонуса
  */
-void process_bonus()
+static void process_bonus()
 {
     // Обработка Бонус-режима
     if (bonus_state == BONUS_ON) // Если включен Бонус-режим
@@ -2372,7 +2372,7 @@ void process_bonus()
 /**
  * @brief Обработка общего состояния игры (переход на новый уровень, Game Over и т.д.)
  */
-void process_game_state()
+static void process_game_state()
 {
     // Декрементировать таймер между последовательными съедениями драгоценных камней (монеток)
     if (coin_time > 0) coin_time--;
