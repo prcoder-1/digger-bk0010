@@ -806,7 +806,6 @@ static uint8_t move_bag(struct bag_info *bag, enum direction dir)
         for (uint8_t i = 0; i < bugs_max; ++i)
         {
             struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
-            if (!bugs_active) continue; // Пропустить неактивных врагов
             if (bug->state != CREATURE_ALIVE) continue; //  Пропустить неживых врагов
 
             // Проверить, что мешок перемещается на врага
@@ -1162,7 +1161,7 @@ static void stop_bag(struct bag_info *bag)
 
         if (check_collision_4_15(bag->x_graph, bag->y_graph, another_bag->x_graph, another_bag->y_graph))
         {
-            // erase_4_15(another_bagbag->x_graph, another_bag->y_graph); // Стереть мешок
+            erase_4_15(another_bag->x_graph, another_bag->y_graph); // Стереть мешок
             another_bag->state = BAG_INACTIVE;
             snd.break_bag = 1;
         }
@@ -1179,7 +1178,7 @@ static void draw_man()
     man_image_phase += man_image_phase_inc; // Переключить фазу изображения
 
     // При необходимости, сменить направление изменения фазы спрайта
-    if (!man_image_phase || man_image_phase >= 2) man_image_phase_inc =- man_image_phase_inc;
+    if (!man_image_phase || man_image_phase >= 2) man_image_phase_inc = -man_image_phase_inc;
 
     uint16_t image_phase = man_image_phase + ((cab) ? 0 : 3);
     const uint8_t *image = (man_dir < DIR_UP) ? (uint8_t *)image_digger_right[image_phase] : (uint8_t *)image_digger_up[image_phase];
@@ -1721,12 +1720,8 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                     {
                         bug->state = CREATURE_DEAD_MONEY_BAG; // Враг был убит мешком с деньгами
 
-                        // В бонус-режиме увеличить количество создаваемых врагов компенсируя убитых мешками
-                        if (bonus_state == BONUS_ON)
-                        {
-                            bugs_total++; // Увеличить количество создаваемых врагов
-                            bugs_active--; // Уменьшить количество активных врагов
-                        }
+                        // В бонус-режиме увеличить количество создаваемых врагов компенсируя убитых мешками.
+                        if (bonus_state == BONUS_ON) bugs_total++;
                     }
                 }
 
@@ -1875,12 +1870,8 @@ static void process_missile()
                     bug->state = CREATURE_RIP; // Враг был убит выстрелом
                     add_score_250(); // Добавить 250 очков за убитого врага
 
-                    // В бонус-режиме увеличить количество создаваемых врагов компенсируя убитых мешками
-                    if (bonus_state == BONUS_ON)
-                    {
-                        bugs_total++; // Увеличить количество создаваемых врагов
-                        bugs_active--; // Уменьшить количество активных врагов
-                    }
+                    // В бонус-режиме увеличить количество создаваемых врагов компенсируя убитых выстрелом.
+                    if (bonus_state == BONUS_ON) bugs_total++;
                 }
             }
 
@@ -2315,7 +2306,7 @@ static void man_rip()
     for (uint8_t i = 0; i < bugs_max; ++i)
     {
         struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
-        if (!bugs_active) continue; // Пропустить неактивных врагов
+        if (bug->state == CREATURE_INACTIVE) continue; // Пропустить неактивных врагов
 
         // Проверить, что враг оказался рядом с могилкой
         if (check_collision_4_15(man_x_graph, man_y_graph, bug->x_graph, bug->y_graph))
