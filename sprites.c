@@ -234,6 +234,140 @@ void sp_4_15_hv_mirror_put(uint16_t x, uint16_t y, const uint8_t *image)
     );
 }
 
+void sp_4_15_mask_put(uint16_t x, uint16_t y, const uint8_t *image, const uint8_t *outline)
+{
+    asm(
+        "mov $040000, r5\n\t"
+        "mov %[y], r0\n\t"
+        "asl r0\n\t"
+        "asl r0\n\t"
+        "asl r0\n\t"
+        "asl r0\n\t"
+        "asl r0\n\t"
+        "asl r0\n\t"
+        "add r0, r5\n\t"
+        "add %[x], r5\n\t"
+
+        "mov %[image], r1\n\t"
+        "mov %[outline], r2\n\t"
+        "mov $15, r4\n\t"
+
+        "bit r5, $1\n\t"
+        "bne .L_odd_%=\n\t"
+
+        // Чётный путь: пословные операции
+        "tst r1\n\t"
+        "beq .L_even_no_img_%=\n"
+
+        // image + outline пословно
+".L_even_both_%=:\n\t"
+        "mov (r5), r0\n\t"
+        "bic (r2)+, r0\n\t"
+        "bis (r1)+, r0\n\t"
+        "mov r0, (r5)+\n\t"
+
+        "mov (r5), r0\n\t"
+        "bic (r2)+, r0\n\t"
+        "bis (r1)+, r0\n\t"
+        "mov r0, (r5)+\n\t"
+
+        "add $60, r5\n\t"
+        "sob r4, .L_even_both_%=\n\t"
+        "br .L_done_%=\n"
+
+        // Только outline пословно
+".L_even_no_img_%=:\n\t"
+        "bic (r2)+, (r5)+\n\t"
+        "bic (r2)+, (r5)+\n\t"
+        "add $60, r5\n\t"
+        "sob r4, .L_even_no_img_%=\n\t"
+        "br .L_done_%=\n"
+
+".L_odd_%=:\n\t"
+        "tst r1\n\t"
+        "beq .L_odd_no_img_%=\n"
+
+        // Нечётный путь: побайтно
+".L_odd_both_%=:\n\t"
+        "movb (r5), r0\n\t"
+        "bicb (r2)+, r0\n\t"
+        "bisb (r1)+, r0\n\t"
+        "movb r0, (r5)+\n\t"
+
+        "movb (r5), r0\n\t"
+        "bicb (r2)+, r0\n\t"
+        "bisb (r1)+, r0\n\t"
+        "movb r0, (r5)+\n\t"
+
+        "movb (r5), r0\n\t"
+        "bicb (r2)+, r0\n\t"
+        "bisb (r1)+, r0\n\t"
+        "movb r0, (r5)+\n\t"
+
+        "movb (r5), r0\n\t"
+        "bicb (r2)+, r0\n\t"
+        "bisb (r1)+, r0\n\t"
+        "movb r0, (r5)+\n\t"
+
+        "add $60, r5\n\t"
+        "sob r4, .L_odd_both_%=\n\t"
+        "br .L_done_%=\n"
+
+".L_odd_no_img_%=:\n\t"
+        "bicb (r2)+, (r5)+\n\t"
+        "bicb (r2)+, (r5)+\n\t"
+        "bicb (r2)+, (r5)+\n\t"
+        "bicb (r2)+, (r5)+\n\t"
+        "add $60, r5\n\t"
+        "sob r4, .L_odd_no_img_%=\n"
+
+".L_done_%=:\n\t"
+        :
+        : [x]"g"(x), [y]"g"(y), [image]"m"(image), [outline]"m"(outline)
+        : "r0", "r1", "r2", "r4", "r5", "cc", "memory"
+    );
+}
+
+void erase_4_15(uint16_t x_graph, uint16_t y_graph)
+{
+    asm volatile (
+        "mov $040000, r0\n\t"
+        "mov %[y], r1\n\t"
+        "asl r1\n\t"
+        "asl r1\n\t"
+        "asl r1\n\t"
+        "asl r1\n\t"
+        "asl r1\n\t"
+        "asl r1\n\t"
+        "add r1, r0\n\t"
+        "add %[x], r0\n\t"
+        "mov $15, r1\n\t"
+
+        "bit r0, $1\n\t"
+        "bne .L_e_odd_%=\n"
+
+".L_e_even_%=:\n\t"
+        "clr (r0)+\n\t"
+        "clr (r0)+\n\t"
+        "add $60, r0\n\t"
+        "sob r1, .L_e_even_%=\n\t"
+        "br .L_e_done_%=\n"
+
+".L_e_odd_%=:\n\t"
+        "clrb (r0)+\n\t"
+        "clrb (r0)+\n\t"
+        "clrb (r0)+\n\t"
+        "clrb (r0)+\n\t"
+        "add $60, r0\n\t"
+        "sob r1, .L_e_odd_%=\n"
+
+".L_e_done_%=:\n\t"
+        :
+        : [x]"g"(x_graph), [y]"g"(y_graph)
+        : "r0", "r1", "cc", "memory"
+    );
+}
+
 void sp_put(uint16_t x, uint16_t y, uint16_t x_width, uint16_t y_width, const uint8_t *image, const uint8_t *outline)
 {
     asm(

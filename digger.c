@@ -332,22 +332,6 @@ void add_score_250()
 }
 
 /**
- * @brief Стирает блок 16x15 пикселей (4x15 байт)
- *
- * @param x_graph - координата X блока
- * @param y_graph - координата Y блока
- */
-void erase_4_15(uint16_t x_graph, uint16_t y_graph)
-{
-    uint8_t *ptr = (uint8_t *)MEM_VIDEO + SCREEN_BYTE_WIDTH * y_graph + x_graph;
-    for (uint16_t i = 0; i < 15; ++i)
-    {
-        ptr[0] = ptr[1] = ptr[2] = ptr[3] = 0;
-        ptr += SCREEN_BYTE_WIDTH;
-    }
-}
-
-/**
  * @brief Проверка соприкосновения двух 4x15-спрайтов по их левым-верхним углам.
  */
 int check_collision_4_15(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
@@ -370,11 +354,14 @@ static uint8_t graph_to_y_log(uint16_t y_graph)
 }
 
 /**
- * @brief Вызов sp_put для спрайтов 4x15 с маской.
+ * @brief Вызов sp_4_15_mask_put для спрайтов 4x15 с маской.
+ *
+ * Специализация быстрее универсального sp_put: пословные блиты в чётном случае,
+ * развёрнутый побайтный путь в нечётном, отдельная ветка для image=null.
  */
 static void sp_4_15_mask(uint16_t x, uint16_t y, const uint8_t *image, const uint8_t *outline)
 {
-    sp_put(x, y, 4, 15, (uint8_t*)image, (uint8_t*)outline);
+    sp_4_15_mask_put(x, y, image, outline);
 }
 
 /**
@@ -1718,7 +1705,7 @@ void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                 // Попытаться спасти врагов от падающего мешка
                 for (uint8_t i = 0; i < bugs_max; ++i)
                 {
-                    volatile struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
+                    struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
                     if (bug->state != CREATURE_ALIVE) continue; // Пропустить неживых врагов
 
                     uint8_t bug_x_graph = bug->x_graph;
