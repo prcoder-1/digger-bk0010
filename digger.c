@@ -2406,14 +2406,26 @@ static void process_game_state()
             constexpr uint16_t go_height = sizeof(game_over) / go_width;
             constexpr uint16_t go_x = (SCREEN_BYTE_WIDTH - go_width) / 2;
             constexpr uint16_t go_y = (SCREEN_PIX_HEIGHT - go_height) / 2;
+            constexpr uint16_t f_x = go_x - 2 * MOVE_X_STEP;
+            constexpr uint16_t f_y = go_y - (MOVE_Y_STEP + 2);
+            constexpr uint16_t f_w = go_width + 4 * MOVE_X_STEP;
+            constexpr uint16_t f_h = go_height + 2 * (MOVE_Y_STEP + 2);
+            sp_clear_brick(f_x, f_y, f_w, f_h); // Очистка фона для надписи Game Over
+            volatile uint8_t *p = (volatile uint8_t *)MEM_VIDEO + f_y * SCREEN_BYTE_WIDTH + f_x;
+            volatile uint8_t *q = p + (f_h - 1) * SCREEN_BYTE_WIDTH;
+            // Отрисовка рамки вокруг надписи Game Over
+            for (uint16_t i = 0; i < f_w; i++) p[i] = p[i + SCREEN_BYTE_WIDTH] = q[i] = q[i - SCREEN_BYTE_WIDTH] = 0xFF;
+            p += 2 * SCREEN_BYTE_WIDTH;
+            for (uint16_t i = 0; i < f_h - 4; i++) {
+                p[0] = 0x0F;
+                p[f_w - 1] = 0xF0;
+                p += SCREEN_BYTE_WIDTH;
+            }
 
-            // Вывести надпись "Game Over"
-            sp_clear_brick(go_x - 2 * MOVE_X_STEP, go_y - 2 * MOVE_Y_STEP, go_width + 4 * MOVE_X_STEP, go_height + 4 * MOVE_Y_STEP);
-            sp_put(go_x, go_y, go_width, go_height, (uint8_t *)game_over, 0);
-            // delay_ms(500);
+            sp_put(go_x, go_y, go_width, go_height, (uint8_t *)game_over, 0); // Вывод написи Game Over
 
-            while(((union EXT_DEV *)REG_EXT_DEV)->bits.MAG_KEY);
-            (void)*(volatile uint8_t *)REG_KEY_DATA;
+            while(((union EXT_DEV *)REG_EXT_DEV)->bits.MAG_KEY); // Ожидание нажатия клавиши
+            (void)*(volatile uint8_t *)REG_KEY_DATA; // Очистка буфера клавиатуры
 
             init_game(); // Установить игру в начальное состояние
         }
