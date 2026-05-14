@@ -2359,7 +2359,7 @@ static void process_bonus()
         {
             bonus_state = BONUS_END;
             snd.chase = 0; // Выключить звук включения/выключения бонус-режима
-            bugs_delay_counter = bugs_delay; //  Перезарядить счётчик времени до появления врагов
+            bugs_delay_counter = 0; // Враги начинают появляться сразу же после окончания бонус-режима
 
             // TODO: Включить музыку Popcorn
         }
