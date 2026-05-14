@@ -207,7 +207,7 @@ struct {
     uint8_t  loose;          /// Флаг, означающий, что звук качающегося мешка включен
     uint8_t  fall;           /// Флаг, означающий, что звук летящего мешка включен
     uint8_t  break_bag;      /// Флаг, означающий, что звук разбивающегося мешка включен
-    uint8_t  money;          /// Флаг, означающий, что звук съедания золота включен
+    uint8_t  money;          /// Счётчик 0..30 - звук съедания золота
     uint8_t  coin;           /// Счётчик 0..7 - звук съедания монетки/драгоценного камня
     uint8_t  fire;           /// Флаг, означающий, что звук выстрела включен
     uint8_t  explode;        /// Флаг, означающий, что звук взрыва включен
@@ -223,6 +223,8 @@ uint16_t fall_period;        /// Период звука летящего меш
 int8_t   coin_snd_note;      /// Номер ноты при съедании монетки (драгоценного камня)
 uint8_t  coin_time;          /// Таймер между последовательными съедениями драгоценных камней (монеток)
 uint16_t fire_snd_period;    /// Период звука выстрела
+uint16_t money_snd_period_1; /// Период звука съедания золота (нечётные ноты)
+uint16_t money_snd_period_2; /// Период звука съедания золота (чётные ноты)
 
 #if defined(DEBUG)
 /**
@@ -1298,18 +1300,14 @@ static void sound_effect()
 
     if (snd.money) // Звук съедаемого золота
     {
-        uint16_t money_snd_count_1 = 500 / N;
-        uint16_t money_snd_count_2 = 4000 / N;
-
-        for (uint16_t i = 0; i < 30; ++i)
+        for (uint8_t k = 10; k && snd.money; --k)
         {
-            uint16_t period = !(i & 1) ? money_snd_count_1 : money_snd_count_2;
-            money_snd_count_1 += money_snd_count_1 >> 4;
-            money_snd_count_2 -= money_snd_count_2 >> 4;
+            uint16_t period = (snd.money & 1) ? money_snd_period_2 : money_snd_period_1;
+            money_snd_period_1 += money_snd_period_1 >> 4;
+            money_snd_period_2 -= money_snd_period_2 >> 4;
             sound(period, 25);
+            snd.money--;
         }
-
-        snd.money = 0;
     }
 
     if (snd.chase) // Звук включения бонус-режима
@@ -2126,12 +2124,14 @@ static void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
                     case BAG_BREAKS:
                     case BAG_BROKEN:
                     {
-                        snd.money = 1; // Издать звук съедаемого золота
+                        // Включить звук съедаемого золота
+                        money_snd_period_1 = 500 / N; // Начальный период чётных звуков
+                        money_snd_period_2 = 4000 / N; // Начальный период нечётных звуков
+                        snd.money = 30; // Количество звуков в последовательности
                         bag->state = BAG_INACTIVE; // Сделать мешок неактивным
                         add_score(500); // 500 очков за съеденное золото
                         // Стереть золото из разбитого мешка
                         erase_4_15(bag->x_graph, bag->y_graph);
-
                         break;
                     }
                 }
