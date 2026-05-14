@@ -2273,6 +2273,19 @@ static void man_rip()
 
     delay_ms(500);
 
+    for (uint8_t i = 0; i < bugs_max; ++i)
+    {
+        struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
+        if (bug->state == CREATURE_INACTIVE) continue; // Пропустить неактивных врагов
+
+        // Проверить, что враг оказался рядом с могилкой
+        if (check_collision_4_15(man_x_graph, man_y_graph, bug->x_graph, bug->y_graph))
+        {
+            bug->state = CREATURE_INACTIVE; // Декативировать врага убившего Диггера
+            erase_4_15(bug->x_graph, bug->y_graph); // Стереть деактивированного врага
+        }
+    }
+
     // Траурный марш
     static const uint8_t music_dead_periods[]   = { C4, C4, C4, C4, DS4, D4, D4, C4, C4, B3, C4 };
     static const uint16_t music_dead_durations[] = { N6, NQ, NE, N6, NQ, NE, NQ, NE, NQ, NE, N12 };
@@ -2302,19 +2315,6 @@ static void man_rip()
     }
 
     erase_4_15(man_x_graph, man_y_graph); // Стереть надгробный камень
-
-    for (uint8_t i = 0; i < bugs_max; ++i)
-    {
-        struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
-        if (bug->state == CREATURE_INACTIVE) continue; // Пропустить неактивных врагов
-
-        // Проверить, что враг оказался рядом с могилкой
-        if (check_collision_4_15(man_x_graph, man_y_graph, bug->x_graph, bug->y_graph))
-        {
-            bug->state = CREATURE_INACTIVE; // Декативировать врага убившего Диггера
-            erase_4_15(bug->x_graph, bug->y_graph); // Стереть деактивированного врага
-        }
-    }
 
     (void)*(volatile uint8_t *)REG_KEY_DATA;
 
