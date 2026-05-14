@@ -846,10 +846,10 @@ static uint8_t move_bag(struct bag_info *bag, enum direction dir)
     if (!rv)
     {
         // Стирание мешка по старым координатам
-        sp_put(bag->x_graph, bag->y_graph, 4, 15, nullptr, (uint8_t *)outline_bag);
+        sp_4_15_mask(bag->x_graph, bag->y_graph, nullptr, outline_bag[0]);
 
         // Отрисовка спрайта передвигаемого мешка
-        sp_put(bag_x_graph, bag_y_graph, 4, 15, (uint8_t *)image_bag, (uint8_t *)outline_bag);
+        sp_4_15_mask(bag_x_graph, bag_y_graph, image_bag[0], outline_bag[0]);
 
         set_background_bits(bag_x_graph, bag_y_graph, dir); // Сбросить биты матрицы фона
         // Удалить монеты уничтоженные мешком
@@ -979,10 +979,11 @@ static void move_bug(struct bug_info *bug)
         if (bug->type == BUG_NOBBIN)
         {
             // Для Ноббинов нужно выбрать наилучшее направление по которому свободен путь
-                 if (check_path(dir_1, bug_x_graph, bug_y_graph)) { dir = dir_1; }
-            else if (check_path(dir_2, bug_x_graph, bug_y_graph)) { dir = dir_2; }
-            else if (check_path(dir_3, bug_x_graph, bug_y_graph)) { dir = dir_3; }
-            else if (check_path(dir_4, bug_x_graph, bug_y_graph)) { dir = dir_4; }
+            const enum direction dirs[4] = { dir_1, dir_2, dir_3, dir_4 };
+            for (uint8_t i = 0; i < 4; ++i)
+            {
+                if (check_path(dirs[i], bug_x_graph, bug_y_graph)) { dir = dirs[i]; break; }
+            }
         }
         else
         {
