@@ -1,88 +1,131 @@
-diff -urp a/gcc/config/pdp11/pdp11.cc b/src/gcc-14.2.0/gcc/config/pdp11/pdp11.cc
+--- a/gcc/config/pdp11/pdp11.opt	2026-06-01 23:01:27.349759647 +0300
++++ b/gcc/config/pdp11/pdp11.opt	2026-06-01 23:01:33.093368052 +0300
+@@ -30,6 +30,10 @@
+ Target Mask(45)
+ Generate code for an 11/45.
+ 
++m1801vm1
++Target Mask(1801VM1)
++Generate code for the K1801VM1 (PDP-11/10-class CPU with SOB and XOR).
++
+ mac0
+ Target Mask(AC0)
+ Return floating-point results in ac0 (fr0 in Unix assembler syntax).
+--- a/gcc/config/pdp11/pdp11.h	2026-06-01 23:01:27.350777718 +0300
++++ b/gcc/config/pdp11/pdp11.h	2026-06-01 23:01:39.430247468 +0300
+@@ -55,6 +55,11 @@
+ #define TARGET_40_PLUS		(TARGET_40 || TARGET_45)
+ #define TARGET_10		(! TARGET_40_PLUS)
+ 
++/* The K1801VM1 is a PDP-11/10-class CPU that also implements the SOB
++   and XOR instructions.  Use this helper for patterns that need either
++   of those without requiring the full PDP-11/40+ instruction set.  */
++#define TARGET_HAS_SOB_XOR	(TARGET_40_PLUS || TARGET_1801VM1)
++
+ #define TARGET_UNIX_ASM_DEFAULT	0
+ 
+ /* "Dialect" just distinguishes between standard DEC mnemonics, which
 --- a/gcc/config/pdp11/pdp11.cc	2024-08-01 11:17:14.000000000 +0300
-+++ b/gcc-14.2.0/src/gcc-14.2.0/gcc/config/pdp11/pdp11.cc	2025-01-03 23:56:58.555977060 +0300
-@@ -2063,8 +2063,12 @@ pdp11_assemble_shift (rtx *operands, mac
++++ b/gcc/config/pdp11/pdp11.cc	2026-06-01 23:02:36.516161171 +0300
+@@ -2063,8 +2063,18 @@
    if (!small)
      {
        /* Loop case, emit the count-down and branch if not done.  */
 -      output_asm_insn ("dec\t%2", operands);
 -      output_asm_insn ("bne\t%l0", lb);
-+      rtx tmpops[2];    
-+      tmpops[0] = operands[2];
-+      tmpops[1] = lb[0];
-+      output_asm_insn ("sob\t%0, %l1", tmpops);
-+      // output_asm_insn ("dec\t%2", operands);
-+      // output_asm_insn ("bne\t%l0", lb);
++      if (TARGET_HAS_SOB_XOR)
++	{
++	  rtx tmpops[2];
++	  tmpops[0] = operands[2];
++	  tmpops[1] = lb[0];
++	  output_asm_insn ("sob\t%0,%l1", tmpops);
++	}
++      else
++	{
++	  output_asm_insn ("dec\t%2", operands);
++	  output_asm_insn ("bne\t%l0", lb);
++	}
      }
    return "";
  }
-
-diff -urp a/gcc/config/pdp11/pdp11.md b/gcc-14.2.0/src/gcc-14.2.0/gcc/config/pdp11/pdp11.md
+@@ -2084,12 +2094,12 @@
+     shift_size *= 2;
+ 
+   /* If shifting by a small constant, the loop is unrolled by the
+-     shift count.  Otherwise, account for the size of the decrement
+-     and branch.  */
++     shift count.  Otherwise, account for the size of the loop tail:
++     a single SOB if available, otherwise DEC + BNE.  */
+   if (CONST_INT_P (operands[2]) && pdp11_small_shift (INTVAL (operands[2])))
+     shift_size *= INTVAL (operands[2]);
+   else
+-    shift_size += 4;
++    shift_size += TARGET_HAS_SOB_XOR ? 2 : 4;
+ 
+   /* Logical right shift takes one more instruction (CLC).  */
+   if (code == LSHIFTRT)
 --- a/gcc/config/pdp11/pdp11.md	2024-08-01 11:17:14.000000000 +0300
-+++ b/gcc-14.2.0/src/gcc-14.2.0/gcc/config/pdp11/pdp11.md	2025-01-03 22:32:28.201616716 +0300
++++ b/gcc/config/pdp11/pdp11.md	2026-06-01 23:02:20.801460207 +0300
 @@ -333,7 +333,7 @@
  	      (set (match_dup 0)
  		   (plus:HI (match_dup 0)
  			 (const_int -1)))])]
 -  "TARGET_40_PLUS"
-+  ""
++  "TARGET_HAS_SOB_XOR"
    "{
      if (GET_MODE (operands[0]) != HImode)
        FAIL;
-@@ -351,9 +351,9 @@
+@@ -351,7 +351,7 @@
     (set (match_dup 0)
  	(plus:HI (match_dup 0)
  		 (const_int -1)))]
 -  "TARGET_40_PLUS"
-+  ""
++  "TARGET_HAS_SOB_XOR"
    "#"
--  "&& reload_completed"
-+  "reload_completed"
+   "&& reload_completed"
    [(parallel [(set (pc)
- 		   (if_then_else
- 		    (ne (match_dup 0) (const_int 1))
 @@ -380,7 +380,7 @@
  	(plus:HI (match_dup 0)
  	      (const_int -1)))
     (clobber (reg:CC CC_REGNUM))]
 -  "TARGET_40_PLUS && reload_completed"
-+  "reload_completed"
++  "TARGET_HAS_SOB_XOR && reload_completed"
    "*
  {
   rtx lb[1];
-@@ -746,13 +746,7 @@
+@@ -746,7 +746,7 @@
      output_asm_insn (\"mov\t(%1)+,(%0)+\", operands);
    else
      output_asm_insn (\"movb\t(%1)+,(%0)+\", operands);
 -  if (TARGET_40_PLUS)
--    output_asm_insn (\"sob\t%0,%l1\", lb);
--  else
--    {
--      output_asm_insn (\"dec\t%0\", lb);
--      output_asm_insn (\"bne\t%l1\", lb);
--    }
-+    output_asm_insn (\"sob\t%0,%l1\", lb);  
++  if (TARGET_HAS_SOB_XOR)
+     output_asm_insn (\"sob\t%0,%l1\", lb);
+   else
+     {
+@@ -756,7 +756,7 @@
    return \"\";
  }"
    [(set (attr "length")
-@@ -1541,9 +1535,9 @@
+-	(if_then_else (match_test "TARGET_40_PLUS")
++	(if_then_else (match_test "TARGET_HAS_SOB_XOR")
+ 		      (const_int 4)
+ 		      (const_int 6)))])
+ 
+@@ -1541,7 +1541,7 @@
    [(set (match_operand:HI 0 "nonimmediate_operand" "=rR,Q")
  	(xor:HI (match_operand:HI 1 "general_operand" "%0,0")
  		(match_operand:HI 2 "register_operand" "r,r")))]
 -  "TARGET_40_PLUS"
-+  ""
++  "TARGET_HAS_SOB_XOR"
    "#"
--  "&& reload_completed"
-+  "reload_completed"
+   "&& reload_completed"
    [(parallel [(set (match_dup 0)
- 		   (xor:HI (match_dup 1) (match_dup 2)))
- 	      (clobber (reg:CC CC_REGNUM))])]
-@@ -1555,7 +1549,7 @@
+@@ -1555,7 +1555,7 @@
  	(xor:HI (match_operand:HI 1 "general_operand" "%0,0")
  	     (match_operand:HI 2 "register_operand" "r,r")))
     (clobber (reg:CC CC_REGNUM))]
 -  "TARGET_40_PLUS && reload_completed"
-+  "reload_completed"
++  "TARGET_HAS_SOB_XOR && reload_completed"
    "xor\t%2,%0"
    [(set_attr "length" "2,4")])
  
