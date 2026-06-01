@@ -6,7 +6,7 @@ OUT_FILE_1=${FILE_1}.out
 OUT_FILE_2=${FILE_2}.out
 OPT_FLAG=-Os -mlra
 XGCC=/home/prcoder/xgcc
-GCC_FLAGS=-std=gnu23 -fomit-frame-pointer -msoft-float -fcprop-registers -fPIC -nostartfiles -nodefaultlibs -nostdlib -m10 $(OPT_FLAG) -I$(XGCC)/include
+GCC_FLAGS=-std=gnu23 -fomit-frame-pointer -msoft-float -fcprop-registers -fPIC -nostartfiles -nodefaultlibs -nostdlib -m10 -m1801vm1 $(OPT_FLAG) -I$(XGCC)/include
 GCC_ASM_FLAGS=-S -fverbose-asm
 AS_FLAGS=-mno-fpu -mlimited-eis -pic
 GMPI_API_URL=http://10.0.0.55/api
@@ -49,11 +49,12 @@ crt0:
 libs: memory.s divmulmod.s sprites.c sprites_title.c sound.c tools.c
 	pdp11-aout-as ${AS_FLAGS} memory.s -o memory.o
 	pdp11-aout-as ${AS_FLAGS} mulhi3.s -o mulhi3.o
+	pdp11-aout-as ${AS_FLAGS} xorhi3.s -o xorhi3.o
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o sprites.o sprites.c
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o sprites_title.o sprites_title.c
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o sound.o sound.c
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o tools.o tools.c
-	pdp11-aout-ar rcs libs.a memory.o sprites.o sound.o tools.o mulhi3.o
+	pdp11-aout-ar rcs libs.a memory.o sprites.o sound.o tools.o mulhi3.o xorhi3.o
 
 digger-out-file: crt0 digger-main-file sprites-file short-font-file levels-file libs
 	pdp11-aout-ld -T a.out.ld -Map digger.map -o ${OUT_FILE_1} crt0.o digger_sprites.o digger_short_font.o digger_levels.o digger.o libs.a
