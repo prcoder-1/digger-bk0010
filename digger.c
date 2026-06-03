@@ -10,32 +10,32 @@
 
 // #define DEBUG // Режим отладки включен
 
-#define SCREEN_Y_OFFSET 25
+constexpr uint16_t SCREEN_Y_OFFSET = 25;
 
-#define FIELD_X_OFFSET 2  // Смещение игрового поля по оси X
-#define FIELD_Y_OFFSET (SCREEN_Y_OFFSET + 32) // Смещение игрового поля по оси Y
-#define POS_X_STEP 4      // Шаг клеток по оси X (в байтах)
-#define POS_Y_STEP 16     // Шаг клеток по оси Y (в строках)
-#define MOVE_X_STEP 1     // Шаг перемещения по оси X (в байтах)
-#define MOVE_Y_STEP 4     // Шаг перемещения по оси Y (в строках)
+constexpr uint16_t FIELD_X_OFFSET = 2;  // Смещение игрового поля по оси X
+constexpr uint16_t FIELD_Y_OFFSET = SCREEN_Y_OFFSET + 32; // Смещение игрового поля по оси Y
+constexpr uint8_t POS_X_STEP = 4;      // Шаг клеток по оси X (в байтах)
+constexpr uint8_t POS_Y_STEP = 16;     // Шаг клеток по оси Y (в строках)
+constexpr uint8_t MOVE_X_STEP = 1;     // Шаг перемещения по оси X (в байтах)
+constexpr uint8_t MOVE_Y_STEP = 4;     // Шаг перемещения по оси Y (в строках)
 
-#define MIN_X_POS FIELD_X_OFFSET // Минимальное положение по оси X
-#define MIN_Y_POS FIELD_Y_OFFSET // Минимальное положение по оси Y
-#define MAX_X_POS (FIELD_X_OFFSET + POS_X_STEP * (W_MAX - 1)) // Максимальное положение по оси X
-#define MAX_Y_POS (FIELD_Y_OFFSET + POS_Y_STEP * (H_MAX - 1)) // Максимальное положение по оси Y
+constexpr uint16_t MIN_X_POS = FIELD_X_OFFSET; // Минимальное положение по оси X
+constexpr uint16_t MIN_Y_POS = FIELD_Y_OFFSET; // Минимальное положение по оси Y
+constexpr uint16_t MAX_X_POS = FIELD_X_OFFSET + POS_X_STEP * (W_MAX - 1); // Максимальное положение по оси X
+constexpr uint16_t MAX_Y_POS = FIELD_Y_OFFSET + POS_Y_STEP * (H_MAX - 1); // Максимальное положение по оси Y
 
-#define COIN_Y_OFFSET 3 // Смещение спрайта монетки в ячейке по оси Y
+constexpr uint16_t COIN_Y_OFFSET = 3; // Смещение спрайта монетки в ячейке по оси Y
 
-#define MAX_BAGS 7 // Максимальное количество мешков с деньгами на уровне
-#define MAX_BUGS 5 // Максимальное количество врагов на уровне
+constexpr uint8_t MAX_BAGS = 7; // Максимальное количество мешков с деньгами на уровне
+constexpr uint8_t MAX_BUGS = 5; // Максимальное количество врагов на уровне
 
-#define MAN_START_X 7 // Начльное положение Диггера по оси X (вклетках)
-#define MAN_START_Y 9 // Начльное положение Диггера по оси Y (вклетках)
+constexpr uint8_t MAN_START_X = 7; // Начльное положение Диггера по оси X (вклетках)
+constexpr uint8_t MAN_START_Y = 9; // Начльное положение Диггера по оси Y (вклетках)
 
-#define LOOSE_WAIT 15 // Время с момента начала покачивания до момента падения мешка
+constexpr uint8_t LOOSE_WAIT = 15; // Время с момента начала покачивания до момента падения мешка
 
-#define BONUS_LIFE_SCORE 20000 // Количество очков для дополнительной жизни
-#define MAX_LIVES 4 // Максимальное количество жизней
+constexpr uint32_t BONUS_LIFE_SCORE = 20000; // Количество очков для дополнительной жизни
+constexpr uint8_t MAX_LIVES = 4; // Максимальное количество жизней
 
 /**
  * @brief Перечисление типов врагов
