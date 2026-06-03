@@ -96,7 +96,7 @@ enum bonus_state : uint8_t
 /**
  * @brief Состояние мешка с деньгами
  *
- * Размер дополнен до 8 байт: при индексации &bags[i] компилятор использует
+ * Размер дополнен до 8 байт: при индексации &bags_state[i] компилятор использует
  * сдвиг (<<3) вместо вызова __mulhi3 на умножение на 5.
  */
 struct bag_info
@@ -148,42 +148,46 @@ uint16_t coins[H_MAX];
 /**
  * @brief Состояние мешков с деньгами
  */
-struct bag_info bags[MAX_BAGS];
+struct bag_info bags_state[MAX_BAGS];
 
 /**
  * @brief Состояние врагов (Хоббинов/Ноббинов)
  */
-struct bug_info bugs[MAX_BUGS];
+struct bug_info bugs_state[MAX_BUGS];
 
 // Переменные отвечающие за состояние Диггера
-uint16_t man_image_phase;      /// Фаза отображения спрайта Диггера
-uint16_t man_image_phase_inc;  /// Инкремент(декремент) фазы отображения спрайта Диггера
-uint16_t man_wait;             /// Задержка перед следующим перемещением Диггера
-uint16_t man_x_graph;          /// Положение Диггера по оси X в графических координатах
-uint16_t man_y_graph;          /// Положение Диггера по оси Y в графических координатах
-enum direction man_dir;        /// Направление движения Диггера
-enum direction man_prev_dir;   /// Предыдущее направление движения Диггера
-enum direction man_new_dir;    /// Желаемое новое направление движения Диггера
-enum creature_state man_state; /// Состояние Диггера (жив, убит, лежит дохлый)
-struct bag_info *man_dead_bag; /// Указатель на мешок от котрого погиб Диггер
+struct {
+    uint16_t image_phase;      /// Фаза отображения спрайта Диггера
+    uint16_t image_phase_inc;  /// Инкремент(декремент) фазы отображения спрайта Диггера
+    uint16_t wait;             /// Задержка перед следующим перемещением Диггера
+    uint16_t x_graph;          /// Положение Диггера по оси X в графических координатах
+    uint16_t y_graph;          /// Положение Диггера по оси Y в графических координатах
+    enum direction dir;        /// Направление движения Диггера
+    enum direction prev_dir;   /// Предыдущее направление движения Диггера
+    enum direction new_dir;    /// Желаемое новое направление движения Диггера
+    enum creature_state state; /// Состояние Диггера (жив, убит, лежит дохлый)
+    struct bag_info *dead_bag; /// Указатель на мешок от котрого погиб Диггер
+} man;
 
 // Переменные отвечающие за создание врагов
-uint8_t bugs_max;           /// Максимальное количество врагов на уровне одновременно
-uint8_t bugs_total;         /// Общее количество врагов на уровне
-uint8_t bugs_delay;         /// Задержка перед рождением врага (Ноббина)
-uint8_t bugs_delay_counter; /// Счётчик задержки перед рождением врага
-uint8_t bugs_active;        /// Количество активных врагов
-uint8_t bugs_created;       /// Общее количество сщзданных врагов
-
-// Переменные отвечающие за мешки
-uint8_t broke_max; // Время через которое исчезнет разбившийся мешок
+struct
+{
+    uint8_t max;           /// Максимальное количество врагов на уровне одновременно
+    uint8_t total;         /// Общее количество врагов на уровне
+    uint8_t delay;         /// Задержка перед рождением врага (Ноббина)
+    uint8_t delay_counter; /// Счётчик задержки перед рождением врага
+    uint8_t active;        /// Количество активных врагов
+    uint8_t created;       /// Общее количество сщзданных врагов
+} bugs;
 
 // Переменные отвечающие за бонус-режим
-enum bonus_state bonus_state; /// Состояние режима бонус
-uint16_t bonus_time;          /// Время активности бонус-режима
-uint8_t  bonus_flash;         /// Время мерцания при включении/выключении Бонус-режима
-uint8_t  bonus_count;         /// Множитель очков в Бонус-режиме (умножается на два за каждого пойманного врага)
-uint32_t bonus_life_score;    /// Количество очков для дополнительное жизни
+struct {
+    enum bonus_state state; /// Состояние режима бонус
+    uint16_t time;          /// Время активности бонус-режима
+    uint8_t  flash;         /// Время мерцания при включении/выключении Бонус-режима
+    uint8_t  count;         /// Множитель очков в Бонус-режиме (умножается на два за каждого пойманного врага)
+    uint32_t life_score;    /// Количество очков для дополнительное жизни
+} bonus;
 
 // Переменные отвечающие за выстрел
 struct {
@@ -198,10 +202,14 @@ struct {
 } mis;
 
 // Переменные отвечающие за состояние игры
-uint16_t difficulty; /// Уровень сложности
-uint16_t level_no;   /// Текущий номер уровня
-int16_t  lives;      /// Текущее количество жизней
-uint32_t score;      /// Количество очков
+struct {
+    uint16_t difficulty; /// Уровень сложности
+    uint16_t level_no;   /// Текущий номер уровня
+    int16_t  lives;      /// Текущее количество жизней
+    uint32_t score;      /// Количество очков
+} game;
+
+uint8_t broke_max; // Время через которое исчезнет разбившийся мешок
 
 // Переменные отвечающие за вывод звуков.
 uint16_t snd_effects = 1;    /// Флаг, показывающий, что звуковые эффекты включены
@@ -303,7 +311,7 @@ static void print_lives()
 
     for (uint16_t l = 1; width > 0; man_x_offset += one_pos_width, width -= one_pos_width)
     {
-        if (++l > lives)
+        if (++l > game.lives)
         {
             sp_clear_brick(man_x_offset, man_y_offset, width, height);
             break;
@@ -318,15 +326,15 @@ static void print_lives()
  */
 static void add_score(uint16_t score_add)
 {
-    score += score_add;
-    print_dec(score, 0, SCREEN_Y_OFFSET + MOVE_Y_STEP);
+    game.score += score_add;
+    print_dec(game.score, 0, SCREEN_Y_OFFSET + MOVE_Y_STEP);
 
      // Если количество жизней не достигло максимального и количество очков досигло бонусного для получения жизни
-    if (lives < MAX_LIVES && (score >= bonus_life_score))
+    if (game.lives < MAX_LIVES && (game.score >= bonus.life_score))
     {
-        lives++; // Увеличичить количество жизней на единицу
+        game.lives++; // Увеличичить количество жизней на единицу
         print_lives(); // Вывесли количество жизней
-        bonus_life_score += BONUS_LIFE_SCORE; // Количество очков до следующего бонуса в виде жизни
+        bonus.life_score += BONUS_LIFE_SCORE; // Количество очков до следующего бонуса в виде жизни
         snd.life = 24; // Издать звук получения жизни
     }
 }
@@ -380,7 +388,7 @@ static inline enum level_symbols getLevelSymbol(uint8_t y_log, uint8_t x_log)
     static const uint8_t word_no_tbl[W_MAX] = { 0,0,0,0,0, 1,1,1,1,1, 2,2,2,2,2 };
     static const uint8_t shift_tbl[W_MAX]   = { 0,3,6,9,12, 0,3,6,9,12, 0,3,6,9,12 };
 
-    return (level[level_no][y_log][word_no_tbl[x_log]] >> shift_tbl[x_log]) & 7;
+    return (level[game.level_no][y_log][word_no_tbl[x_log]] >> shift_tbl[x_log]) & 7;
 }
 
 static void bonus_indicator(uint16_t color);
@@ -391,7 +399,7 @@ static void bonus_indicator(uint16_t color);
 static void init_level_state()
 {
     // Отключить бонус-режим
-    bonus_state = BONUS_OFF;
+    bonus.state = BONUS_OFF;
 
     // Стереть вишенку
     erase_4_15(FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP, FIELD_Y_OFFSET);
@@ -402,7 +410,7 @@ static void init_level_state()
     // Деактивировать всех врагов
     for (uint8_t i = 0; i < MAX_BUGS; ++i)
     {
-        struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
+        struct bug_info *bug = &bugs_state[i]; // Структура с информацией о враге
         if (bug->state == CREATURE_INACTIVE) continue; // Пропустить неактивных врагов
 
         erase_4_15(bug->x_graph, bug->y_graph); // Стереть врага
@@ -412,7 +420,7 @@ static void init_level_state()
     // Деактивировать нестационарные мешки
     for (uint16_t i = 0; i < MAX_BAGS; ++i)
     {
-        struct bag_info *bag = &bags[i];  // Структура с информацией о мешке
+        struct bag_info *bag = &bags_state[i];  // Структура с информацией о мешке
         if (bag->state == BAG_INACTIVE) continue; // Пропустить неактивные мешки
         if ((bag->state == BAG_STATIONARY) && (bag->dir == DIR_STOP)) continue; // Пропустить стационарные мешки
 
@@ -420,30 +428,30 @@ static void init_level_state()
         bag->state = BAG_INACTIVE;
     }
 
-    // print_dec(difficulty, 0, MAX_Y_POS + 2 * POS_Y_STEP);
+    // print_dec(game.difficulty, 0, MAX_Y_POS + 2 * POS_Y_STEP);
 
-    if (difficulty > 6) bugs_max = 5;      // На уровне сложности 7 и выше максимально 5 врагов одновременно
-    else if (difficulty > 0) bugs_max = 4; // На уровне сложности со 1 до 6 (включительно) до 4 врагов одновременно
-    else bugs_max = 3;                      // На первом уровне максимально три варага одновременно
+    if (game.difficulty > 6) bugs.max = 5;      // На уровне сложности 7 и выше максимально 5 врагов одновременно
+    else if (game.difficulty > 0) bugs.max = 4; // На уровне сложности со 1 до 6 (включительно) до 4 врагов одновременно
+    else bugs.max = 3;                      // На первом уровне максимально три варага одновременно
 
     // Переменные относщиеся к созданию и управлению врагами
-    bugs_total = difficulty + 6;         // Общее количество врагов на уровне - шесть плюс уровень сложности
-    bugs_delay = 45 - (difficulty << 1); // Задержка появления врагов (с ростом сложности убывает)
-    bugs_delay_counter = bugs_delay;     // Инициализация счётчика задержки врага исходным значением
-    bugs_active = 0;                     // Количество активных врагов
-    bugs_created = 0;                    // Общее количество сщзданных врагов
+    bugs.total = game.difficulty + 6;         // Общее количество врагов на уровне - шесть плюс уровень сложности
+    bugs.delay = 45 - (game.difficulty << 1); // Задержка появления врагов (с ростом сложности убывает)
+    bugs.delay_counter = bugs.delay;     // Инициализация счётчика задержки врага исходным значением
+    bugs.active = 0;                     // Количество активных врагов
+    bugs.created = 0;                    // Общее количество сщзданных врагов
 
-    broke_max = 140 - difficulty * 10; // Время через которое исчезнет разбившийся мешок (с ростом сложности убывает)
+    broke_max = 140 - game.difficulty * 10; // Время через которое исчезнет разбившийся мешок (с ростом сложности убывает)
 
     // Инициализация переменных Диггера
-    man_dir = DIR_RIGHT;
-    man_prev_dir = DIR_RIGHT;
-    man_x_graph = FIELD_X_OFFSET + MAN_START_X * POS_X_STEP; // Исходная координата Диггера на экране по оси X
-    man_y_graph = FIELD_Y_OFFSET + MAN_START_Y * POS_Y_STEP; // Исходная координата Диггера на экране по оси Y
-    man_image_phase = 0;        // Фаза анимации Диггера
-    man_image_phase_inc = 1;    // Направление ихменения фазы анимации Диггера
-    man_wait = 0;               // Задержка перед следующим перемещением Диггера
-    man_state = CREATURE_ALIVE; // Исходное состояние - Диггер жив
+    man.dir = DIR_RIGHT;
+    man.prev_dir = DIR_RIGHT;
+    man.x_graph = FIELD_X_OFFSET + MAN_START_X * POS_X_STEP; // Исходная координата Диггера на экране по оси X
+    man.y_graph = FIELD_Y_OFFSET + MAN_START_Y * POS_Y_STEP; // Исходная координата Диггера на экране по оси Y
+    man.image_phase = 0;        // Фаза анимации Диггера
+    man.image_phase_inc = 1;    // Направление ихменения фазы анимации Диггера
+    man.wait = 0;               // Задержка перед следующим перемещением Диггера
+    man.state = CREATURE_ALIVE; // Исходное состояние - Диггер жив
 
     // Инициализация переменных снаряда
     mis.fire = 0;
@@ -488,8 +496,8 @@ static void gnaw(enum direction dir, uint16_t x_graph, uint16_t y_graph)
  */
 static void init_level()
 {
-    clr_words(bags, sizeof(bags) / 2); // Деактивировать все мешки
-    clr_words(bugs, sizeof(bugs) / 2); // Деактивировать всех врагов
+    clr_words(bags_state, sizeof(bags_state) / 2); // Деактивировать все мешки
+    clr_words(bugs_state, sizeof(bugs_state) / 2); // Деактивировать всех врагов
 
     constexpr uint16_t bg_block_width = sizeof(image_background[0][0]); // Ширина блока фона
     constexpr uint16_t bg_block_height = sizeof(image_background[0]) / sizeof(image_background[0][0]); // Высота блока фона
@@ -497,7 +505,7 @@ static void init_level()
     constexpr uint16_t x_size = 13; // Ширина поля фона в блоках
     constexpr uint16_t y_size = POS_Y_STEP * H_MAX / bg_block_height + MOVE_Y_STEP + 2; // Высота поля фона в блоках
 
-    const uint8_t *back_image = (uint8_t *)image_background[level_no]; // Указатель на образец фона для текущего уровня
+    const uint8_t *back_image = (uint8_t *)image_background[game.level_no]; // Указатель на образец фона для текущего уровня
 
     // Отрисовка фона
     for (uint16_t y_graph = 0; y_graph < y_size * bg_block_height; y_graph += bg_block_height)
@@ -531,7 +539,7 @@ static void init_level()
             }
             else if (ls == LEV_B)
             {
-                struct bag_info *bag = &bags[bag_num++]; // Структура с информацией об очередном мешке
+                struct bag_info *bag = &bags_state[bag_num++]; // Структура с информацией об очередном мешке
 
                 bag->state = BAG_STATIONARY; // Мешок стоит на месте
                 bag->count = 0;              // Счётчик сброшен
@@ -796,18 +804,18 @@ static uint8_t move_bag(struct bag_info *bag, enum direction dir)
         }
 
         // Проверить перемещается ли мешок на Диггера
-        if (check_collision_4_15(bag_x_graph, bag_y_graph, man_x_graph, man_y_graph))
+        if (check_collision_4_15(bag_x_graph, bag_y_graph, man.x_graph, man.y_graph))
         {
-            if (move_to_object(dir, bag_x_graph, man_x_graph))
+            if (move_to_object(dir, bag_x_graph, man.x_graph))
             {
                 rv = 1; // Если да, отменить перемещение
             }
         }
 
         // Проверить перемещается ли мешок на врага
-        for (uint8_t i = 0; i < bugs_max; ++i)
+        for (uint8_t i = 0; i < bugs.max; ++i)
         {
-            struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
+            struct bug_info *bug = &bugs_state[i]; // Структура с информацией о враге
             if (bug->state != CREATURE_ALIVE) continue; //  Пропустить неживых врагов
 
             // Проверить, что мешок перемещается на врага
@@ -824,7 +832,7 @@ static uint8_t move_bag(struct bag_info *bag, enum direction dir)
         // Проверка соприкосновение с другими мешками
         for (uint8_t i = 0; i < MAX_BAGS; ++i)
         {
-            struct bag_info *another_bag = &bags[i]; // Структура с информацией о мешке
+            struct bag_info *another_bag = &bags_state[i]; // Структура с информацией о мешке
 
             if (another_bag == bag) continue; // Пропустить мешок, процедуру обработки которого вызвали
 
@@ -908,18 +916,18 @@ static void move_bug(struct bug_info *bug)
     if (!bug_x_rem && !bug_y_rem)
     {
         // Если Хоббин застрял на время более заданного, то превратить его в Ноббина
-        if ((bug->type == BUG_HOBBIN) && (bug->count > (32 + difficulty * 2)))
+        if ((bug->type == BUG_HOBBIN) && (bug->count > (32 + game.difficulty * 2)))
         {
             bug->count = 0;         // Очистить время застревания
             bug->type = BUG_NOBBIN; // Превратить врага в Ноббина
         }
 
         // Поиск порядка наилучших направлений движения
-        dir_1 = (man_x_graph < bug_x_graph) ? DIR_LEFT : DIR_RIGHT;
-        dir_2 = (man_y_graph < bug_y_graph) ? DIR_UP   : DIR_DOWN;
+        dir_1 = (man.x_graph < bug_x_graph) ? DIR_LEFT : DIR_RIGHT;
+        dir_2 = (man.y_graph < bug_y_graph) ? DIR_UP   : DIR_DOWN;
 
         // Если расстояние по горизонтали превышает расстояние по вертикали, то отдать приоритет оси X
-        if (abs16(man_y_graph - bug_y_graph) > abs16(man_x_graph - bug_x_graph))
+        if (abs16(man.y_graph - bug_y_graph) > abs16(man.x_graph - bug_x_graph))
         {
             // Если расстояние по вертикали превышает расстояние по горизонтали, то отдать приоритет оси Y
             dir_1 ^= dir_2;
@@ -931,7 +939,7 @@ static void move_bug(struct bug_info *bug)
         dir_4 = dir_1 ^ 1;
 
         // Если включён режим Бонус, то поменять порядок направлений чтобы враги разбегались
-        if (bonus_state == BONUS_ON)
+        if (bonus.state == BONUS_ON)
         {
             // Наиболее приоритетное направление поменять с наименее приоритетным
             dir_1 ^= dir_4;
@@ -974,9 +982,9 @@ static void move_bug(struct bug_info *bug)
         }
 
         // В уровнях сложности до шестого использовать элемент случайности в выборе направления
-        if ((difficulty < 5) && ((rand() & 0xF) > (difficulty + 10)))
+        if ((game.difficulty < 5) && ((rand() & 0xF) > (game.difficulty + 10)))
         {
-            // В одном из (5 + difficulty) случаев поменять наиболее
+            // В одном из (5 + game.difficulty) случаев поменять наиболее
             // приоритетное направление с менее приоритетным
             dir_1 ^= dir_3;
             dir_3 ^= dir_1;
@@ -1022,7 +1030,7 @@ static void move_bug(struct bug_info *bug)
         remove_coin(graph_to_x_log(bug_x_graph), graph_to_y_log(bug_y_graph));
     }
 
-    if (man_state == CREATURE_ALIVE) // Если Диггер жив
+    if (man.state == CREATURE_ALIVE) // Если Диггер жив
     {
         // Выждать время задержки перед запуском нового врага
         if (bug->state == CREATURE_STARTING)
@@ -1044,7 +1052,7 @@ static void move_bug(struct bug_info *bug)
         // Проверить соприкосновение врага с мешками
         for (uint8_t i = 0; i < MAX_BAGS; ++i)
         {
-            struct bag_info *bag = &bags[i]; // Структура с информацией о мешках
+            struct bag_info *bag = &bags_state[i]; // Структура с информацией о мешках
 
             if (bag->state == BAG_INACTIVE) continue; // Пропустить неактивные мешки
 
@@ -1157,7 +1165,7 @@ static void stop_bag(struct bag_info *bag)
     // TODO: Унчтожить все мешки под тем, который остановился
     for (uint16_t i = 0; i < MAX_BAGS; ++i)
     {
-        struct bag_info *another_bag = &bags[i];  // Структура с информацией о мешке
+        struct bag_info *another_bag = &bags_state[i];  // Структура с информацией о мешке
         if (another_bag == bag) continue; // Пропустить мешок обработка которого производится
         if (another_bag->state == BAG_INACTIVE) continue; // Пропустить неактивные мешки
 
@@ -1177,28 +1185,28 @@ static void draw_man()
 {
     uint8_t cab = !mis.flying && !mis.wait; // Флаг наличия "башенки"
 
-    man_image_phase += man_image_phase_inc; // Переключить фазу изображения
+    man.image_phase += man.image_phase_inc; // Переключить фазу изображения
 
     // При необходимости, сменить направление изменения фазы спрайта
-    if (!man_image_phase || man_image_phase >= 2) man_image_phase_inc = -man_image_phase_inc;
+    if (!man.image_phase || man.image_phase >= 2) man.image_phase_inc = -man.image_phase_inc;
 
-    uint16_t image_phase = man_image_phase + ((cab) ? 0 : 3);
-    const uint8_t *image = (man_dir < DIR_UP) ? (uint8_t *)image_digger_right[image_phase] : (uint8_t *)image_digger_up[image_phase];
+    uint16_t image_phase = man.image_phase + ((cab) ? 0 : 3);
+    const uint8_t *image = (man.dir < DIR_UP) ? (uint8_t *)image_digger_right[image_phase] : (uint8_t *)image_digger_up[image_phase];
 
-    if (man_dir == DIR_LEFT)
+    if (man.dir == DIR_LEFT)
     {
         // Едет влево (отзеркаленный правый)
-        sp_4_15_h_mirror_put(man_x_graph, man_y_graph, image);
+        sp_4_15_h_mirror_put(man.x_graph, man.y_graph, image);
     }
-    else if (man_dir == DIR_RIGHT || man_dir == DIR_UP)
+    else if (man.dir == DIR_RIGHT || man.dir == DIR_UP)
     {
         // Едет вправо или вверх (обычный спрайт)
-        sp_4_15_put(man_x_graph, man_y_graph, image);
+        sp_4_15_put(man.x_graph, man.y_graph, image);
     }
     else
     {
         // Едет вниз (отзеркален горизонтально и вертикально)
-        sp_4_15_hv_mirror_put(man_x_graph, man_y_graph, image);
+        sp_4_15_hv_mirror_put(man.x_graph, man.y_graph, image);
     }
 }
 
@@ -1375,11 +1383,11 @@ static void sound_effect()
  */
 static void init_game()
 {
-    difficulty = 0; // Начальный уровень сложности
-    level_no = 0;   // Начальный уровень
-    lives = 3;      // Начальное количество жизней
-    score = 0;      // Начальное количество очков
-    bonus_life_score = BONUS_LIFE_SCORE;
+    game.difficulty = 0; // Начальный уровень сложности
+    game.level_no = 0;   // Начальный уровень
+    game.lives = 3;      // Начальное количество жизней
+    game.score = 0;      // Начальное количество очков
+    bonus.life_score = BONUS_LIFE_SCORE;
 
     add_score(0);  // Печать начального количества очков (нули)
     print_lives(); // Вывод начального количества жизней
@@ -1392,24 +1400,24 @@ static void init_game()
 static void process_bugs()
 {
     // Обработка появления врагов
-    if (bugs_delay_counter > 0) --bugs_delay_counter; // Отсчёт времени до появления нового врага
+    if (bugs.delay_counter > 0) --bugs.delay_counter; // Отсчёт времени до появления нового врага
     else
     {
-        bugs_delay_counter = bugs_delay; // Перезарядить счётчик времени до появления врага
+        bugs.delay_counter = bugs.delay; // Перезарядить счётчик времени до появления врага
 
-        if (man_state == CREATURE_ALIVE) // Если Диггер жив
+        if (man.state == CREATURE_ALIVE) // Если Диггер жив
         {
-            if ((bugs_created < bugs_total) && (bugs_active < bugs_max)) // Если врагов на экране одновременно меньше максимального количества
+            if ((bugs.created < bugs.total) && (bugs.active < bugs.max)) // Если врагов на экране одновременно меньше максимального количества
             {
-                if (bonus_state != BONUS_ON) // Если не включен бонус-режим, запустить нового врага
+                if (bonus.state != BONUS_ON) // Если не включен бонус-режим, запустить нового врага
                 {
                     // Координаты рожденияя врагов - в правом верхнем углу
                     constexpr uint8_t bug_start_x = FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP;
                     constexpr uint8_t bug_start_y = FIELD_Y_OFFSET + 0 * POS_Y_STEP;
 
-                    for (uint16_t i = 0; i < bugs_max; ++i)
+                    for (uint16_t i = 0; i < bugs.max; ++i)
                     {
-                        struct bug_info *bug = &bugs[i];
+                        struct bug_info *bug = &bugs_state[i];
 
                         if (bug->state != CREATURE_INACTIVE) continue; // Пропустить активных врагов
 
@@ -1424,8 +1432,8 @@ static void process_bugs()
                         bug->type = BUG_NOBBIN;         // Враги рождаются в виде Ноббинов
                         bug->dir = DIR_STOP;            // Начальное направление движения
 
-                        bugs_active++;  // Увеличить счётчик активных врагов
-                        bugs_created++; // Увеличить общее количество созданных врагов
+                        bugs.active++;  // Увеличить счётчик активных врагов
+                        bugs.created++; // Увеличить общее количество созданных врагов
 
                         break;
                     }
@@ -1434,18 +1442,18 @@ static void process_bugs()
             else
             {
                 // Если Бонус (вишенка) ещё не появлялся и создано максимальное количество врагов
-                if ((bonus_state == BONUS_OFF) && (bugs_created == bugs_total))
+                if ((bonus.state == BONUS_OFF) && (bugs.created == bugs.total))
                 {
-                    bonus_state = BONUS_READY; // Включить готовность к активации бонус-режима
+                    bonus.state = BONUS_READY; // Включить готовность к активации бонус-режима
                 }
             }
         }
     }
 
     // Обработка врагов (Ноббинов и Хоббинов)
-    for (uint16_t i = 0; i < bugs_max; ++i)
+    for (uint16_t i = 0; i < bugs.max; ++i)
     {
-        struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
+        struct bug_info *bug = &bugs_state[i]; // Структура с информацией о враге
 
         if (bug->state == CREATURE_INACTIVE) continue; // Пропустить, если враг не активен
 
@@ -1462,11 +1470,11 @@ static void process_bugs()
 
                 if (bug->type == BUG_NOBBIN) // Если это Ноббин
                 {
-                    for (uint16_t t = 0; t < bugs_max; ++t)
+                    for (uint16_t t = 0; t < bugs.max; ++t)
                     {
                         if (t == i) continue; // Пропустить самого себя
 
-                        struct bug_info *another_bug = &bugs[t];
+                        struct bug_info *another_bug = &bugs_state[t];
                         if (another_bug->state != CREATURE_ALIVE) continue; // Пропустить неживых врагов
 
                         // Если враг соприкоснулся с другим врагом
@@ -1483,7 +1491,7 @@ static void process_bugs()
                     }
 
                     //  Если Ноббин застрял или соприкоснулся с другим на определённое (зависящее от уровня сложности) время
-                    if (bug->count > (20 - difficulty))
+                    if (bug->count > (20 - game.difficulty))
                     {
                         bug->count = 0;         // Сбросить счётчик застревания
                         bug->type = BUG_HOBBIN; // Переключить тип врага на Хоббина
@@ -1491,7 +1499,7 @@ static void process_bugs()
                 }
 
                 // Если выпало случайное число с вероятностью зависящей от уровня сложности
-                if ((rand() & 0xF) < difficulty) move_bug(bug); // Переместить врага ещё раз для увеличения скорости
+                if ((rand() & 0xF) < game.difficulty) move_bug(bug); // Переместить врага ещё раз для увеличения скорости
 
                 // Здесь специально нету break для проваливания в следующую секцию
             }
@@ -1521,10 +1529,10 @@ static void process_bugs()
 
                 erase_4_15(bug->x_graph, bug->y_graph); // Стереть убитого врага
                 bug->state = CREATURE_INACTIVE;         // Декативировать убитого врага
-                bugs_active--;                          // Уменьшить количество активных врагов
+                bugs.active--;                          // Уменьшить количество активных врагов
 
                 // Количество оставшихся врагов (сколько осталось создать плюс количество активных)
-                uint8_t creatures_left =  bugs_total - bugs_created + bugs_active;
+                uint8_t creatures_left =  bugs.total - bugs.created + bugs.active;
                 if (!creatures_left) snd.done = 1; // Если врагов больше не осталось - окончание уровня
 
                 break;
@@ -1544,7 +1552,7 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
 
     for (uint8_t i = 0; i < MAX_BAGS; ++i)
     {
-        struct bag_info *bag = &bags[i]; // Структура с информацией о мешке
+        struct bag_info *bag = &bags_state[i]; // Структура с информацией о мешке
 
         uint8_t bag_x_graph = bag->x_graph;
         uint8_t bag_y_graph = bag->y_graph;
@@ -1574,7 +1582,7 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                             case DIR_STOP: // Если мешок неподвижен
                             {
                                 // Если Диггер двигался вверх и он находится под мешком, то пока не начинать раскачивать мешок
-                                if (!((man_x_log == bag_x_log) && (man_y_log == bag_y_log + 1) && (man_new_dir == DIR_UP)))
+                                if (!((man_x_log == bag_x_log) && (man_y_log == bag_y_log + 1) && (man.new_dir == DIR_UP)))
                                 {
                                     // Начать раскачивать мешок
                                     bag->state = BAG_LOOSE;  // Мешок раскачивается
@@ -1694,20 +1702,20 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                 // sp_put(bag_x_graph, bag_y_graph, sizeof(image_bag_fall[0]), sizeof(image_bag_fall) / sizeof(image_bag_fall[0]),
                 //         (uint8_t *)image_bag_fall, (uint8_t *)outline_bag_fall);
 
-                if (man_state == CREATURE_ALIVE) //  Если Диггер жив
+                if (man.state == CREATURE_ALIVE) //  Если Диггер жив
                 {
                     // Проверить, что Диггер попал под падающий под мешок
-                    if (check_collision_4_15(man_x_graph, man_y_graph, bag_x_graph, bag_y_graph))
+                    if (check_collision_4_15(man.x_graph, man.y_graph, bag_x_graph, bag_y_graph))
                     {
-                        man_state = CREATURE_DEAD_MONEY_BAG; // Диггер погиб от падающего мешка
-                        man_dead_bag = bag; // Указатель на мешок от которого погиб Диггер
+                        man.state = CREATURE_DEAD_MONEY_BAG; // Диггер погиб от падающего мешка
+                        man.dead_bag = bag; // Указатель на мешок от которого погиб Диггер
                     }
                 }
 
                 // Попытаться спасти врагов от падающего мешка
-                for (uint8_t i = 0; i < bugs_max; ++i)
+                for (uint8_t i = 0; i < bugs.max; ++i)
                 {
-                    struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
+                    struct bug_info *bug = &bugs_state[i]; // Структура с информацией о враге
                     if (bug->state != CREATURE_ALIVE) continue; // Пропустить неживых врагов
 
                     uint8_t bug_x_graph = bug->x_graph;
@@ -1723,7 +1731,7 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                         bug->state = CREATURE_DEAD_MONEY_BAG; // Враг был убит мешком с деньгами
 
                         // В бонус-режиме увеличить количество создаваемых врагов компенсируя убитых мешками.
-                        if (bonus_state == BONUS_ON) bugs_total++;
+                        if (bonus.state == BONUS_ON) bugs.total++;
                     }
                 }
 
@@ -1859,9 +1867,9 @@ static void process_missile()
             // Проверить попал ли выстрел во врага. Делается ДО check_path,
             // иначе если снаряд достиг последней клетки тоннеля одновременно с врагом
             // (стена впереди), check_path фейлит и враг остаётся живым.
-            for (uint8_t i = 0; i < bugs_max; ++i)
+            for (uint8_t i = 0; i < bugs.max; ++i)
             {
-                struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
+                struct bug_info *bug = &bugs_state[i]; // Структура с информацией о враге
                 if (bug->state != CREATURE_ALIVE) continue; //  Пропустить неживых врагов
 
                 // Проверить, что выстрел попал во врага
@@ -1873,7 +1881,7 @@ static void process_missile()
                     add_score_250(); // Добавить 250 очков за убитого врага
 
                     // В бонус-режиме увеличить количество создаваемых врагов компенсируя убитых выстрелом.
-                    if (bonus_state == BONUS_ON) bugs_total++;
+                    if (bonus.state == BONUS_ON) bugs.total++;
                 }
             }
 
@@ -1906,10 +1914,10 @@ static void process_missile()
                 if (mis.fire) // Если произведён выстрел
                 {
                     mis.fire = 0;
-                    mis.wait = 85 + difficulty * 4; // Начальное значение счётчика появления "башенки"
+                    mis.wait = 85 + game.difficulty * 4; // Начальное значение счётчика появления "башенки"
                     mis.image_phase = 0;
                     mis.flying = 1;
-                    mis.dir = man_dir;
+                    mis.dir = man.dir;
 
                     // Определить начальное положение выстрела в зависимости от
                     // координат Диггера и его направления движения.
@@ -1918,8 +1926,8 @@ static void process_missile()
                     static const int8_t fire_dx[4] = { -MOVE_X_STEP, 4, 1, 1 };
                     static const int8_t fire_dy[4] = { MOVE_Y_STEP, MOVE_Y_STEP, -MOVE_Y_STEP, 15 + MOVE_Y_STEP };
 
-                    mis.x_graph = man_x_graph + fire_dx[mis.dir];
-                    mis.y_graph = man_y_graph + fire_dy[mis.dir];
+                    mis.x_graph = man.x_graph + fire_dx[mis.dir];
+                    mis.y_graph = man.y_graph + fire_dy[mis.dir];
 
                     // Вывести начальное положение спрайта выстрела
                     sp_put(mis.x_graph, mis.y_graph, missile_x_size, missile_y_size, (uint8_t *)image_missile[mis.image_phase], nullptr);
@@ -1956,12 +1964,12 @@ static inline void eat_coin()
 static void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
 {
     // Обработка перемещения Диггера
-    if (man_state == CREATURE_ALIVE) // Если Диггер жив
+    if (man.state == CREATURE_ALIVE) // Если Диггер жив
     {
-        if (man_wait) man_wait--; // Если Диггер в режиме задержки (при толкании мешков)
+        if (man.wait) man.wait--; // Если Диггер в режиме задержки (при толкании мешков)
         else
         {
-            man_new_dir = DIR_STOP;
+            man.new_dir = DIR_STOP;
 
             // Обработка управления с клавиатуры и джойстика
             volatile uint16_t port_state = *((uint16_t *)REG_PAR_INTERF); // Состояние регистра параллельного порта
@@ -1979,7 +1987,7 @@ static void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
                 {
                     if ((key_pressed && (code == key_codes[i])) || (port_state & (1 << i)))
                     {
-                        man_new_dir = joy_dirs[i];
+                        man.new_dir = joy_dirs[i];
                         break;
                     }
                 }
@@ -2011,13 +2019,13 @@ static void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
 #if defined(DEBUG)
                     case 'D': // Увеличение уровня сложности
                     {
-                        if (++difficulty >= 10) difficulty = 0;
+                        if (++game.difficulty >= 10) game.difficulty = 0;
                         break;
                     }
 
                     case 'L':  // Добавление жизни
                     {
-                        lives++;
+                        game.lives++;
                         print_lives();
                         snd.life = 24;
                         break;
@@ -2033,32 +2041,32 @@ static void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
             }
 
             // Если новое желаемое направление движения вверх-вниз, то применить его в середине клетки по-горизонтали
-            if (man_x_rem == 0 && (man_new_dir == DIR_UP || man_new_dir == DIR_DOWN))
+            if (man_x_rem == 0 && (man.new_dir == DIR_UP || man.new_dir == DIR_DOWN))
             {
-                man_dir = man_new_dir;
+                man.dir = man.new_dir;
             }
 
             // Если новое желаемое направление движения влево-вправо, то применить его в середине клетки по-вертикали
-            if (man_y_rem == 0 && (man_new_dir == DIR_LEFT || man_new_dir == DIR_RIGHT))
+            if (man_y_rem == 0 && (man.new_dir == DIR_LEFT || man.new_dir == DIR_RIGHT))
             {
-                man_dir = man_new_dir;
+                man.dir = man.new_dir;
             }
 
             // Остановиться при попытке выхода за игровое поле
-            if ((man_new_dir == DIR_STOP) || check_out_of_range(man_dir, man_x_graph, man_y_graph))
+            if ((man.new_dir == DIR_STOP) || check_out_of_range(man.dir, man.x_graph, man.y_graph))
             {
-                man_dir = DIR_STOP;
+                man.dir = DIR_STOP;
             }
 
-            if (bonus_state == BONUS_READY)
+            if (bonus.state == BONUS_READY)
             {
                 // Проверить что Диггер соприкоснулся с вишенкой
-                if (check_collision_4_15(man_x_graph, man_y_graph, FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP, FIELD_Y_OFFSET))
+                if (check_collision_4_15(man.x_graph, man.y_graph, FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP, FIELD_Y_OFFSET))
                 {
-                    bonus_state = BONUS_ON; // Включить Бонус-режим
-                    bonus_count = 1; // Начальное значение множителя очков в Бонус-режиме
-                    bonus_time = 230 - difficulty * 20; // Время действия Бонус-режима
-                    bonus_flash = 19; // Время мигания индикатора включения Бонус-режима
+                    bonus.state = BONUS_ON; // Включить Бонус-режим
+                    bonus.count = 1; // Начальное значение множителя очков в Бонус-режиме
+                    bonus.time = 230 - game.difficulty * 20; // Время действия Бонус-режима
+                    bonus.flash = 19; // Время мигания индикатора включения Бонус-режима
 
                     add_score(1000); // 1000 очков за вишенку
 
@@ -2072,29 +2080,29 @@ static void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
                 }
             }
 
-            uint8_t prev_man_x_graph = man_x_graph;
-            uint8_t prev_man_y_graph = man_y_graph;
+            uint8_t prev_man_x_graph = man.x_graph;
+            uint8_t prev_man_y_graph = man.y_graph;
 
-            if (man_dir != DIR_STOP)
+            if (man.dir != DIR_STOP)
             {
                 // Переместить Диггера на один шаг в заданном направлении
-                man_x_graph += dir_dx[man_dir] * MOVE_X_STEP;
-                man_y_graph += dir_dy[man_dir] * MOVE_Y_STEP;
+                man.x_graph += dir_dx[man.dir] * MOVE_X_STEP;
+                man.y_graph += dir_dy[man.dir] * MOVE_Y_STEP;
             }
-            else man_dir = man_prev_dir;
+            else man.dir = man.prev_dir;
 
             uint16_t collision_flag = 0;
 
             // Обработка толкания мешков и съедения золота
             for (uint8_t i = 0; i < MAX_BAGS; ++i)
             {
-                struct bag_info *bag = &bags[i]; // Структура с информацией о мешке
+                struct bag_info *bag = &bags_state[i]; // Структура с информацией о мешке
                 if (bag->state == BAG_INACTIVE) continue; // Пропустить неактивные мешки
 
                 // Если Диггер не соприкоснулся с мешком, проверить следующий мешок
-                if (!check_collision_4_15(bag->x_graph, bag->y_graph, man_x_graph, man_y_graph)) continue;
+                if (!check_collision_4_15(bag->x_graph, bag->y_graph, man.x_graph, man.y_graph)) continue;
 
-                man_wait++; // Задержать Диггера перед мешком или золотом
+                man.wait++; // Задержать Диггера перед мешком или золотом
 
                 switch (bag->state)
                 {
@@ -2102,7 +2110,7 @@ static void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
                     case BAG_LOOSE:
                     {
                         // Если направление движения Диггера вверх или вниз, или мешок не удалось переместить
-                        if (man_dir == DIR_UP || man_dir == DIR_DOWN || move_bag(bag, man_dir))
+                        if (man.dir == DIR_UP || man.dir == DIR_DOWN || move_bag(bag, man.dir))
                         {
                             collision_flag = 1;
                         }
@@ -2135,29 +2143,29 @@ static void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
             if (collision_flag)
             {
                 // Вернуть Диггера в прежнее положение
-                man_x_graph = prev_man_x_graph;
-                man_y_graph = prev_man_y_graph;
+                man.x_graph = prev_man_x_graph;
+                man.y_graph = prev_man_y_graph;
             }
             else
             {
-                if (man_x_graph != prev_man_x_graph || man_y_graph != prev_man_y_graph) // Если Диггер переместился
+                if (man.x_graph != prev_man_x_graph || man.y_graph != prev_man_y_graph) // Если Диггер переместился
                 {
                      // Очистить биты фона, который был "прогрызен"
-                    set_background_bits(man_x_graph, man_y_graph, man_dir);
-                    set_background_bits(man_x_graph, man_y_graph, man_dir ^ 1);
+                    set_background_bits(man.x_graph, man.y_graph, man.dir);
+                    set_background_bits(man.x_graph, man.y_graph, man.dir ^ 1);
 
                     // Стереть след от Диггера с нужной стороы
-                    erase_trail(man_dir, man_x_graph, man_y_graph);
+                    erase_trail(man.dir, man.x_graph, man.y_graph);
 
                     // Нарисовать "прогрыз" от движения Диггера
-                    gnaw(man_dir, prev_man_x_graph, prev_man_y_graph);
+                    gnaw(man.dir, prev_man_x_graph, prev_man_y_graph);
 
                     // Удалить монеты съеденные Диггером.
                     {
-                        const uint8_t cx0 = graph_to_x_log(man_x_graph);
-                        const uint8_t cy0 = graph_to_y_log(man_y_graph);
-                        const uint8_t cx1 = graph_to_x_log(man_x_graph + 3);
-                        const uint8_t cy1 = graph_to_y_log(man_y_graph + 11);
+                        const uint8_t cx0 = graph_to_x_log(man.x_graph);
+                        const uint8_t cy0 = graph_to_y_log(man.y_graph);
+                        const uint8_t cx1 = graph_to_x_log(man.x_graph + 3);
+                        const uint8_t cy1 = graph_to_y_log(man.y_graph + 11);
                         if (remove_coin(cx0, cy0)) eat_coin();
                         if (cx1 != cx0 && remove_coin(cx1, cy0)) eat_coin();
                         if (cy1 != cy0 && remove_coin(cx0, cy1)) eat_coin();
@@ -2169,58 +2177,58 @@ static void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
             draw_man(); // Нарисовать Диггера
 
             // Проверить Диггера на сопркосновение с врагами
-            for (uint8_t i = 0; i < bugs_max; ++i)
+            for (uint8_t i = 0; i < bugs.max; ++i)
             {
-                struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
+                struct bug_info *bug = &bugs_state[i]; // Структура с информацией о враге
 
                 if (bug->state != CREATURE_ALIVE) continue; // Пропустить дохлых врагов
 
                 // Если Диггер не касается врага
-                if (!check_collision_4_15(bug->x_graph, bug->y_graph, man_x_graph, man_y_graph)) continue;
+                if (!check_collision_4_15(bug->x_graph, bug->y_graph, man.x_graph, man.y_graph)) continue;
 
-                if (bonus_state == BONUS_ON)
+                if (bonus.state == BONUS_ON)
                 {
                     // Если включен режим Бонус
                     snd.bug = 1; // Запустить воспроизведение звука съедения врага
                     snd.bug_c1 = 0;
                     snd.bug_c2 = 4;
                     snd.bug_period = 0;
-                    add_score(bonus_count * 200); // 200 * bonus_count очков за каждого съеденного врага
-                    bonus_count <<= 1; // Удвоить bonus_count
+                    add_score(bonus.count * 200); // 200 * bonus.count очков за каждого съеденного врага
+                    bonus.count <<= 1; // Удвоить bonus.count
 
                     // Стереть съеденного врага
                     erase_4_15(bug->x_graph, bug->y_graph);
                     bug->state = CREATURE_INACTIVE; // Деактивировать врага
 
-                    bugs_active--; // Уменьшить количество активных врагов
-                    bugs_total++;  // Увеличить количество создаваемых врагов компенсируя съеденных
+                    bugs.active--; // Уменьшить количество активных врагов
+                    bugs.total++;  // Увеличить количество создаваемых врагов компенсируя съеденных
                 }
                 else
                 {
-                    erase_4_15(man_x_graph, man_y_graph); // Стереть Диггера
+                    erase_4_15(man.x_graph, man.y_graph); // Стереть Диггера
                     man_rip();
                 }
             }
 
-            man_prev_dir = man_dir;
+            man.prev_dir = man.dir;
         }
     }
     else
     {
         // Перемещение и отрисовка убитого Диггера
-        if (man_state == CREATURE_DEAD_MONEY_BAG)
+        if (man.state == CREATURE_DEAD_MONEY_BAG)
         {
-            uint8_t bag_y_pos = man_dead_bag->y_graph; // Вертикальная позиция мешка от которого погиб Диггер
-            if (bag_y_pos > man_y_graph)
+            uint8_t bag_y_pos = man.dead_bag->y_graph; // Вертикальная позиция мешка от которого погиб Диггер
+            if (bag_y_pos > man.y_graph)
             {
-                erase_4_15(man_x_graph, man_y_graph);
-                man_y_graph = bag_y_pos; // Если мешок опустился ниже Диггера, Диггер перемещается за мешком
+                erase_4_15(man.x_graph, man.y_graph);
+                man.y_graph = bag_y_pos; // Если мешок опустился ниже Диггера, Диггер перемещается за мешком
             }
 
             // Нарисовать перевёрнутого Диггера
-            sp_4_15_mask(man_x_graph, man_y_graph, image_digger_turned_over[0], outline_digger_turned_over[0]);
+            sp_4_15_mask(man.x_graph, man.y_graph, image_digger_turned_over[0], outline_digger_turned_over[0]);
 
-            if (man_dead_bag->dir == DIR_STOP)
+            if (man.dead_bag->dir == DIR_STOP)
             {
                 man_rip();
             }
@@ -2244,17 +2252,17 @@ static void man_rip()
     {
         if (snd_effects) sound(period, 2);
 
-        if (man_state != CREATURE_DEAD_MONEY_BAG)
+        if (man.state != CREATURE_DEAD_MONEY_BAG)
         {
-            uint16_t y_graph = man_y_graph - bounce[i >> 3];
+            uint16_t y_graph = man.y_graph - bounce[i >> 3];
 
             // Анимация подпрыгивающего перевёрнутого Диггера
             if (prev_y_graph)
             {
-                sp_4_15_mask(man_x_graph, prev_y_graph, nullptr, outline_digger_turned_over[0]);
+                sp_4_15_mask(man.x_graph, prev_y_graph, nullptr, outline_digger_turned_over[0]);
             }
 
-            sp_4_15_mask(man_x_graph, y_graph, image_digger_turned_over[0], outline_digger_turned_over[0]);
+            sp_4_15_mask(man.x_graph, y_graph, image_digger_turned_over[0], outline_digger_turned_over[0]);
 
             prev_y_graph = y_graph;
         }
@@ -2275,13 +2283,13 @@ static void man_rip()
 
     delay_ms(500);
 
-    for (uint8_t i = 0; i < bugs_max; ++i)
+    for (uint8_t i = 0; i < bugs.max; ++i)
     {
-        struct bug_info *bug = &bugs[i]; // Структура с информацией о враге
+        struct bug_info *bug = &bugs_state[i]; // Структура с информацией о враге
         if (bug->state == CREATURE_INACTIVE) continue; // Пропустить неактивных врагов
 
         // Проверить, что враг оказался рядом с могилкой
-        if (check_collision_4_15(man_x_graph, man_y_graph, bug->x_graph, bug->y_graph))
+        if (check_collision_4_15(man.x_graph, man.y_graph, bug->x_graph, bug->y_graph))
         {
             bug->state = CREATURE_INACTIVE; // Декативировать врага убившего Диггера
             erase_4_15(bug->x_graph, bug->y_graph); // Стереть деактивированного врага
@@ -2309,18 +2317,18 @@ static void man_rip()
 
         if (i < sizeof(rip_frames) / sizeof(rip_frames[0]))
         {
-            sp_put(man_x_graph, man_y_graph + rip_frames[i][0], 4, rip_frames[i][1],
+            sp_put(man.x_graph, man.y_graph + rip_frames[i][0], 4, rip_frames[i][1],
                    (uint8_t *)image_rip, nullptr);
         }
 
         delay_ms(30);
     }
 
-    erase_4_15(man_x_graph, man_y_graph); // Стереть надгробный камень
+    erase_4_15(man.x_graph, man.y_graph); // Стереть надгробный камень
 
     (void)*(volatile uint8_t *)REG_KEY_DATA;
 
-    man_state = CREATURE_RIP;
+    man.state = CREATURE_RIP;
 }
 
 static void bonus_indicator(uint16_t color)
@@ -2339,29 +2347,29 @@ static void bonus_indicator(uint16_t color)
 static void process_bonus()
 {
     // Обработка Бонус-режима
-    if (bonus_state == BONUS_ON) // Если включен Бонус-режим
+    if (bonus.state == BONUS_ON) // Если включен Бонус-режим
     {
-        if ((man_state == CREATURE_ALIVE) && bonus_time) // Если Диггер жив и время Бонус-режима не закончилось
+        if ((man.state == CREATURE_ALIVE) && bonus.time) // Если Диггер жив и время Бонус-режима не закончилось
         {
-            bonus_time--; // Декрементировать время Бонус-режима
+            bonus.time--; // Декрементировать время Бонус-режима
 
             // Мигание в начале и в конце времени Бонус-режима
-            if (bonus_flash || bonus_time < 20)
+            if (bonus.flash || bonus.time < 20)
             {
-                bonus_flash--;
-                snd.chase = bonus_flash;
+                bonus.flash--;
+                snd.chase = bonus.flash;
 
                 // Мигание при включении бонус-режима
-                bonus_indicator((bonus_time & 1) ? (bonus_flash ? 0xFFFF : 0xAAAA) : 0x0000);
+                bonus_indicator((bonus.time & 1) ? (bonus.flash ? 0xFFFF : 0xAAAA) : 0x0000);
 
                 // TODO: Включить музыку бонус-режима
             }
         }
         else
         {
-            bonus_state = BONUS_END;
+            bonus.state = BONUS_END;
             snd.chase = 0; // Выключить звук включения/выключения бонус-режима
-            bugs_delay_counter = 0; // Враги начинают появляться сразу же после окончания бонус-режима
+            bugs.delay_counter = 0; // Враги начинают появляться сразу же после окончания бонус-режима
 
             // TODO: Включить музыку Popcorn
         }
@@ -2382,25 +2390,25 @@ static void process_game_state()
         snd.done = 0;
 
         // Циклическое увеличение номера уровня
-        level_no++;
-        level_no &= LEVELS_NUM - 1;
+        game.level_no++;
+        game.level_no &= LEVELS_NUM - 1;
 
         // Увеличение сложности после прохождения очередного уровня (максимальный уровень 9)
-        if (difficulty < 10) difficulty++;
+        if (game.difficulty < 10) game.difficulty++;
 
         init_level(); // Инициализация нового уровня
     }
 
-    if (man_state == CREATURE_RIP)
+    if (man.state == CREATURE_RIP)
     {
-        lives--;                    // Уменьшить количество жизней
+        game.lives--;                    // Уменьшить количество жизней
         print_lives();              // Вывести количество жизней
 
-        if (lives > 0) // Проверить остались ли ещё жизни
+        if (game.lives > 0) // Проверить остались ли ещё жизни
         {
             // Если жизни остались
             init_level_state(); // Инициализировать состояние уровня
-            man_state = CREATURE_ALIVE; // Оживить Диггера
+            man.state = CREATURE_ALIVE; // Оживить Диггера
         }
         else
         {
@@ -2468,8 +2476,8 @@ void main()
         // а так же, сбросить флаг события таймера
         tve_csr->reg = (1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN) | (1 << TVE_CSR_D4);
 
-        const uint8_t man_abs_x_pos = man_x_graph - FIELD_X_OFFSET;
-        const uint8_t man_abs_y_pos = man_y_graph - FIELD_Y_OFFSET;
+        const uint8_t man_abs_x_pos = man.x_graph - FIELD_X_OFFSET;
+        const uint8_t man_abs_y_pos = man.y_graph - FIELD_Y_OFFSET;
         const uint8_t man_x_log = man_abs_x_pos / POS_X_STEP;
         const uint8_t man_y_log = man_abs_y_pos / POS_Y_STEP;
         const uint8_t man_x_rem = man_abs_x_pos % POS_X_STEP;
