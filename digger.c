@@ -186,14 +186,16 @@ uint8_t  bonus_count;         /// Множитель очков в Бонус-р
 uint32_t bonus_life_score;    /// Количество очков для дополнительное жизни
 
 // Переменные отвечающие за выстрел
-uint16_t mis_x_graph;     /// Положение выстрела по оси X в графических координатах
-uint16_t mis_y_graph;     /// Положение выстрела по оси Y в графических координатах
-uint8_t  mis_image_phase; /// Фаза анимации при выводе спрайта снаряда
-uint8_t  mis_fire;        /// Флаг выстрела
-uint8_t  mis_flying;      /// Флаг означающий, что снаряд летит
-uint8_t  mis_wait;        /// Задержка готовности выстрела
-uint8_t  mis_explode;     /// Счётчик взрывающегося снаряда
-enum direction mis_dir;   /// Направление полёта выстрела
+struct {
+    uint16_t x_graph;     /// Положение выстрела по оси X в графических координатах
+    uint16_t y_graph;     /// Положение выстрела по оси Y в графических координатах
+    uint8_t  image_phase; /// Фаза анимации при выводе спрайта снаряда
+    uint8_t  fire;        /// Флаг выстрела
+    uint8_t  flying;      /// Флаг означающий, что снаряд летит
+    uint8_t  wait;        /// Задержка готовности выстрела
+    uint8_t  explode;     /// Счётчик взрывающегося снаряда
+    enum direction dir;   /// Направление полёта выстрела
+} mis;
 
 // Переменные отвечающие за состояние игры
 uint16_t difficulty; /// Уровень сложности
@@ -444,10 +446,10 @@ static void init_level_state()
     man_state = CREATURE_ALIVE; // Исходное состояние - Диггер жив
 
     // Инициализация переменных снаряда
-    mis_fire = 0;
-    mis_flying = 0;
-    mis_wait = 0;
-    mis_explode = 0;
+    mis.fire = 0;
+    mis.flying = 0;
+    mis.wait = 0;
+    mis.explode = 0;
 
     // Инициализация переменных используемых для звуковых эффектов.
     clr_words(&snd, sizeof(snd) / 2);
@@ -1173,7 +1175,7 @@ static void stop_bag(struct bag_info *bag)
  */
 static void draw_man()
 {
-    uint8_t cab = !mis_flying && !mis_wait; // Флаг наличия "башенки"
+    uint8_t cab = !mis.flying && !mis.wait; // Флаг наличия "башенки"
 
     man_image_phase += man_image_phase_inc; // Переключить фазу изображения
 
@@ -1820,35 +1822,35 @@ static void process_missile()
     constexpr uint16_t explode_y_size = sizeof(image_explode[0]) / explode_x_size;
     constexpr uint16_t explode_phases_no = sizeof(image_explode) / sizeof(image_explode[0]);
 
-    if (mis_explode)
+    if (mis.explode)
     {
         // Обработка взрывающегося выстрела
-        if (mis_image_phase < explode_phases_no)
+        if (mis.image_phase < explode_phases_no)
         {
             // Вывести изображение взрыва
-            sp_put(mis_x_graph, mis_y_graph, explode_x_size, explode_y_size, (uint8_t *)image_explode[mis_image_phase++], nullptr);
+            sp_put(mis.x_graph, mis.y_graph, explode_x_size, explode_y_size, (uint8_t *)image_explode[mis.image_phase++], nullptr);
         }
         else
         {
             // Стереть изображение взрыва
-            sp_clear_brick(mis_x_graph, mis_y_graph, explode_x_size, explode_y_size);
-            mis_flying = 0;  // Выстрел больше не летит
-            mis_explode = 0; // И не взрывается
+            sp_clear_brick(mis.x_graph, mis.y_graph, explode_x_size, explode_y_size);
+            mis.flying = 0;  // Выстрел больше не летит
+            mis.explode = 0; // И не взрывается
         }
     }
     else
     {
         // Обработка летящего выстрела
-        if (mis_flying)
+        if (mis.flying)
         {
             // Стереть предыдущее изображение выстрела
-            // sp_put(mis_x_graph, mis_y_graph, missile_x_size, missile_y_size, nullptr, (uint8_t *)outline_missile);
-            sp_clear_brick(mis_x_graph, mis_y_graph, missile_x_size, missile_y_size);
+            // sp_put(mis.x_graph, mis.y_graph, missile_x_size, missile_y_size, nullptr, (uint8_t *)outline_missile);
+            sp_clear_brick(mis.x_graph, mis.y_graph, missile_x_size, missile_y_size);
 
             // Переместить выстрел на один шаг в заданном направлении.
             // Скорость выстрела вдвое выше скорости перемещения врагов и Диггера.
-            mis_x_graph += dir_dx[mis_dir] * (2 * MOVE_X_STEP);
-            mis_y_graph += dir_dy[mis_dir] * (2 * MOVE_Y_STEP);
+            mis.x_graph += dir_dx[mis.dir] * (2 * MOVE_X_STEP);
+            mis.y_graph += dir_dy[mis.dir] * (2 * MOVE_Y_STEP);
 
             uint8_t explode = 0;
 
@@ -1863,7 +1865,7 @@ static void process_missile()
                 if (bug->state != CREATURE_ALIVE) continue; //  Пропустить неживых врагов
 
                 // Проверить, что выстрел попал во врага
-                if (check_collision_4_15(mis_x_graph, mis_y_graph, bug->x_graph, bug->y_graph))
+                if (check_collision_4_15(mis.x_graph, mis.y_graph, bug->x_graph, bug->y_graph))
                 {
                     explode = 1; // Взорвать выстрел
                     bug->count = 1; // Чтобы CREATURE_RIP стёр врага на следующем тике, а не ждал старого счётчика
@@ -1875,39 +1877,39 @@ static void process_missile()
                 }
             }
 
-            if (!check_path(mis_dir, mis_x_graph, mis_y_graph))
+            if (!check_path(mis.dir, mis.x_graph, mis.y_graph))
             {
                 explode = 1; // Взорвать выстрел - впереди стена/край
             }
             else if (!explode)
             {
                 // Циклически менять фазу анимации выстрела
-                if (++mis_image_phase >= missile_phases_no) mis_image_phase = 0;
+                if (++mis.image_phase >= missile_phases_no) mis.image_phase = 0;
 
                 // Вывести новое изображение выстрела
-                sp_put(mis_x_graph, mis_y_graph, missile_x_size, missile_y_size, (uint8_t *)image_missile[mis_image_phase], nullptr);
+                sp_put(mis.x_graph, mis.y_graph, missile_x_size, missile_y_size, (uint8_t *)image_missile[mis.image_phase], nullptr);
             }
 
             if (explode)
             {
                 snd.fire = 0;                  // Выключить звук летящего выстрела
-                mis_explode = 1;               // Включить взрыв выстрела
-                mis_image_phase = 0;           // Начальная фаза взрыва
+                mis.explode = 1;               // Включить взрыв выстрела
+                mis.image_phase = 0;           // Начальная фаза взрыва
                 snd.explode = 1;               // Включить звук взрыва
             }
         }
         else
         {
-            if (mis_wait) mis_wait--; // Уменьшить счётчик задержки выстрела
+            if (mis.wait) mis.wait--; // Уменьшить счётчик задержки выстрела
             else
             {
-                if (mis_fire) // Если произведён выстрел
+                if (mis.fire) // Если произведён выстрел
                 {
-                    mis_fire = 0;
-                    mis_wait = 85 + difficulty * 4; // Начальное значение счётчика появления "башенки"
-                    mis_image_phase = 0;
-                    mis_flying = 1;
-                    mis_dir = man_dir;
+                    mis.fire = 0;
+                    mis.wait = 85 + difficulty * 4; // Начальное значение счётчика появления "башенки"
+                    mis.image_phase = 0;
+                    mis.flying = 1;
+                    mis.dir = man_dir;
 
                     // Определить начальное положение выстрела в зависимости от
                     // координат Диггера и его направления движения.
@@ -1916,11 +1918,11 @@ static void process_missile()
                     static const int8_t fire_dx[4] = { -MOVE_X_STEP, 4, 1, 1 };
                     static const int8_t fire_dy[4] = { MOVE_Y_STEP, MOVE_Y_STEP, -MOVE_Y_STEP, 15 + MOVE_Y_STEP };
 
-                    mis_x_graph = man_x_graph + fire_dx[mis_dir];
-                    mis_y_graph = man_y_graph + fire_dy[mis_dir];
+                    mis.x_graph = man_x_graph + fire_dx[mis.dir];
+                    mis.y_graph = man_y_graph + fire_dy[mis.dir];
 
                     // Вывести начальное положение спрайта выстрела
-                    sp_put(mis_x_graph, mis_y_graph, missile_x_size, missile_y_size, (uint8_t *)image_missile[mis_image_phase], nullptr);
+                    sp_put(mis.x_graph, mis.y_graph, missile_x_size, missile_y_size, (uint8_t *)image_missile[mis.image_phase], nullptr);
 
                     // Включить звук выстрела
                     snd.fire_period = 10;
@@ -1983,7 +1985,7 @@ static void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
                 }
             }
 
-            if (!mis_wait && (port_state & ((1 << PAR_INTERF_LEFT_BUTTON) | (1 << PAR_INTERF_RIGHT_BUTTON)))) mis_fire = 1;
+            if (!mis.wait && (port_state & ((1 << PAR_INTERF_LEFT_BUTTON) | (1 << PAR_INTERF_RIGHT_BUTTON)))) mis.fire = 1;
 
             if (new_code) // Если поступил новый скан-код
             {
@@ -1997,7 +1999,7 @@ static void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
 
                     case 32:  // Пробел - выстрел
                     {
-                        if (!mis_wait) mis_fire = 1;
+                        if (!mis.wait) mis.fire = 1;
                         break;
                     }
 
