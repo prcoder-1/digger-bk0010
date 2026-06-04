@@ -234,7 +234,7 @@ void sp_4_15_hv_mirror_put(uint16_t x, uint16_t y, const uint8_t *image)
     );
 }
 
-void sp_4_15_mask_put(uint16_t x, uint16_t y, const uint8_t *image, const uint8_t *outline)
+void sp_4_15_mask(uint16_t x, uint16_t y, const uint8_t *image, const uint8_t *outline)
 {
     asm(
         "mov $040000, r5\n\t"

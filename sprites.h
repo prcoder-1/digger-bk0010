@@ -23,7 +23,7 @@ void sp_4_15_hv_mirror_put(uint16_t x, uint16_t y, const uint8_t *image);
  * приёмника пишет пословно (2 mov на строку), для нечётного — побайтно но без
  * внутреннего sob (4 байтных стора на строку).
  */
-void sp_4_15_mask_put(uint16_t x, uint16_t y, const uint8_t *image, const uint8_t *outline);
+void sp_4_15_mask(uint16_t x, uint16_t y, const uint8_t *image, const uint8_t *outline);
 
 /**
  * @brief Выводит спрайт произвольного размера по заданным координатам в видеопамять (используя маску)
