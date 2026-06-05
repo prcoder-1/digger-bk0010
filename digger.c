@@ -546,7 +546,8 @@ static void init_level()
                 // Нарисовать мешок с золотом
                 sp_4_15_mask(bag->x_graph, bag->y_graph, image_bag[0], outline_bag[0]);
             }
-            else if (ls == LEV_H || ls == LEV_S)
+
+            if (ls == LEV_H || ls == LEV_S)
             {
                 *bg |= 0x0F;  // устанавливаем все биты состояния фона для горизонтальных проходов
                 for (uint16_t i = 4; i > 0; --i)
@@ -577,16 +578,15 @@ static void init_level()
 }
 
 /**
- * @brief Определяет по состоянию байта клетки, что клетка не полностью проедена
- * Клетка считается не полностью проеденной, если в байте установлено больше одного бита.
+ * @brief Определяет по состоянию байта клетки, что клетка  проедена
  *
  * @param byte - байт с состоянием клетки
  *
- * @return - 1 - клетка не полностью проедена, 0 - клетка проедена полностью
+ * @return - 1 - клетка проедена, 0 - клетка не проедена
  */
 static uint16_t full_bite(uint8_t byte)
 {
-    return (byte & (byte - 1)) != 0;
+    return byte & (byte - 1);
 
     // int bits_count;
     // for (bits_count = 0; byte; bits_count++)
@@ -631,9 +631,9 @@ static uint8_t check_path(enum direction dir, uint8_t x_graph, uint8_t y_graph)
     if ((x_log >= W_MAX) || (y_log >= H_MAX)) return 0;
 
     const uint8_t neighbor_cell = background[y_log][x_log]; // Состояние соседней клетки
-    if (full_bite(neighbor_cell) && ((neighbor_cell & dir_matrix[dir].mask) || (current_cell & dir_matrix[dir].cur_mask))) return 1;
-
-    return 0;
+    if (!full_bite(neighbor_cell)) return 0;
+    if (neighbor_cell & dir_matrix[dir].mask) return 1;
+    return current_cell & dir_matrix[dir].cur_mask;
 }
 
 /**
