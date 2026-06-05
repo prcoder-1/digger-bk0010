@@ -336,13 +336,18 @@ static void add_score(uint16_t score_add)
     game.score += score_add;
     print_dec(game.score, 0, SCREEN_Y_OFFSET + MOVE_Y_STEP);
 
-     // Если количество жизней не достигло максимального и количество очков досигло бонусного для получения жизни
-    if (game.lives < MAX_LIVES && (game.score >= bonus.life_score))
+     // Если количество очков досигло бонусного для получения жизни
+    if (game.score >= bonus.life_score)
     {
-        game.lives++; // Увеличичить количество жизней на единицу
-        print_lives(); // Вывесли количество жизней
         bonus.life_score += BONUS_LIFE_SCORE; // Количество очков до следующего бонуса в виде жизни
-        snd.life = 24; // Издать звук получения жизни
+
+        // Выдать жизнь только если максимум ещё не достигнут
+        if (game.lives < MAX_LIVES)
+        {
+            game.lives++; // Увеличичить количество жизней на единицу
+            print_lives(); // Вывесли количество жизней
+            snd.life = 24; // Издать звук получения жизни
+        }
     }
 }
 
@@ -2460,7 +2465,7 @@ void main()
     volatile uint16_t *t_limit = (volatile uint16_t *)REG_TVE_LIMIT;
     volatile union TVE_CSR *tve_csr = (volatile union TVE_CSR *)REG_TVE_CSR;
 
-    constexpr uint16_t FPS = 10; // Частота обновления кадров
+    constexpr uint16_t FPS = 11; // Частота обновления кадров
     *t_limit = 3000000 / 128 / 4 / FPS;
 
     init_game(); // Начальная инициализация игры
