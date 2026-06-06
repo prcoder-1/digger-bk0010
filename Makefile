@@ -1,5 +1,6 @@
-FILE_1=digger_tpc
-FILE_2=digger_tit
+VERSION=0.7
+FILE_1=digger_tpc_v${VERSION}
+FILE_2=digger_tit_v${VERSION}
 BIN_FILE_1=${FILE_1}.bin
 BIN_FILE_2=${FILE_2}.bin
 OUT_FILE_1=${FILE_1}.out
