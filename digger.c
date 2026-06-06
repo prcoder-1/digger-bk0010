@@ -2432,7 +2432,9 @@ static void process_game_state()
 
             sp_put(go_x, go_y, go_width, go_height, (uint8_t *)game_over, 0); // Вывод написи Game Over
 
-            while(((union EXT_DEV *)REG_EXT_DEV)->bits.MAG_KEY); // Ожидание нажатия клавиши
+             // Ожидание нажатия клавиши или кнопки джойстика
+            while(((union EXT_DEV *)REG_EXT_DEV)->bits.MAG_KEY &&
+                  !(*((uint16_t *)REG_PAR_INTERF) & ((1 << PAR_INTERF_LEFT_BUTTON) | (1 << PAR_INTERF_RIGHT_BUTTON))));
             (void)*(volatile uint8_t *)REG_KEY_DATA; // Очистка буфера клавиатуры
 
             init_game(); // Установить игру в начальное состояние
