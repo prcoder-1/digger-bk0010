@@ -9,6 +9,7 @@
 #include "digger_music.h"
 
 // #define DEBUG // Режим отладки включен
+// #define MINIMAP // Отладочные карты уровня
 
 constexpr uint8_t POS_X_STEP = 4;      // Шаг клеток по оси X (в байтах)
 constexpr uint8_t POS_Y_STEP = 16;     // Шаг клеток по оси Y (в строках)
@@ -247,7 +248,7 @@ struct {
     uint8_t  done;                /// Флаг, означающий, что звук завершения уровня включен
 } snd;
 
-#if defined(DEBUG)
+#if defined(MINIMAP)
 /**
  * @brief Отладочная процедура отображения мини-карты состояния фона
  */
@@ -263,9 +264,6 @@ static void draw_coin_minimap()
 {
     sp_put(45, SCREEN_Y_OFFSET + MOVE_Y_STEP + 2, sizeof(coins[0]), sizeof(coins) / sizeof(coins[0]), (uint8_t*)coins, 0);
 }
-#else
-#define draw_bg_minimap() ;
-#define draw_coin_minimap() ;
 #endif
 
 static int remove_coin(uint8_t x_log, uint8_t y_log);
@@ -2476,24 +2474,33 @@ void main()
         // а так же, сбросить флаг события таймера
         tve_csr->reg = (1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN) | (1 << TVE_CSR_D4);
 
-        const uint8_t man_abs_x_pos = man.x_graph - FIELD_X_OFFSET;
-        const uint8_t man_abs_y_pos = man.y_graph - FIELD_Y_OFFSET;
-        const uint8_t man_x_log = man_abs_x_pos / POS_X_STEP;
-        const uint8_t man_y_log = man_abs_y_pos / POS_Y_STEP;
-        const uint8_t man_x_rem = man_abs_x_pos % POS_X_STEP;
-        const uint8_t man_y_rem = (man_abs_y_pos % POS_Y_STEP) >> 2;
+        // Положение Диггера на момент входа в кадр: остатки нужны process_man
+        // чтобы понять, на границе ли клетки и можно ли менять направление.
+        const uint8_t man_x_rem = (man.x_graph - FIELD_X_OFFSET) % POS_X_STEP;
+        const uint8_t man_y_rem = ((man.y_graph - FIELD_Y_OFFSET) % POS_Y_STEP) >> 2;
+
+        // Диггер обрабатывается первым - чтение клавиатуры, движение, выстрел.
+        // Это снимает кадр задержки между нажатием и реакцией: остальные системы
+        // в этом же кадре видят новую позицию/направление/mis.fire.
+        process_man(man_x_rem, man_y_rem);
+
+        // Логические координаты Диггера ПОСЛЕ хода - для process_bags
+        const uint8_t man_x_log = (man.x_graph - FIELD_X_OFFSET) / POS_X_STEP;
+        const uint8_t man_y_log = (man.y_graph - FIELD_Y_OFFSET) / POS_Y_STEP;
 
         process_bugs();
         process_bags(man_x_log, man_y_log);
         process_missile();
-        process_man(man_x_rem, man_y_rem);
         process_bonus();
         if (snd_effects) sound_effect();
         process_game_state();
 
-#if defined(DEBUG)
+#if defined(MINIMAP)
         draw_coin_minimap(); // Нарисовать мини-карту монеток
         draw_bg_minimap();   // Нарисовать мини-карту ячеек фона
+#endif
+
+#if defined(DEBUG)
         // Рспечатать оставшееся свободное время
         print_dec(*((volatile uint16_t *)REG_TVE_COUNT), 0, MAX_Y_POS + 2 * POS_Y_STEP);
 #endif
