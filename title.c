@@ -42,8 +42,15 @@ void print_str(const char *str, uint16_t x_graph, uint16_t y_graph)
         char c = *str++;
         if (c != ' ')
         {
-            uint16_t index = c - 'A';
-            title_sp_put(x_graph, y_graph, sizeof(ch_alpha[0][0]), sizeof(ch_alpha[0]) / sizeof(ch_alpha[0][0]), (uint8_t *)ch_alpha[index], nullptr); // Вывести спрайт буквы
+            if (c == '.')
+            {
+                title_sp_put(x_graph, y_graph, sizeof(ch_dot[0]), sizeof(ch_dot) / sizeof(ch_dot[0]), (uint8_t *)ch_dot, nullptr); // Вывести спрайт точки
+            }
+            else
+            {
+                uint16_t index = c - 'A';
+                title_sp_put(x_graph, y_graph, sizeof(ch_alpha[0][0]), sizeof(ch_alpha[0]) / sizeof(ch_alpha[0][0]), (uint8_t *)ch_alpha[index], nullptr); // Вывести спрайт буквы
+            }
         }
 
         x_graph += sizeof(ch_alpha[0][0]);
@@ -55,6 +62,10 @@ constexpr uint16_t str_height = sizeof(ch_alpha[0]) / char_width;
 constexpr uint16_t y_space = 8;
 constexpr uint16_t windmill_height = 42;
 constexpr uint16_t table_height = SCREEN_PIX_HEIGHT - (str_height + y_space) - windmill_height;
+
+const char unpacking_str[] = "UNPACKING...";
+constexpr uint16_t unpacking_str_x_pos = (SCREEN_BYTE_WIDTH - char_width * sizeof(unpacking_str) + char_width) / 2;
+constexpr uint16_t unpacking_str_y_pos = (SCREEN_PIX_HEIGHT + str_height) / 2;
 
 const char digger_str[] = "D I G G E R";
 constexpr uint16_t digger_str_x_pos = (SCREEN_BYTE_WIDTH - char_width * sizeof(digger_str) + char_width) / 2;
@@ -506,6 +517,9 @@ void main()
 
     set_PSW(1 << PSW_I); // Замаскировать прерывания IRQ
     ((union KEY_STATE *)REG_KEY_STATE)->bits.INT_MASK = 1; // Отключить прерывание от клавиатуры
+
+    // Строка "UNPACKING..."
+    print_str(unpacking_str, unpacking_str_x_pos, unpacking_str_y_pos);
 
     // Распаковать обложку прямо в экранное ОЗУ.
     zx0_decompress(cover_zx0, (uint8_t *)MEM_VIDEO);
