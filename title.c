@@ -10,126 +10,23 @@
 
 #define COIN_Y_OFFSET 3 // Смещение спрайта монетки в ячейке по оси Y
 
-#define SND_TIMER_MODE         ((1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN)) // без предделителей: 1 такт = 1/23438 c
-#define SND_END_PAUSE_CYCLES   (2 * 23438u)
+// Длительность одного «кадра» демо в тактах таймера (23438 Гц).
+// 150 тактов ≈ 6.4 мс/кадр, тот же бюджет, что был в исходной версии
+// с поллинг-музыкой (там этот же объём времени уходил на music_service).
+constexpr uint16_t FRAME_TICKS = 150;
 
-uint16_t snd_note_idx       = -1; // индекс текущей ноты в popcorn_periods/durations
-uint16_t snd_period         = 1; // средний полупериод текущей ноты в тактах таймера
-uint16_t snd_cycles_left    = 0; // тактов до конца текущей ноты
-uint16_t snd_cycles_total   = 0; // полная длительность текущей ноты (для расчёта огибающей)
-uint16_t snd_speaker        = 0; // текущее состояние бита динамика (0 или 0100)
-uint16_t snd_frame_ticks    = 0; // абсолютная wall-time-метка в тактах для пейсинга кадров демо
-
-// Полу-период синуса в 17 точках, нормировано к 64 = sin(π/2). Используется
-// для построения огибающей по форме sin(π·t) от 0 до 1 и обратно до 0.
-static const uint8_t snd_sin_table[17] = {
-    0, 12, 24, 36, 45, 53, 59, 63, 64, 63, 59, 53, 45, 36, 24, 12, 0
-};
-
-// Таблица on_ticks (в тактах таймера) для огибающей текущей ноты.
-// snd_on_dur_ticks[i] = snd_sin_table[i] · snd_period / 128, что даёт максимум
-// скважности 25 % (на пике sin = 64, on_ticks = snd_period / 2 при полном
-// периоде 2·snd_period).
-static uint16_t snd_on_dur_ticks[17];
-
-// Соответствующее количество итераций sob в CPU-loop'е для выдержки ON-полуволны.
-// 1 такт таймера = 128 CPU-циклов (при f/128). sob занимает ~6 циклов,
-// поэтому 1 такт ≈ 21 итерация. Множитель можно подстроить, если на реальном
-// железе sob идёт быстрее/медленнее.
-static uint16_t snd_on_dur_iters[17];
-#define SND_DELAY_ITERS_PER_TICK 10u
+#define FRAME_TIMER_MODE ((1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN))
 
 /**
- * @brief Сервис одного события таймера.
+ * @brief Заглушка для music-aware блиттеров из sprites_title.c.
+ *
+ * Эти блиттеры (title_sp_4_15_put и пр.) предназначались для проигрывания
+ * музыки во время отрисовки и в каждой итерации зовут music_service. В
+ * текущей сборке музыка играется синхронно ДО демо (см. play_popcorn),
+ * поэтому music_service - пустая функция: jsr+rts ≈ 16 циклов на итерацию
+ * блиттера, на размер титульного экрана это пренебрежимо.
  */
-void music_service()
-{
-    volatile union TVE_CSR *csr = (volatile union TVE_CSR *)REG_TVE_CSR;
-    volatile uint16_t      *lim = (volatile uint16_t *)REG_TVE_LIMIT;
-    volatile uint16_t      *spk = (volatile uint16_t *)REG_EXT_DEV;
-
-    if (snd_cycles_left > (snd_period << 1))
-    {
-        uint16_t progress = snd_cycles_total - snd_cycles_left;
-        uint16_t env_raw  = (progress < snd_cycles_left) ? progress : snd_cycles_left;
-        uint16_t idx      = env_raw >> 8;
-        if (idx > 8) idx = 8;
-        uint16_t on_ticks    = snd_on_dur_ticks[idx];
-        uint16_t delay_count = snd_on_dur_iters[idx];
-        uint16_t off_ticks   = (snd_period << 1) - on_ticks;
-        if (off_ticks < 1) off_ticks = 1;
-
-        *spk = 0100;                       // динамик ON
-        if (delay_count) {
-            asm volatile (
-                "mov %0, r0\n\t"
-                "1: sob r0, 1b\n\t"
-                : : "r"(delay_count) : "r0", "cc"
-            );
-        }
-        *spk = 0;                          // динамик OFF
-        *lim = off_ticks;
-        csr->reg = SND_TIMER_MODE;          // рестарт таймера на off_ticks
-
-        snd_cycles_left -= snd_period << 1;
-        snd_frame_ticks += snd_period << 1;
-        return;
-    }
-
-    snd_frame_ticks += snd_period << 1;     // учли только что прошедший период
-
-    // === Активная нота кончается на этом тике ===
-    if (snd_cycles_left)
-    {
-        snd_speaker        = 0;
-        *spk               = 0;             // динамик OFF
-        *lim               = snd_period;
-        csr->reg           = SND_TIMER_MODE;
-        snd_cycles_left    = 0;
-        return;
-    }
-
-    if (snd_note_idx == -1) return;
-
-    uint8_t next_period = popcorn_periods[snd_note_idx];
-    if (!next_period)
-    {
-        snd_note_idx       = -1;
-        csr->reg           = SND_TIMER_MODE;
-        return;
-    }
-
-    uint8_t duration = popcorn_durations[snd_note_idx];
-    snd_note_idx++;
-    snd_cycles_left  = ((uint16_t)duration << 10) + ((uint16_t)duration << 9) - ((uint16_t)duration << 6);
-    snd_cycles_total = snd_cycles_left;             // полная длительность для огибающей
-    snd_period       = next_period;
-
-    // Расчёт огибающей.
-    for (uint8_t i = 0; i < 17; i++) {
-        uint16_t on_ticks   = ((uint16_t)snd_sin_table[i] * (uint16_t)next_period) >> 9;
-        if (snd_sin_table[i] > 0 && on_ticks == 0) on_ticks = 1;
-        snd_on_dur_ticks[i] = on_ticks;
-        snd_on_dur_iters[i] = on_ticks * SND_DELAY_ITERS_PER_TICK;
-    }
-
-    // Запускаем таймер на полный период (2·snd_period).
-    *lim     = (uint16_t)next_period << 1;
-    csr->reg = SND_TIMER_MODE;
-}
-
-/**
- * @brief Инлайновая проверка FL и вызов music_service.
- */
-#define MUSIC_TICK() do { \
-    asm volatile ( \
-        "tstb @%[csr]\n\t" \
-        "bpl 1f\n\t" \
-        "jsr pc, _music_service\n" \
-        "1:\n\t" \
-        : : [csr]"i"(REG_TVE_CSR) : "r0", "r1", "cc", "memory" \
-    ); \
-} while (0)
+void music_service() { }
 
 /**
  * @brief Вывод строки
@@ -150,7 +47,6 @@ void print_str(const char *str, uint16_t x_graph, uint16_t y_graph)
         }
 
         x_graph += sizeof(ch_alpha[0][0]);
-        MUSIC_TICK();
     }
 }
 
@@ -170,7 +66,6 @@ const char player_str[] = "PLAYER";
 constexpr uint16_t player_x_pos = (SCREEN_BYTE_WIDTH + SCREEN_BYTE_WIDTH / 2 - char_width * sizeof(player_str) + char_width) / 2;
 
 uint16_t one_player_y;
-uint16_t note_index = 0;
 
 /**
  * @brief Инициализация демо
@@ -210,15 +105,13 @@ void init_demo()
     // Нижняя линия рамки
     title_sp_paint_brick_long(0, y_pos, SCREEN_BYTE_WIDTH, 2, 0b01010101);
 
-    volatile union TVE_CSR *csr = (volatile union TVE_CSR *)REG_TVE_CSR;
+    // Запустить кадровый таймер демо. Лимит выставляется один раз; режим
+    // непрерывный (CAP=0, OS=0), счётчик автоматически перезагружается.
     volatile uint16_t      *lim = (volatile uint16_t *)REG_TVE_LIMIT;
-
-    *lim = 0;
-    csr->reg = SND_TIMER_MODE;
+    volatile union TVE_CSR *csr = (volatile union TVE_CSR *)REG_TVE_CSR;
+    *lim = FRAME_TICKS;
+    csr->reg = FRAME_TIMER_MODE;
 }
-
-// Длительность одного «кадра» демо в тактах таймера (23438 Гц).
-constexpr uint16_t FRAME_TICKS = 150;
 
 uint16_t demo_time = 0;
 uint16_t nobbin_x = 0, nobbin_y = 0;
@@ -282,13 +175,10 @@ void process_demo_state()
     // Время до повтора демо
     constexpr uint16_t demo_restart_time = cherry_print_time + 250;
 
-    uint16_t frame_target = snd_frame_ticks + FRAME_TICKS;
-
     switch (demo_time)
     {
         case start_time:
         {
-            snd_note_idx = 0;
             // Очистка области Demo
             nobbin_x = hobbin_x = digger_x = 0;
             constexpr uint16_t demo_height = table_height - (str_height + y_space * 2) * 2;
@@ -421,7 +311,6 @@ void process_demo_state()
         title_sp_clear_strip(nobbin_x + image_width, nobbin_y, image_height);
         title_sp_4_15_put(nobbin_x, nobbin_y, (uint8_t *)image_nobbin[image_phase]);
     }
-    MUSIC_TICK();
 
     if (hobbin_x)
     {
@@ -429,41 +318,12 @@ void process_demo_state()
         if (hobbin_mirror) title_sp_4_15_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_left[image_phase]);
         else title_sp_4_15_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_right[image_phase]);
     }
-    MUSIC_TICK();
 
     if (digger_x)
     {
         title_sp_clear_strip(digger_x + image_width, digger_y, image_height);
         if (digger_mirror) title_sp_4_15_put(digger_x, digger_y, (uint8_t *)image_digger_left[image_phase]);
         else title_sp_4_15_put(digger_x, digger_y, (uint8_t *)image_digger_right[image_phase]);
-    }
-    MUSIC_TICK();
-
-    // Компенсация за отсутствующие анимационные спрайты.
-    {
-        uint8_t missing_sprites = 0;
-        if (!nobbin_x) missing_sprites++;
-        if (!hobbin_x) missing_sprites++;
-        if (!digger_x) missing_sprites++;
-
-        while (missing_sprites--)
-        {
-            // 45 поллингов = 15 (clear_strip) + 30 (sp_4_15_put 15 строк × 2).
-            // Каждая итерация: MUSIC_TICK (~15 циклов) + 12 nop (24 цикла) =
-            // ~39 циклов. На спрайт ~1750 циклов — близко к реальной
-            // длительности отрисовки sp_4_15_put + clear_strip (~1245-1500
-            // циклов с учётом байт-операций и POLL_FL).
-            uint8_t i = 45;
-            while (i--)
-            {
-                MUSIC_TICK();
-                asm volatile (
-                    "nop\n\tnop\n\tnop\n\tnop\n\t"
-                    "nop\n\tnop\n\tnop\n\tnop\n\t"
-                    "nop\n\tnop\n\tnop\n\tnop"
-                );
-            }
-        }
     }
 
     if (!(demo_time & 7))
@@ -481,23 +341,12 @@ void process_demo_state()
         demo_time = 0;
     }
 
-    // Подгонка интервала между MUSIC_TICK в этом цикле к интервалам внутри
-    // спрайтовых рутин (~25-30 циклов). Без этого polling-loop поллит таймер
-    // плотнее, чем рисование, и средняя полленг-задержка отличается между
-    // фазой "только polling-loop" (нет спрайтов на экране) и фазой "рисование +
-    // polling-loop" (есть спрайты), что проявляется как разница в темпе и
-    // дрожании звука.
-    while ((int16_t)(snd_frame_ticks - frame_target) < 0)
-    {
-        MUSIC_TICK();
-        asm volatile (
-            "nop\n\tnop\n\tnop\n\tnop\n\t"
-            "nop\n\tnop\n\tnop\n\tnop\n\t"
-            "nop\n\tnop\n\tnop\n\tnop\n\t"
-            "nop\n\tnop\n\tnop\n\tnop\n\t"
-            "nop\n\tnop\n\tnop\n\tnop"
-        );
-    }
+    // Кадровый пейсинг: ждём истечения таймера FRAME_TICKS, перезапускаем
+    // его (запись в CSR сбрасывает флаг FL). Без звука это единственный
+    // ограничитель темпа демо.
+    volatile union TVE_CSR *csr = (volatile union TVE_CSR *)REG_TVE_CSR;
+    while ((csr->reg & (1 << TVE_CSR_FL)) == 0);
+    csr->reg = FRAME_TIMER_MODE;
 }
 
 extern void start();
@@ -596,19 +445,30 @@ void zx0_decompress(const uint8_t *src, uint8_t *dst)
 }
 
 /**
- * @brief Опрос регистра клавиатуры до нажатия любой клавиши.
+ * @brief Синхронное проигрывание мелодии «Popcorn» через sound_vibrato.
  *
- * Прерывания от клавиатуры в этой сборке замаскированы, поэтому системные
- * ячейки не обновляются — опрашиваем железо напрямую и тут же гасим
- * аппаратный флаг чтением регистра данных.
+ * Аналог проигрывания траурного марша в digger.c::man_rip(): идём по
+ * параллельным массивам periods/durations, на каждой ноте sound_vibrato
+ * блокирует CPU на её длительности. Терминатор - нулевой period.
+ *
+ * Между нотами опрашиваем регистр клавиатуры: любое нажатие прерывает
+ * музыку, гасит флаг STATE и выходит из функции - так пользователь может
+ * пропустить заставку, не дожидаясь конца мелодии.
  */
-static void wait_for_key()
+static void play_popcorn()
 {
     volatile union KEY_STATE *ks = (volatile union KEY_STATE *)REG_KEY_STATE;
     volatile uint16_t        *kd = (volatile uint16_t *)REG_KEY_DATA;
 
-    while (!ks->bits.STATE) { /* ожидание нажатия */ }
-    (void)*kd; // считать код, чтобы сбросить флаг STATE
+    for (uint16_t i = 0; popcorn_periods[i] != 0; ++i)
+    {
+        if (ks->bits.STATE)
+        {
+            (void)*kd; // сбросить флаг STATE, чтобы дальше не сработал ложный wait
+            return;
+        }
+        sound_vibrato(popcorn_periods[i], popcorn_durations[i]);
+    }
 }
 
 /**
@@ -627,9 +487,13 @@ void main()
     set_PSW(1 << PSW_I); // Замаскировать прерывания IRQ
     ((union KEY_STATE *)REG_KEY_STATE)->bits.INT_MASK = 1; // Отключить прерывание от клавиатуры
 
-    // Распаковать обложку прямо в экранное ОЗУ и подождать нажатия клавиши.
+    // Распаковать обложку прямо в экранное ОЗУ.
     zx0_decompress(cover_zx0, (uint8_t *)MEM_VIDEO);
-    wait_for_key();
+
+    // Сразу после splash начать проигрывание Popcorn. Музыка прерывается
+    // нажатием любой клавиши (см. play_popcorn). После окончания мелодии
+    // или нажатия клавиши - переход к демо.
+    play_popcorn();
 
     init_demo(); // Инициализация демо
     for (;;) process_demo_state(); // Основной бесконечный цикл демо
