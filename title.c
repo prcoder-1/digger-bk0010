@@ -6,6 +6,7 @@
 #include "digger_sprites_title.h"
 #include "digger_music_title.h"
 #include "digger_full_font.h"
+#include "digger_title.h"
 
 #define COIN_Y_OFFSET 3 // Смещение спрайта монетки в ячейке по оси Y
 
@@ -501,21 +502,126 @@ void process_demo_state()
 
 extern void start();
 
+// === Распаковщик ZX0 (modern v2, прямой поток) ============================
+// Состояние в файловой области — компактнее, чем гонять указатели через стек.
+static const uint8_t *zx0_src;
+static uint8_t zx0_bit_mask;
+static uint8_t zx0_bit_value;
+static uint8_t zx0_last_byte;
+static uint8_t zx0_backtrack;
+
+// `zx0_bit_mask` хранит число оставшихся в `zx0_bit_value` бит (8..1).
+// Активный бит всегда в позиции 7, поэтому возврат сводится к `value >> 7`
+// (для uint8_t это уже 0/1) — обходим баг кодогенерации gcc -Os -mlra на
+// идиоме `(a & b) ? 1 : 0`, где `neg`-флаг затирается следующим `clr` и
+// функция всегда возвращает 0.
+static uint8_t zx0_read_bit()
+{
+    uint8_t bit;
+    if (zx0_backtrack)
+    {
+        zx0_backtrack = 0;
+        return zx0_last_byte & 1;
+    }
+    if (!zx0_bit_mask)
+    {
+        zx0_bit_value = *zx0_src++;
+        zx0_bit_mask  = 8;
+    }
+    bit            = zx0_bit_value >> 7;
+    zx0_bit_value  = zx0_bit_value << 1;
+    zx0_bit_mask--;
+    return bit;
+}
+
+static uint16_t zx0_elias(uint8_t inverted)
+{
+    uint16_t value = 1;
+    while (!zx0_read_bit())
+    {
+        value = (value << 1) | (zx0_read_bit() ^ inverted);
+    }
+    return value;
+}
+
+/**
+ * @brief Распаковка потока ZX0 в произвольную область памяти.
+ *
+ * @param src - указатель на сжатый поток ZX0
+ * @param dst - указатель на буфер-приёмник; он же служит «историей» для ссылок по смещению
+ */
+void zx0_decompress(const uint8_t *src, uint8_t *dst)
+{
+    uint16_t last_offset = 1;
+    uint16_t length;
+    uint8_t *p;
+
+    zx0_src       = src;
+    zx0_bit_mask  = 0;
+    zx0_backtrack = 0;
+
+literals:
+    length = zx0_elias(0);
+    while (length--) *dst++ = *zx0_src++;
+    if (zx0_read_bit()) goto new_offset;
+
+    /* COPY_FROM_LAST_OFFSET */
+    length = zx0_elias(0);
+    p      = dst - last_offset;
+    while (length--) *dst++ = *p++;
+    if (!zx0_read_bit()) goto literals;
+
+new_offset:
+    {
+        uint16_t hi = zx0_elias(1);
+        if (hi == 256) return;                 // маркер конца потока
+        zx0_last_byte = *zx0_src++;
+        last_offset   = (hi << 7) - (zx0_last_byte >> 1);
+        zx0_backtrack = 1;                     // бит 0 только что прочитанного байта
+                                               // — первый бит следующей гаммы
+        length = zx0_elias(0) + 1;
+        p      = dst - last_offset;
+        while (length--) *dst++ = *p++;
+        if (zx0_read_bit()) goto new_offset;
+        goto literals;
+    }
+}
+
+/**
+ * @brief Опрос регистра клавиатуры до нажатия любой клавиши.
+ *
+ * Прерывания от клавиатуры в этой сборке замаскированы, поэтому системные
+ * ячейки не обновляются — опрашиваем железо напрямую и тут же гасим
+ * аппаратный флаг чтением регистра данных.
+ */
+static void wait_for_key()
+{
+    volatile union KEY_STATE *ks = (volatile union KEY_STATE *)REG_KEY_STATE;
+    volatile uint16_t        *kd = (volatile uint16_t *)REG_KEY_DATA;
+
+    while (!ks->bits.STATE) { /* ожидание нажатия */ }
+    (void)*kd; // считать код, чтобы сбросить флаг STATE
+}
+
 /**
  * @brief Основная программа
  */
 void main()
 {
-    // EMT_14();
+    EMT_14();
 
     typedef void (*vector)();
     *((volatile vector *)VEC_STOP) = start; // Установить вектор клавиши "СТОП" на _start
 
-    // EMT_16(0233);
-    // EMT_16(0236);
+    EMT_16(0233);
+    EMT_16(0236);
 
     set_PSW(1 << PSW_I); // Замаскировать прерывания IRQ
     ((union KEY_STATE *)REG_KEY_STATE)->bits.INT_MASK = 1; // Отключить прерывание от клавиатуры
+
+    // Распаковать обложку прямо в экранное ОЗУ и подождать нажатия клавиши.
+    zx0_decompress(cover_zx0, (uint8_t *)MEM_VIDEO);
+    wait_for_key();
 
     init_demo(); // Инициализация демо
     for (;;) process_demo_state(); // Основной бесконечный цикл демо

@@ -44,6 +44,9 @@ sprites-file-title: digger_sprites_title.c
 music-file-title: digger_music_title.c
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o digger_music_title.o digger_music_title.c
 
+cover-file-title: digger_title.c
+	pdp11-aout-gcc ${GCC_FLAGS} -c -o digger_title.o digger_title.c
+
 crt0:
 	pdp11-aout-as ${AS_FLAGS} crt0.s -o crt0.o
 
@@ -64,8 +67,8 @@ digger-out-file: crt0 digger-main-file sprites-file short-font-file levels-file 
 # блиттеров со встроенным `music_tick` (sp_4_15_put / sp_4_15_h_mirror_put /
 # sp_put / sp_paint_brick_long) подхватываются именно из этого .o, а не из
 # sprites.o в libs.a. В диггерной сборке sprites_title.o не упоминается.
-title-out-file: crt0 title-main-file sprites-file-title full-font-file music-file-title libs
-	pdp11-aout-ld -T a.out.ld -Map title.map -o ${OUT_FILE_2} crt0.o digger_sprites_title.o digger_full_font.o digger_music_title.o title.o sprites_title.o libs.a
+title-out-file: crt0 title-main-file sprites-file-title full-font-file music-file-title cover-file-title libs
+	pdp11-aout-ld -T a.out.ld -Map title.map -o ${OUT_FILE_2} crt0.o digger_sprites_title.o digger_full_font.o digger_music_title.o digger_title.o title.o sprites_title.o libs.a
 
 aout2bin:
 	gcc aout2bin.c -o aout2bin
