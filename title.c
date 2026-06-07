@@ -555,35 +555,43 @@ void zx0_decompress(const uint8_t *src, uint8_t *dst)
     uint16_t last_offset = 1;
     uint16_t length;
     uint8_t *p;
+    uint8_t bit;
 
     zx0_src       = src;
     zx0_bit_mask  = 0;
     zx0_backtrack = 0;
 
-literals:
-    length = zx0_elias(0);
-    while (length--) *dst++ = *zx0_src++;
-    if (zx0_read_bit()) goto new_offset;
-
-    /* COPY_FROM_LAST_OFFSET */
-    length = zx0_elias(0);
-    p      = dst - last_offset;
-    while (length--) *dst++ = *p++;
-    if (!zx0_read_bit()) goto literals;
-
-new_offset:
+    for (;;)
     {
-        uint16_t hi = zx0_elias(1);
-        if (hi == 256) return;                 // маркер конца потока
-        zx0_last_byte = *zx0_src++;
-        last_offset   = (hi << 7) - (zx0_last_byte >> 1);
-        zx0_backtrack = 1;                     // бит 0 только что прочитанного байта
+        /* === LITERALS === */
+        length = zx0_elias(0);
+        while (length--) *dst++ = *zx0_src++;
+        bit = zx0_read_bit();
+
+        if (!bit)
+        {
+            /* === COPY_FROM_LAST_OFFSET === */
+            length = zx0_elias(0);
+            p = dst - last_offset;
+            while (length--) *dst++ = *p++;
+            bit = zx0_read_bit();
+        }
+
+        while (bit)
+        {
+            /* === COPY_FROM_NEW_OFFSET === */
+            uint16_t hi = zx0_elias(1);
+            if (hi == 256) return;             // маркер конца потока
+
+            zx0_last_byte = *zx0_src++;
+            last_offset   = (hi << 7) - (zx0_last_byte >> 1);
+            zx0_backtrack = 1;                 // бит 0 только что прочитанного байта
                                                // — первый бит следующей гаммы
-        length = zx0_elias(0) + 1;
-        p      = dst - last_offset;
-        while (length--) *dst++ = *p++;
-        if (zx0_read_bit()) goto new_offset;
-        goto literals;
+            length = zx0_elias(0) + 1;
+            p = dst - last_offset;
+            while (length--) *dst++ = *p++;
+            bit = zx0_read_bit();
+        }
     }
 }
 

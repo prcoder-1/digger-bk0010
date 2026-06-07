@@ -70,7 +70,3 @@
 // Основная музыка "Popcorn"
 extern const uint8_t popcorn_periods[];
 extern const uint8_t popcorn_durations[];
-
-// Музыка для режима "Бонус"
-extern const uint8_t bonus_periods[];
-extern const uint8_t bonus_durations[];
