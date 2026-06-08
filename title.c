@@ -1,5 +1,5 @@
 #include "memory.h"
-#include "sprites_title.h"
+#include "sprites.h"
 #include "sound.h"
 #include "tools.h"
 #include "emt.h"
@@ -11,22 +11,29 @@
 #define COIN_Y_OFFSET 3 // Смещение спрайта монетки в ячейке по оси Y
 
 // Длительность одного «кадра» демо в тактах таймера (23438 Гц).
-// 150 тактов ≈ 6.4 мс/кадр, тот же бюджет, что был в исходной версии
-// с поллинг-музыкой (там этот же объём времени уходил на music_service).
+// 150 тактов ≈ 6.4 мс/кадр
 constexpr uint16_t FRAME_TICKS = 150;
 
 #define FRAME_TIMER_MODE ((1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN))
 
 /**
- * @brief Заглушка для music-aware блиттеров из sprites_title.c.
+ * @brief Заливка прямоугольника однобайтовым образцом color прямо в видеопамять.
  *
- * Эти блиттеры (title_sp_4_15_put и пр.) предназначались для проигрывания
- * музыки во время отрисовки и в каждой итерации зовут music_service. В
- * текущей сборке музыка играется синхронно ДО демо (см. play_popcorn),
- * поэтому music_service - пустая функция: jsr+rts ≈ 16 циклов на итерацию
- * блиттера, на размер титульного экрана это пренебрежимо.
+ * @param x_graph - координата X по которой будет осуществлён вывод прямоугольника
+ * @param y_graph - координата Y по которой будет осуществлён вывод прямоугольника
+ * @param x_width - ширина прямоугольника в байтах
+ * @param y_width - высота прямоугольника в строках
+ * @param color   - цвет прямоугольника в виде байта
  */
-void music_service() { }
+static void paint_brick(uint16_t x_graph, uint16_t y_graph, uint16_t x_width, uint16_t y_width, uint8_t color)
+{
+    volatile uint8_t *p = (volatile uint8_t *)MEM_VIDEO + y_graph * SCREEN_BYTE_WIDTH + x_graph;
+    while (y_width--)
+    {
+        for (uint16_t i = 0; i < x_width; ++i) p[i] = color;
+        p += SCREEN_BYTE_WIDTH;
+    }
+}
 
 /**
  * @brief Вывод строки
@@ -44,12 +51,12 @@ void print_str(const char *str, uint16_t x_graph, uint16_t y_graph)
         {
             if (c == '.')
             {
-                title_sp_put(x_graph, y_graph, sizeof(ch_dot[0]), sizeof(ch_dot) / sizeof(ch_dot[0]), (uint8_t *)ch_dot, nullptr); // Вывести спрайт точки
+                sp_put(x_graph, y_graph, sizeof(ch_dot[0]), sizeof(ch_dot) / sizeof(ch_dot[0]), (uint8_t *)ch_dot, nullptr); // Вывести спрайт точки
             }
             else
             {
                 uint16_t index = c - 'A';
-                title_sp_put(x_graph, y_graph, sizeof(ch_alpha[0][0]), sizeof(ch_alpha[0]) / sizeof(ch_alpha[0][0]), (uint8_t *)ch_alpha[index], nullptr); // Вывести спрайт буквы
+                sp_put(x_graph, y_graph, sizeof(ch_alpha[0][0]), sizeof(ch_alpha[0]) / sizeof(ch_alpha[0][0]), (uint8_t *)ch_alpha[index], nullptr); // Вывести спрайт буквы
             }
         }
 
@@ -67,6 +74,10 @@ const char unpacking_str[] = "UNPACKING...";
 constexpr uint16_t unpacking_str_x_pos = (SCREEN_BYTE_WIDTH - char_width * sizeof(unpacking_str) + char_width) / 2;
 constexpr uint16_t unpacking_str_y_pos = (SCREEN_PIX_HEIGHT + str_height) / 2;
 
+const char loading_str[] = "LOADING";
+constexpr uint16_t loading_str_x_pos = 3 + char_width;
+constexpr uint16_t loading_str_y_pos = str_height + y_space + 2 + y_space;
+
 const char digger_str[] = "D I G G E R";
 constexpr uint16_t digger_str_x_pos = (SCREEN_BYTE_WIDTH - char_width * sizeof(digger_str) + char_width) / 2;
 
@@ -83,7 +94,7 @@ uint16_t one_player_y;
  */
 void init_demo()
 {
-    title_sp_paint_brick_long(0, 0, SCREEN_BYTE_WIDTH, SCREEN_PIX_HEIGHT, 0); // Очистка экрана
+    paint_brick(0, 0, SCREEN_BYTE_WIDTH, SCREEN_PIX_HEIGHT, 0); // Очистка экрана
 
     uint16_t y_pos = 0;
 
@@ -92,7 +103,7 @@ void init_demo()
     y_pos += str_height + y_space;
 
     // Верхняя линия рамки
-    title_sp_paint_brick_long(0, y_pos, SCREEN_BYTE_WIDTH, 2, 0b01010101);
+    paint_brick(0, y_pos, SCREEN_BYTE_WIDTH, 2, 0b01010101);
     y_pos += 2;
 
     one_player_y = y_pos + y_space;
@@ -107,14 +118,14 @@ void init_demo()
     one_player_y += str_height + y_space * 2;
 
     // Вертикальные линии рамки и разделитель
-    title_sp_paint_brick_long(0, y_pos, 1, table_height, 0b00000001);
-    title_sp_paint_brick_long(SCREEN_BYTE_WIDTH - 1, y_pos, 1, table_height, 0b01000000);
-    title_sp_paint_brick_long(SCREEN_BYTE_WIDTH / 2, y_pos, 1, table_height, 0b01000000);
-    title_sp_paint_brick_long(SCREEN_BYTE_WIDTH / 2 + 1, y_pos, 1, table_height, 0b00000001);
+    paint_brick(0, y_pos, 1, table_height, 0b00000001);
+    paint_brick(SCREEN_BYTE_WIDTH - 1, y_pos, 1, table_height, 0b01000000);
+    paint_brick(SCREEN_BYTE_WIDTH / 2, y_pos, 1, table_height, 0b01000000);
+    paint_brick(SCREEN_BYTE_WIDTH / 2 + 1, y_pos, 1, table_height, 0b00000001);
     y_pos += table_height;
 
     // Нижняя линия рамки
-    title_sp_paint_brick_long(0, y_pos, SCREEN_BYTE_WIDTH, 2, 0b01010101);
+    paint_brick(0, y_pos, SCREEN_BYTE_WIDTH, 2, 0b01010101);
 
     // Запустить кадровый таймер демо. Лимит выставляется один раз; режим
     // непрерывный (CAP=0, OS=0), счётчик автоматически перезагружается.
@@ -193,7 +204,7 @@ void process_demo_state()
             // Очистка области Demo
             nobbin_x = hobbin_x = digger_x = 0;
             constexpr uint16_t demo_height = table_height - (str_height + y_space * 2) * 2;
-            title_sp_paint_brick_long(SCREEN_BYTE_WIDTH / 2 + 2, one_player_y, SCREEN_BYTE_WIDTH / 2 - 3, demo_height, 0);
+            paint_brick(SCREEN_BYTE_WIDTH / 2 + 2, one_player_y, SCREEN_BYTE_WIDTH / 2 - 3, demo_height, 0);
             break;
         }
 
@@ -275,7 +286,7 @@ void process_demo_state()
         {
             bag_x = digger_x;
             bag_y = digger_y + image_height + y_space;
-            title_sp_4_15_put(bag_x, bag_y, (uint8_t *)image_bag);
+            sp_4_15_put(bag_x, bag_y, (uint8_t *)image_bag);
             break;
         }
 
@@ -290,7 +301,7 @@ void process_demo_state()
         {
             emerald_x = bag_x;
             emerald_y = bag_y + image_height + y_space;
-            title_sp_put(emerald_x, emerald_y + COIN_Y_OFFSET, sizeof(image_coin[0]), sizeof(image_coin) / sizeof(image_coin[0]), (uint8_t *)image_coin, nullptr);
+            sp_put(emerald_x, emerald_y + COIN_Y_OFFSET, sizeof(image_coin[0]), sizeof(image_coin) / sizeof(image_coin[0]), (uint8_t *)image_coin, nullptr);
             break;
         }
 
@@ -305,7 +316,7 @@ void process_demo_state()
         {
             cherry_x = emerald_x;
             cherry_y = emerald_y + image_height + y_space;
-            title_sp_4_15_put(cherry_x, cherry_y, (uint8_t *)image_cherry);
+            sp_4_15_put(cherry_x, cherry_y, (uint8_t *)image_cherry);
             break;
         }
 
@@ -319,22 +330,22 @@ void process_demo_state()
 
     if (nobbin_x)
     {
-        title_sp_clear_strip(nobbin_x + image_width, nobbin_y, image_height);
-        title_sp_4_15_put(nobbin_x, nobbin_y, (uint8_t *)image_nobbin[image_phase]);
+        paint_brick(nobbin_x + image_width, nobbin_y, 1, image_height, 0);
+        sp_4_15_put(nobbin_x, nobbin_y, (uint8_t *)image_nobbin[image_phase]);
     }
 
     if (hobbin_x)
     {
-        title_sp_clear_strip(hobbin_x + image_width, hobbin_y, image_height);
-        if (hobbin_mirror) title_sp_4_15_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_left[image_phase]);
-        else title_sp_4_15_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_right[image_phase]);
+        paint_brick(hobbin_x + image_width, hobbin_y, 1, image_height, 0);
+        if (hobbin_mirror) sp_4_15_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_left[image_phase]);
+        else sp_4_15_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_right[image_phase]);
     }
 
     if (digger_x)
     {
-        title_sp_clear_strip(digger_x + image_width, digger_y, image_height);
-        if (digger_mirror) title_sp_4_15_put(digger_x, digger_y, (uint8_t *)image_digger_left[image_phase]);
-        else title_sp_4_15_put(digger_x, digger_y, (uint8_t *)image_digger_right[image_phase]);
+        paint_brick(digger_x + image_width, digger_y, 1, image_height, 0);
+        if (digger_mirror) sp_4_15_put(digger_x, digger_y, (uint8_t *)image_digger_left[image_phase]);
+        else sp_4_15_put(digger_x, digger_y, (uint8_t *)image_digger_right[image_phase]);
     }
 
     if (!(demo_time & 7))
@@ -462,44 +473,131 @@ void zx0_decompress(const uint8_t *src, uint8_t *dst)
  * параллельным массивам periods/durations, на каждой ноте sound_vibrato
  * блокирует CPU на её длительности. Терминатор - нулевой period.
  *
- * Между нотами опрашиваем регистр клавиатуры: любое нажатие прерывает
- * музыку, гасит флаг STATE и выходит из функции - так пользователь может
- * пропустить заставку, не дожидаясь конца мелодии.
+ * Мелодия проигрывается по кругу: после терминатора массива внешний цикл
+ * перезапускает проход сначала. Опрос клавиатуры/джойстика между нотами
+ * - единственный способ выйти из функции.
  *
  * --- Соответствие PC-версии по строю ---
  * sound_vibrato выдаёт пульс с периодом волны 2*period*sob_cycles тактов
  * CPU (sob ~ 6 циклов на КР1801ВМ1, см. CLAUDE.md). При N=20 и period~228
  * для C4 это даёт ~1098 Гц = C6, на ДВЕ ОКТАВЫ выше PC (там 261.6 Гц).
  *
- * Полное соответствие PC требовало бы scale=4.78. На октаву ВЫШЕ PC
- * (что и хочется здесь) - scale = 4.78/2 = 2.39. Берём 2.0625 = 2+1/16,
- * реализуется как (p<<1)+(p>>4). Это даёт промах ~-100 центов от
- * (PC+октава) - значит звучит примерно на октаву выше PC (а не на две
- * октавы как было без скейла). Durance делим на 2 (>>1) - время ноты
- * сохраняется ~неизменным.
+ * Хотим звучать на октаву выше предыдущей ревизии (которая шла со scale
+ * 2.0625 = на одну октаву выше PC). Очередное удвоение частоты = очередное
+ * деление периода пополам, то есть scale = 2.0625 / 2 = 1.03125 = 1+1/32,
+ * реализуется как p + (p >> 5). Получаемая частота ~ PC + две октавы
+ * (то же, что BK без скейла), с допустимым промахом ~100 центов.
+ *
+ * Длительность ноты в sound_vibrato пропорциональна period*durance. Период
+ * теперь вдвое меньше предыдущей ревизии (где был scale 2.0625 и durance
+ * делилась на 2). Чтобы абсолютное время ноты осталось прежним, durance
+ * передаётся без деления - произведение period*durance не меняется.
  *
  * Сдвиг применяется только в этом плейере: оставляет digger.c::man_rip
  * с прежним строем (пользователь к нему привык, переделка digger.c
  * массивов под uint16_t - отдельная задача).
  */
-static void play_popcorn()
+/**
+ * @brief Проверка нажатия любой клавиши клавиатуры ИЛИ кнопки джойстика.
+ *
+ * Используется в play_popcorn для возможности прервать мелодию любым
+ * управляющим устройством - и клавиатурой, и джойстиком.
+ */
+static bool any_key_or_button_pressed()
 {
     volatile union KEY_STATE *ks = (volatile union KEY_STATE *)REG_KEY_STATE;
-    volatile uint16_t        *kd = (volatile uint16_t *)REG_KEY_DATA;
+    volatile uint16_t        *jp = (volatile uint16_t *)REG_PAR_INTERF;
 
-    for (uint16_t i = 0; popcorn_periods[i] != 0; ++i)
+    if (ks->bits.STATE) return true;
+    return (*jp & ((1 << PAR_INTERF_LEFT_BUTTON) | (1 << PAR_INTERF_RIGHT_BUTTON))) != 0;
+}
+
+/**
+ * @brief Проверка триггера выхода из демо: пробел ИЛИ кнопка джойстика.
+ *
+ * Чтение REG_KEY_DATA попутно гасит флаг STATE - так что любая клавиша,
+ * не пробел, тоже потребляется. Это безопасно: title-binary не реагирует
+ * на другие клавиши, "пропажа" нажатия незаметна.
+ */
+static bool space_or_button_pressed()
+{
+    volatile union KEY_STATE *ks = (volatile union KEY_STATE *)REG_KEY_STATE;
+    volatile uint16_t        *jp = (volatile uint16_t *)REG_PAR_INTERF;
+    volatile uint8_t         *kd = (volatile uint8_t *)REG_KEY_DATA;
+
+    if (*jp & ((1 << PAR_INTERF_LEFT_BUTTON) | (1 << PAR_INTERF_RIGHT_BUTTON))) return true;
+    if (ks->bits.STATE) return *kd == 32; // 32 = scancode пробела (см. digger.c::process_man)
+    return false;
+}
+
+static void play_popcorn()
+{
+    volatile uint16_t *kd = (volatile uint16_t *)REG_KEY_DATA;
+
+    for (;;) // мелодия зацикливается до нажатия клавиши/кнопки
     {
-        if (ks->bits.STATE)
+        for (uint16_t i = 0; popcorn_periods[i] != 0; ++i)
         {
-            (void)*kd; // сбросить флаг STATE, чтобы дальше не сработал ложный wait
-            return;
+            if (any_key_or_button_pressed())
+            {
+                (void)*kd; // сбросить флаг STATE на случай нажатия клавиши
+                return;
+            }
+            // Период домножаем на ~1.03125 (p + (p>>5)) - частота вдвое
+            // выше предыдущей ревизии (была scale 2.0625). Durance передаём
+            // как есть: при вдвое меньшем периоде половинка durance дала бы
+            // ноту вчетверо короче прежней, поэтому делитель убран -
+            // произведение period*durance сохраняется.
+            const uint16_t p = popcorn_periods[i];
+            sound_vibrato(p + (p >> 5), popcorn_durations[i]);
         }
-        // Период домножаем на ~2.0625 ((p<<1)+(p>>4)) - сдвигает строй
-        // вниз на одну октаву (между BK-without-scale и PC-частотой).
-        // Durance делим на 2 - время звучания почти не меняется.
-        const uint16_t p = popcorn_periods[i];
-        sound_vibrato((p << 1) + (p >> 4), popcorn_durations[i] >> 1);
     }
+}
+
+// === Цепочечная загрузка digger_tpc_v0.7.bin ==============================
+//
+// EMT_36 (драйвер магнитофона ПЗУ) грузит файл по адресу из его заголовка
+// (DATA_PTR=0). digger_tpc.bin укладывается в MEM_USER=0o1000=0x200, что
+// СТИРАЕТ наш title-код в этой же области. Поэтому возвращаться из EMT в C
+// нельзя - стек указывает на затёртый код.
+//
+// Решение: 6-байтовый stub "emt 036; mov $01000, pc" размещён в BSS
+// (0x20..0xD0). BSS лежит НИЖЕ MEM_USER и загрузкой не затрагивается.
+// EMT возвращается ровно в этот stub, тот сразу прыгает на entry-point
+// загруженного digger_tpc - там уже свежий код.
+//
+// Имя файла - 16 байт, padded пробелами. Должно совпадать с тем, как файл
+// зарегистрирован на ленте/в Gryphon-MPI; правьте при необходимости.
+static uint16_t chain_stub[3]; // BSS: переживает загрузку digger_tpc
+static const char tpc_filename[16] = "digger_tpc_v0.7 ";
+
+static void load_and_run_tpc(void) __attribute__((noreturn));
+static void load_and_run_tpc(void)
+{
+    // Покажем "LOADING" на текущем splash, прежде чем CPU уйдёт в ROM.
+    print_str(loading_str, loading_str_x_pos, loading_str_y_pos);
+
+    // Подготовить блок параметров драйвера магнитофона в системной области.
+    struct EMT_36_PARAMS *p = (struct EMT_36_PARAMS *)SYS_EMT_36_PARAMS;
+    p->COMMAND  = EMT_36_FILE_READ;
+    p->DATA_PTR = (uint8_t *)0; // 0 = использовать load-адрес из заголовка файла
+    p->SIZE     = 0;             // 0 = размер из заголовка, без ограничения
+    for (uint8_t i = 0; i < 16; i++) p->NAME[i] = tpc_filename[i];
+
+    // Загрузить stub в BSS (живёт на 0x20..0xD0, ниже области загрузки):
+    //   emt 036         - вызов ROM-драйвера магнитофона
+    //   mov $01000, pc  - прыжок на entry-point загруженного бинарника
+    chain_stub[0] = 0104036; // EMT 036
+    chain_stub[1] = 0012707; // MOV #imm, PC
+    chain_stub[2] = 0001000; // imm = MEM_USER
+
+    // r1 = указатель на параметры (как требует EMT_36), PC := адрес stub'а.
+    asm volatile (
+        "mov %0, r1\n\t"
+        "mov %1, pc\n\t"
+        : : "r"(p), "r"(&chain_stub[0]) : "r1", "memory"
+    );
+    __builtin_unreachable();
 }
 
 /**
@@ -525,10 +623,16 @@ void main()
     zx0_decompress(cover_zx0, (uint8_t *)MEM_VIDEO);
 
     // Сразу после splash начать проигрывание Popcorn. Музыка прерывается
-    // нажатием любой клавиши (см. play_popcorn). После окончания мелодии
-    // или нажатия клавиши - переход к демо.
+    // нажатием любой клавиши ИЛИ кнопки джойстика. После окончания мелодии
+    // или прерывания - переход к демо.
     play_popcorn();
 
     init_demo(); // Инициализация демо
-    for (;;) process_demo_state(); // Основной бесконечный цикл демо
+    for (;;)
+    {
+        process_demo_state();
+        // Пробел или кнопка джойстика - выход из демо и загрузка игровой
+        // версии digger_tpc через EMT_36 (load_and_run_tpc не возвращается).
+        if (space_or_button_pressed()) load_and_run_tpc();
+    }
 }
