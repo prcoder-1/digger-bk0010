@@ -490,9 +490,6 @@ static bool any_key_or_button_pressed()
  * Скважность PWM: 1/2 длительности - полный звук, далее 4 убывающих
  * стадии по 1/8 со ступенчатым делением PW пополам.
  *
- * Для нот короче 8 полупериодов огибающая не помещается - откатываемся
- * на плоский PWM в полную громкость.
- *
  * Цикл по стадиям decay написан так, чтобы PW каждой стадии получался
  * единым сдвигом локального регистра.
  */
@@ -500,12 +497,14 @@ static void play_note_env(uint16_t period, uint16_t durance)
 {
     if (durance < 8)
     {
+        // Для нот короче 8 полупериодов огибающая не помещается,
+        // откатываемся на плоский PWM в полную громкость
         sound_pwm(period, durance, period);
         return;
     }
 
     const uint16_t base = durance >> 3;    // 1/8 длительности
-    sound_pwm(period, base << 2, period);  // hold 4/8 на полной громкости
+    sound_pwm(period, base << 1, period);  // hold 4/8 на полной громкости
 
     uint16_t pw = period;
     for (uint8_t s = 0; s < 4; ++s)
