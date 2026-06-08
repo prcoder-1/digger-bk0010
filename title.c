@@ -11,13 +11,13 @@
 #define COIN_Y_OFFSET 3 // Смещение спрайта монетки в ячейке по оси Y
 
 // Длительность одного «кадра» демо в тактах таймера (23438 Гц).
-// 150 тактов ≈ 6.4 мс/кадр
-constexpr uint16_t FRAME_TICKS = 150;
+// 300 тактов ≈ 12.8 мс/кадр
+constexpr uint16_t FRAME_TICKS = 300;
 
 #define FRAME_TIMER_MODE ((1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN))
 
 /**
- * @brief Заливка прямоугольника однобайтовым образцом color прямо в видеопамять.
+ * @brief Заливка прямоугольника однобайтовым образцом color в видеопамяти
  *
  * @param x_graph - координата X по которой будет осуществлён вывод прямоугольника
  * @param y_graph - координата Y по которой будет осуществлён вывод прямоугольника
@@ -363,9 +363,8 @@ void process_demo_state()
         demo_time = 0;
     }
 
-    // Кадровый пейсинг: ждём истечения таймера FRAME_TICKS, перезапускаем
-    // его (запись в CSR сбрасывает флаг FL). Без звука это единственный
-    // ограничитель темпа демо.
+    // Ограничение частоты кадров демо.
+    // Ждём истечения таймера FRAME_TICKS, перезапускаем его (запись в CSR сбрасывает флаг FL).
     volatile union TVE_CSR *csr = (volatile union TVE_CSR *)REG_TVE_CSR;
     while ((csr->reg & (1 << TVE_CSR_FL)) == 0);
     csr->reg = FRAME_TIMER_MODE;
@@ -373,19 +372,19 @@ void process_demo_state()
 
 extern void start();
 
-// === Распаковщик ZX0 (modern v2, прямой поток) ============================
-// Состояние в файловой области — компактнее, чем гонять указатели через стек.
+// Распаковщик ZX0
 static const uint8_t *zx0_src;
-static uint8_t zx0_bit_mask;
+static uint8_t zx0_bit_mask;  //< Число оставшихся в `zx0_bit_value` бит (8..1)
 static uint8_t zx0_bit_value;
 static uint8_t zx0_last_byte;
 static uint8_t zx0_backtrack;
 
-// `zx0_bit_mask` хранит число оставшихся в `zx0_bit_value` бит (8..1).
-// Активный бит всегда в позиции 7, поэтому возврат сводится к `value >> 7`
-// (для uint8_t это уже 0/1) — обходим баг кодогенерации gcc -Os -mlra на
-// идиоме `(a & b) ? 1 : 0`, где `neg`-флаг затирается следующим `clr` и
-// функция всегда возвращает 0.
+/*
+    Активный бит всегда в позиции 7, поэтому возврат сводится к `value >> 7`
+    (для uint8_t это уже 0/1) — обходим баг кодогенерации gcc -Os -mlra на
+    идиоме `(a & b) ? 1 : 0`, где `neg`-флаг затирается следующим `clr` и
+    функция всегда возвращает 0.
+*/
 static uint8_t zx0_read_bit()
 {
     uint8_t bit;
@@ -467,95 +466,35 @@ void zx0_decompress(const uint8_t *src, uint8_t *dst)
 }
 
 /**
- * @brief Синхронное проигрывание мелодии «Popcorn» через sound_vibrato.
- *
- * Аналог проигрывания траурного марша в digger.c::man_rip(): идём по
- * параллельным массивам periods/durations, на каждой ноте sound_vibrato
- * блокирует CPU на её длительности. Терминатор - нулевой period.
- *
- * Мелодия проигрывается по кругу: после терминатора массива внешний цикл
- * перезапускает проход сначала. Опрос клавиатуры/джойстика между нотами
- * - единственный способ выйти из функции.
- *
- * --- Соответствие PC-версии по строю ---
- * sound_vibrato выдаёт пульс с периодом волны 2*period*sob_cycles тактов
- * CPU (sob ~ 6 циклов на КР1801ВМ1, см. CLAUDE.md). При N=20 и period~228
- * для C4 это даёт ~1098 Гц = C6, на ДВЕ ОКТАВЫ выше PC (там 261.6 Гц).
- *
- * Хотим звучать на октаву выше предыдущей ревизии (которая шла со scale
- * 2.0625 = на одну октаву выше PC). Очередное удвоение частоты = очередное
- * деление периода пополам, то есть scale = 2.0625 / 2 = 1.03125 = 1+1/32,
- * реализуется как p + (p >> 5). Получаемая частота ~ PC + две октавы
- * (то же, что BK без скейла), с допустимым промахом ~100 центов.
- *
- * Длительность ноты в sound_vibrato пропорциональна period*durance. Период
- * теперь вдвое меньше предыдущей ревизии (где был scale 2.0625 и durance
- * делилась на 2). Чтобы абсолютное время ноты осталось прежним, durance
- * передаётся без деления - произведение period*durance не меняется.
- *
- * Сдвиг применяется только в этом плейере: оставляет digger.c::man_rip
- * с прежним строем (пользователь к нему привык, переделка digger.c
- * массивов под uint16_t - отдельная задача).
- */
-/**
- * @brief Проверка нажатия любой клавиши клавиатуры ИЛИ кнопки джойстика.
- *
- * Используется в play_popcorn для возможности прервать мелодию любым
- * управляющим устройством - и клавиатурой, и джойстиком.
+ * @brief Проверка нажатия любой клавиши клавиатуры или кнопки джойстика
  */
 static bool any_key_or_button_pressed()
 {
-    volatile union KEY_STATE *ks = (volatile union KEY_STATE *)REG_KEY_STATE;
-    volatile uint16_t        *jp = (volatile uint16_t *)REG_PAR_INTERF;
+    volatile union KEY_STATE *key_state_ptr = (volatile union KEY_STATE *)REG_KEY_STATE;
+    volatile uint16_t        *par_port_ptr = (volatile uint16_t *)REG_PAR_INTERF;
 
-    if (ks->bits.STATE) return true;
-    return (*jp & ((1 << PAR_INTERF_LEFT_BUTTON) | (1 << PAR_INTERF_RIGHT_BUTTON))) != 0;
+    if (key_state_ptr->bits.STATE) return true;
+    return (*par_port_ptr & ((1 << PAR_INTERF_LEFT_BUTTON) | (1 << PAR_INTERF_RIGHT_BUTTON))) != 0;
 }
 
 /**
- * @brief Проверка триггера выхода из демо: пробел ИЛИ кнопка джойстика.
- *
- * Чтение REG_KEY_DATA попутно гасит флаг STATE - так что любая клавиша,
- * не пробел, тоже потребляется. Это безопасно: title-binary не реагирует
- * на другие клавиши, "пропажа" нажатия незаметна.
- */
-static bool space_or_button_pressed()
-{
-    volatile union KEY_STATE *ks = (volatile union KEY_STATE *)REG_KEY_STATE;
-    volatile uint16_t        *jp = (volatile uint16_t *)REG_PAR_INTERF;
-    volatile uint8_t         *kd = (volatile uint8_t *)REG_KEY_DATA;
-
-    if (*jp & ((1 << PAR_INTERF_LEFT_BUTTON) | (1 << PAR_INTERF_RIGHT_BUTTON))) return true;
-    if (ks->bits.STATE) return *kd == 32; // 32 = scancode пробела (см. digger.c::process_man)
-    return false;
-}
-
-/**
- * @brief Проигрывание ноты с амплитудной огибающей (аналог PC music1).
+ * @brief Проигрывание ноты с амплитудной огибающей
  *
  * Однобитовый динамик БК позволяет менять громкость только через PWM:
  * за один аудио-цикл (2*period sob-тактов) включаем динамик на `pw`
  * тактов, выключаем на остальные. Когда pw близок к period - 50% duty,
  * максимальный звук; при малых pw - почти тишина.
  *
- * Форма огибающей мимикрирует PC chk_music() для music1 (TH.C:881-886):
- * мгновенная атака, длинный hold на полной громкости (PC: ~330 мс из
- * любой ноты), затем плавный спад к тишине. На BK с пропорциональным
- * (а не временным) hold_count: 1/2 длительности - полный звук, 4
- * убывающих стадии по 1/8 со ступенчатым делением pw пополам.
+ * Форма огибающей - мгновенная атака, длинный hold на полной громкости,
+ * затем плавный спад к тишине.
+ * Скважность PWM: 1/2 длительности - полный звук, далее 4 убывающих
+ * стадии по 1/8 со ступенчатым делением PW пополам.
  *
  * Для нот короче 8 полупериодов огибающая не помещается - откатываемся
  * на плоский PWM в полную громкость.
  *
- * Цикл по стадиям decay написан так, чтобы pw каждой стадии получался
- * единым сдвигом локального регистра. Раньше код делал серию из 5
- * прямых вызовов sound_pwm с pw = period/4, period/2 и т.д.: gcc
- * -Os -mlra пробовал кешировать period/4 на стеке через предыдущую
- * стадию и считал его глубину неверно (промах на одно слово после
- * нескольких аккумулятивных пушей аргументов). Pw четвёртой стадии
- * получался произвольным -> внутренние sob крутили до 65536 итераций
- * -> секунды щелчков. С локальной переменной pw в регистре кеширования
- * между вызовами нет.
+ * Цикл по стадиям decay написан так, чтобы PW каждой стадии получался
+ * единым сдвигом локального регистра.
  */
 static void play_note_env(uint16_t period, uint16_t durance)
 {
@@ -565,32 +504,29 @@ static void play_note_env(uint16_t period, uint16_t durance)
         return;
     }
 
-    const uint16_t base = durance >> 3;            // 1/8 длительности
-    sound_pwm(period, base << 2, period);          // hold 4/8 на полной громкости
+    const uint16_t base = durance >> 3;    // 1/8 длительности
+    sound_pwm(period, base << 2, period);  // hold 4/8 на полной громкости
 
     uint16_t pw = period;
     for (uint8_t s = 0; s < 4; ++s)
     {
-        pw >>= 1;                                  // 1/2, 1/4, 1/8, 1/16 от period
+        pw >>= 1;  // 1/2, 1/4, 1/8, 1/16 от периода
         sound_pwm(period, base, pw);
     }
 }
 
 static void play_popcorn()
 {
-    volatile uint16_t *kd = (volatile uint16_t *)REG_KEY_DATA;
-
-    for (;;) // мелодия зацикливается до нажатия клавиши/кнопки
+    for (;;)
     {
         for (uint16_t i = 0; popcorn_periods[i] != 0; ++i)
         {
             if (any_key_or_button_pressed())
             {
-                (void)*kd; // сбросить флаг STATE на случай нажатия клавиши
+                (void)*(volatile uint16_t *)REG_KEY_DATA;
                 return;
             }
-            // Период домножаем на ~1.03125 (p + (p>>5)) - сохраняет
-            // музыкальный строй (см. длинный комментарий выше).
+            // Период домножаем на ~1.03125 (p + (p>>5)) - сохраняет музыкальный строй (см. длинный комментарий выше)
             const uint16_t p = popcorn_periods[i];
             play_note_env(p + (p >> 5), popcorn_durations[i]);
         }
@@ -614,8 +550,8 @@ static void play_popcorn()
 static uint16_t chain_stub[3]; // BSS: переживает загрузку digger_tpc
 static const char tpc_filename[16] = "digger_tpc_v0.7 ";
 
-static void load_and_run_tpc(void) __attribute__((noreturn));
-static void load_and_run_tpc(void)
+static void load_and_run_digger(void) __attribute__((noreturn));
+static void load_and_run_digger(void)
 {
     // Покажем "LOADING" на текущем splash, прежде чем CPU уйдёт в ROM.
     print_str(loading_str, loading_str_x_pos, loading_str_y_pos);
@@ -648,34 +584,31 @@ static void load_and_run_tpc(void)
  */
 void main()
 {
-    EMT_14();
+    // EMT_14();
 
-    typedef void (*vector)();
-    *((volatile vector *)VEC_STOP) = start; // Установить вектор клавиши "СТОП" на _start
+    // typedef void (*vector)();
+    // *((volatile vector *)VEC_STOP) = start; // Установить вектор клавиши "СТОП" на _start
 
-    EMT_16(0233);
-    EMT_16(0236);
+    // EMT_16(0233);
+    // EMT_16(0236);
+    paint_brick(0, 0, SCREEN_BYTE_WIDTH, SCREEN_PIX_HEIGHT, 0); // Очистка экрана
 
     set_PSW(1 << PSW_I); // Замаскировать прерывания IRQ
     ((union KEY_STATE *)REG_KEY_STATE)->bits.INT_MASK = 1; // Отключить прерывание от клавиатуры
 
-    // Строка "UNPACKING..."
+    // Отображение строки "UNPACKING..."
     print_str(unpacking_str, unpacking_str_x_pos, unpacking_str_y_pos);
 
-    // Распаковать обложку прямо в экранное ОЗУ.
+    // Распаковать обложку в экранное ОЗУ
     zx0_decompress(cover_zx0, (uint8_t *)MEM_VIDEO);
 
-    // Сразу после splash начать проигрывание Popcorn. Музыка прерывается
-    // нажатием любой клавиши ИЛИ кнопки джойстика. После окончания мелодии
-    // или прерывания - переход к демо.
+    // Воспроизвести музыку Popcorn
     play_popcorn();
 
     init_demo(); // Инициализация демо
     for (;;)
     {
         process_demo_state();
-        // Пробел или кнопка джойстика - выход из демо и загрузка игровой
-        // версии digger_tpc через EMT_36 (load_and_run_tpc не возвращается).
-        if (space_or_button_pressed()) load_and_run_tpc();
+        if (any_key_or_button_pressed()) load_and_run_digger();
     }
 }
