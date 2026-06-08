@@ -45,11 +45,12 @@ const uint16_t popcorn_periods[] = {
 // деление uint16_t/uint16_t в рантайме потребовало бы __udivhi3 из
 // divmulmod.s (~682 байта, не помещается в свободные ~278 байт title-бинаря).
 //
-// REF_P подобран так, чтобы худший случай durance * REF_P (NQ*REF_P =
-// 256*200 = 51200) ещё помещался в uint16_t, и при этом NE-нота
-// получалась ~50-100 мс при типичных period 100-400.
+// REF_P = 200: даёт темп ~570 BPM, NQ ~ 105 мс, NE ~ 52 мс. Все durance
+// укладываются в uint16_t. (unsigned long) в макросе расширяет арифметику
+// до 32 бит на время компиляции - страхует от молчаливого переполнения,
+// если в будущем понадобятся ноты NH/NW.
 #define REF_P 200u
-#define DUR(c, p) ((uint16_t)((unsigned)(c) * REF_P / (p)))
+#define DUR(c, p) ((uint16_t)((unsigned long)(c) * REF_P / (p)))
 
 const uint16_t popcorn_durations[] = {
 
