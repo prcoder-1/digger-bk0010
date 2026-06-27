@@ -9,7 +9,7 @@
 #include "digger_title.h"
 
 #define COIN_Y_OFFSET 3 // Смещение спрайта монетки в ячейке по оси Y
-#define STR_DEF(x) #x
+#define STR(x) #x
 
 // Длительность одного «кадра» демо в тактах таймера (23438 Гц).
 // 300 тактов ≈ 12.8 мс/кадр
@@ -48,16 +48,37 @@ void print_str(const char *str, uint16_t x_graph, uint16_t y_graph)
     while (*str)
     {
         char c = *str++;
-        if (c != ' ')
+        switch (c)
         {
-            if (c == '.')
+            case ' ':
+            {
+                sp_put(x_graph, y_graph, sizeof(ch_space[0]), sizeof(ch_space) / sizeof(ch_space[0]), (uint8_t *)ch_space, nullptr); // Вывести спрайт пробела
+                break;
+            }
+
+            case '0' ... '9':
+            {
+                c -= '0';
+                sp_put(x_graph, y_graph, sizeof(ch_digits[0][0]), sizeof(ch_digits[0]) / sizeof(ch_digits[0][0]), (uint8_t *)ch_digits[c], nullptr); // Вывести спрайт цифры
+                break;
+            }
+
+            case 'A' ... 'Z':
+            {
+                c -= 'A';
+                sp_put(x_graph, y_graph, sizeof(ch_alpha[0][0]), sizeof(ch_alpha[0]) / sizeof(ch_alpha[0][0]), (uint8_t *)ch_alpha[c], nullptr); // Вывести спрайт буквы
+                break;
+            }
+
+            case '.':
             {
                 sp_put(x_graph, y_graph, sizeof(ch_dot[0]), sizeof(ch_dot) / sizeof(ch_dot[0]), (uint8_t *)ch_dot, nullptr); // Вывести спрайт точки
+                break;
             }
-            else
+
+            default:
             {
-                uint16_t index = c - 'A';
-                sp_put(x_graph, y_graph, sizeof(ch_alpha[0][0]), sizeof(ch_alpha[0]) / sizeof(ch_alpha[0][0]), (uint8_t *)ch_alpha[index], nullptr); // Вывести спрайт буквы
+                sp_put(x_graph, y_graph, sizeof(ch_underline[0]), sizeof(ch_underline) / sizeof(ch_underline[0]), (uint8_t *)ch_underline, nullptr); // Вывести спрайт подчёркивания
             }
         }
 
@@ -67,7 +88,7 @@ void print_str(const char *str, uint16_t x_graph, uint16_t y_graph)
 
 constexpr uint16_t char_width = sizeof(ch_alpha[0][0]);
 constexpr uint16_t str_height = sizeof(ch_alpha[0]) / char_width;
-constexpr uint16_t y_space = 8;
+constexpr uint16_t y_space = 6;
 constexpr uint16_t windmill_height = 42;
 constexpr uint16_t table_height = SCREEN_PIX_HEIGHT - (str_height + y_space) - windmill_height;
 
@@ -76,8 +97,12 @@ constexpr uint16_t unpacking_str_x_pos = (SCREEN_BYTE_WIDTH - char_width * sizeo
 constexpr uint16_t unpacking_str_y_pos = (SCREEN_PIX_HEIGHT + str_height) / 2;
 
 const char loading_str[] = "LOADING";
-constexpr uint16_t loading_str_x_pos = 3 + char_width;
-constexpr uint16_t loading_str_y_pos = str_height + y_space + 2 + y_space;
+constexpr uint16_t loading_str_x_pos = (SCREEN_BYTE_WIDTH - char_width * sizeof(loading_str) + char_width) / 2;
+constexpr uint16_t loading_str_y_pos = str_height + y_space + 2 + table_height + y_space;
+
+static const char game_filename_str[sizeof(STR(BIN_FILE_1))] = STR(BIN_FILE_1);
+constexpr uint16_t game_filename_x_pos = (SCREEN_BYTE_WIDTH - char_width * sizeof(game_filename_str) + char_width) / 2;
+constexpr uint16_t game_filename_y_pos = loading_str_y_pos + str_height + y_space;
 
 const char digger_str[] = "D I G G E R";
 constexpr uint16_t digger_str_x_pos = (SCREEN_BYTE_WIDTH - char_width * sizeof(digger_str) + char_width) / 2;
@@ -531,14 +556,15 @@ static void play_popcorn()
     }
 }
 
-static const char tpc_filename[sizeof(STR_DEF(FILE_1))] = STR_DEF(FILE_1);
-
 // Загрузка и запуск основного файла игры
 static void load_and_run_digger(void) __attribute__((noreturn));
 static void load_and_run_digger(void)
 {
     // Показать строку "LOADING"
     print_str(loading_str, loading_str_x_pos, loading_str_y_pos);
+
+    // Показать строку с именем загружаемого файла
+    print_str(game_filename_str, game_filename_x_pos, game_filename_y_pos);
 
     // Подготовить блок параметров драйвера магнитофона в системной области
     struct EMT_36_PARAMS *p = (struct EMT_36_PARAMS *)SYS_EMT_36_PARAMS;
@@ -547,7 +573,7 @@ static void load_and_run_digger(void)
     p->SIZE     = 0;                  // Размер из заголовка, без ограничения (0)
     for (uint8_t i = 0; i < 16; i++)  // Фромирование 16 байт имени файлв
     {
-        if (i < sizeof(tpc_filename)) p->NAME[i] = tpc_filename[i]; // Копирование из статического поля с именем
+        if (i < sizeof(game_filename_str)) p->NAME[i] = game_filename_str[i]; // Копирование из статического поля с именем
         else p->NAME[i] = ' '; // Дополнение до 16 байт нулями
     }
 
