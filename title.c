@@ -9,6 +9,7 @@
 #include "digger_title.h"
 
 #define COIN_Y_OFFSET 3 // Смещение спрайта монетки в ячейке по оси Y
+#define STR_DEF(x) #x
 
 // Длительность одного «кадра» демо в тактах таймера (23438 Гц).
 // 300 тактов ≈ 12.8 мс/кадр
@@ -451,12 +452,11 @@ void zx0_decompress(const uint8_t *src, uint8_t *dst)
         {
             /* === COPY_FROM_NEW_OFFSET === */
             uint16_t hi = zx0_elias(1);
-            if (hi == 256) return;             // маркер конца потока
+            if (hi == 256) return;             // Маркер конца потока
 
             zx0_last_byte = *zx0_src++;
             last_offset   = (hi << 7) - (zx0_last_byte >> 1);
-            zx0_backtrack = 1;                 // бит 0 только что прочитанного байта
-                                               // — первый бит следующей гаммы
+            zx0_backtrack = 1;                 // Бит 0 только что прочитанного байта — первый бит следующей гаммы
             length = zx0_elias(0) + 1;
             p = dst - last_offset;
             while (length--) *dst++ = *p++;
@@ -481,16 +481,13 @@ static bool any_key_or_button_pressed()
  * @brief Проигрывание ноты с амплитудной огибающей
  *
  * Однобитовый динамик БК позволяет менять громкость только через PWM:
- * за один аудио-цикл (2*period sob-тактов) включаем динамик на `pw`
- * тактов, выключаем на остальные. Когда pw близок к period - 50% duty,
- * максимальный звук; при малых pw - почти тишина.
+ * за один аудио-цикл (2*period sob-тактов) включаем динамик на `pw` тактов, выключаем на остальные.
+ * Когда pw близок к period - 50% duty, максимальный звук; при малых pw - почти тишина.
  *
- * Форма огибающей - мгновенная атака, длинный hold на полной громкости,
- * затем плавный спад к тишине.
- * Скважность PWM: 3/8 длительности - полный звук, далее 4 убывающих
- * стадии по 1/8 со ступенчатым делением PW пополам. Нота играет 7/8
- * от выделенного durance. Небольшая пауза в конце позволяет точно
- * подогнать темп под оригинал.
+ * Форма огибающей - мгновенная атака, длинный hold на полной громкости, затем плавный спад к тишине.
+ * Скважность PWM: 3/8 длительности - полный звук, далее 4 убывающих стадии по 1/8 со ступенчатым
+ * делением PW пополам. Нота играет 7/8 от выделенного durance.
+ * Небольшая пауза в конце позволяет точно подогнать темп под оригинал.
  *
  * Цикл по стадиям decay написан так, чтобы PW каждой стадии получался
  * единым сдвигом локального регистра.
@@ -499,8 +496,7 @@ static void play_note_env(uint16_t period, uint16_t durance)
 {
     if (durance < 8)
     {
-        // Для нот короче 8 полупериодов огибающая не помещается,
-        // откатываемся на плоский PWM в полную громкость
+        // Для нот короче 8 полупериодов огибающая не помещается откатываемся на плоский PWM в полную громкость
         sound_pwm(period, durance, period);
         return;
     }
@@ -516,6 +512,7 @@ static void play_note_env(uint16_t period, uint16_t durance)
     }
 }
 
+// Проигрыватель музыки Popcorn на заставке
 static void play_popcorn()
 {
     for (;;)
@@ -524,59 +521,41 @@ static void play_popcorn()
         {
             if (any_key_or_button_pressed())
             {
-                (void)*(volatile uint16_t *)REG_KEY_DATA;
+                (void)*(volatile uint16_t *)REG_KEY_DATA; // Очистка буфера клавиатуры
                 return;
             }
-            // Период домножаем на ~1.03125 (p + (p>>5)) - сохраняет музыкальный строй (см. длинный комментарий выше)
+
             const uint16_t p = popcorn_periods[i];
             play_note_env(p + (p >> 5), popcorn_durations[i]);
         }
     }
 }
 
-// === Цепочечная загрузка digger_tpc_v0.7.bin ==============================
-//
-// EMT_36 (драйвер магнитофона ПЗУ) грузит файл по адресу из его заголовка
-// (DATA_PTR=0). digger_tpc.bin укладывается в MEM_USER=0o1000=0x200, что
-// СТИРАЕТ наш title-код в этой же области. Поэтому возвращаться из EMT в C
-// нельзя - стек указывает на затёртый код.
-//
-// Решение: 6-байтовый stub "emt 036; mov $01000, pc" размещён в BSS
-// (0x20..0xD0). BSS лежит НИЖЕ MEM_USER и загрузкой не затрагивается.
-// EMT возвращается ровно в этот stub, тот сразу прыгает на entry-point
-// загруженного digger_tpc - там уже свежий код.
-//
-// Имя файла - 16 байт, padded пробелами. Должно совпадать с тем, как файл
-// зарегистрирован на ленте/в Gryphon-MPI; правьте при необходимости.
-static uint16_t chain_stub[3]; // BSS: переживает загрузку digger_tpc
-static const char tpc_filename[16] = "digger_tpc_v0.7 ";
+static const char tpc_filename[sizeof(STR_DEF(FILE_1))] = STR_DEF(FILE_1);
 
+// Загрузка и запуск основного файла игры
 static void load_and_run_digger(void) __attribute__((noreturn));
 static void load_and_run_digger(void)
 {
-    // Покажем "LOADING" на текущем splash, прежде чем CPU уйдёт в ROM.
+    // Показать строку "LOADING"
     print_str(loading_str, loading_str_x_pos, loading_str_y_pos);
 
-    // Подготовить блок параметров драйвера магнитофона в системной области.
+    // Подготовить блок параметров драйвера магнитофона в системной области
     struct EMT_36_PARAMS *p = (struct EMT_36_PARAMS *)SYS_EMT_36_PARAMS;
-    p->COMMAND  = EMT_36_FILE_READ;
-    p->DATA_PTR = (uint8_t *)0; // 0 = использовать load-адрес из заголовка файла
-    p->SIZE     = 0;             // 0 = размер из заголовка, без ограничения
-    for (uint8_t i = 0; i < 16; i++) p->NAME[i] = tpc_filename[i];
+    p->COMMAND  = EMT_36_FILE_READ;   // Считывание файла через EMT36
+    p->DATA_PTR = (uint8_t *)nullptr; // Использовать адрес загрузки из заголовка файла
+    p->SIZE     = 0;                  // Размер из заголовка, без ограничения (0)
+    for (uint8_t i = 0; i < 16; i++)  // Фромирование 16 байт имени файлв
+    {
+        if (i < sizeof(tpc_filename)) p->NAME[i] = tpc_filename[i]; // Копирование из статического поля с именем
+        else p->NAME[i] = ' '; // Дополнение до 16 байт нулями
+    }
 
-    // Загрузить stub в BSS (живёт на 0x20..0xD0, ниже области загрузки):
-    //   emt 036         - вызов ROM-драйвера магнитофона
-    //   mov $01000, pc  - прыжок на entry-point загруженного бинарника
-    chain_stub[0] = 0104036; // EMT 036
-    chain_stub[1] = 0012707; // MOV #imm, PC
-    chain_stub[2] = 0001000; // imm = MEM_USER
+    // Загрузить файл с магнитофона через вызов EMT36
+    EMT_36((const char *)p);
 
-    // r1 = указатель на параметры (как требует EMT_36), PC := адрес stub'а.
-    asm volatile (
-        "mov %0, r1\n\t"
-        "mov %1, pc\n\t"
-        : : "r"(p), "r"(&chain_stub[0]) : "r1", "memory"
-    );
+    // Перейти на entry-point загруженного файла игры
+    asm volatile ("jmp @#01000\n" ::: "memory");
     __builtin_unreachable();
 }
 
@@ -585,13 +564,6 @@ static void load_and_run_digger(void)
  */
 void main()
 {
-    // EMT_14();
-
-    // typedef void (*vector)();
-    // *((volatile vector *)VEC_STOP) = start; // Установить вектор клавиши "СТОП" на _start
-
-    // EMT_16(0233);
-    // EMT_16(0236);
     paint_brick(0, 0, SCREEN_BYTE_WIDTH, SCREEN_PIX_HEIGHT, 0); // Очистка экрана
 
     set_PSW(1 << PSW_I); // Замаскировать прерывания IRQ
@@ -600,7 +572,7 @@ void main()
     // Отображение строки "UNPACKING..."
     print_str(unpacking_str, unpacking_str_x_pos, unpacking_str_y_pos);
 
-    // Распаковать обложку в экранное ОЗУ
+    // Распаковать заставку в экранное ОЗУ
     zx0_decompress(cover_zx0, (uint8_t *)MEM_VIDEO);
 
     // Воспроизвести музыку Popcorn
@@ -609,7 +581,7 @@ void main()
     init_demo(); // Инициализация демо
     for (;;)
     {
-        process_demo_state();
-        if (any_key_or_button_pressed()) load_and_run_digger();
+        process_demo_state(); // Обработка состояний демо
+        if (any_key_or_button_pressed()) load_and_run_digger(); // Запустить игру при нажатии клавиши или кнопки джойстика
     }
 }

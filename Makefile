@@ -24,7 +24,7 @@ digger-main-file: digger.c
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o digger.o digger.c
 
 title-main-file: title.c
-	pdp11-aout-gcc ${GCC_FLAGS} -c -o title.o title.c
+	pdp11-aout-gcc ${GCC_FLAGS} -DFILE1=${FILE_1} -c -o title.o title.c
 
 levels-file: digger_levels.c
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o digger_levels.o digger_levels.c

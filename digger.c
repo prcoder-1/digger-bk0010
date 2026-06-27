@@ -58,7 +58,6 @@ enum direction : uint8_t
     DIR_UP,       /**< Движется вверх */
     DIR_DOWN,     /**< Движется вниз */
     DIR_STOP      /**< Стоит на месте */
-
 };
 
 /**
@@ -2458,6 +2457,8 @@ void main()
 
     set_PSW(1 << PSW_I); // Замаскировать прерывания IRQ
     ((union KEY_STATE *)REG_KEY_STATE)->bits.INT_MASK = 1; // Отключить прерывание от клавиатуры
+
+    (void)*(volatile uint8_t *)REG_KEY_DATA; // Очистка буфера клавиатуры
 
     volatile uint16_t *ptr = (uint16_t *)MEM_VIDEO;
     for (uint16_t i = 0; i < SCREEN_WORD_WIDTH * (FIELD_Y_OFFSET - MOVE_Y_STEP * 3); ++i) *(ptr + i) = 0;
