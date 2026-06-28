@@ -8,8 +8,10 @@
 #include "digger_full_font.h"
 #include "digger_title.h"
 
+#define STR_(x) #x
+#define STR(x) STR_(x)
+
 #define COIN_Y_OFFSET 3 // Смещение спрайта монетки в ячейке по оси Y
-#define STR(x) #x
 
 // Длительность одного «кадра» демо в тактах таймера (23438 Гц).
 // 300 тактов ≈ 12.8 мс/кадр

@@ -2461,7 +2461,7 @@ void main()
     (void)*(volatile uint8_t *)REG_KEY_DATA; // Очистка буфера клавиатуры
 
     volatile uint16_t *ptr = (uint16_t *)MEM_VIDEO;
-    for (uint16_t i = 0; i < SCREEN_WORD_WIDTH * (FIELD_Y_OFFSET - MOVE_Y_STEP * 3); ++i) *(ptr + i) = 0;
+    for (uint16_t i = 0; i < SCREEN_WORD_WIDTH * SCREEN_PIX_HEIGHT; ++i) *(ptr + i) = 0;
 
     volatile uint16_t *t_limit = (volatile uint16_t *)REG_TVE_LIMIT;
     volatile union TVE_CSR *tve_csr = (volatile union TVE_CSR *)REG_TVE_CSR;
