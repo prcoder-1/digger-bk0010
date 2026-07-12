@@ -1252,7 +1252,7 @@ static void sound_effect()
     {
         static const uint16_t coin_periods[] = { C5, D5, E5, F5, G5, A5, B5, C6 };
         uint16_t period = coin_periods[snd.coin_note & 7];
-        sound(period, 30);
+        sound(period, 16); // короче — чтобы съедание камней не тормозило движение
         snd.coin--;
     }
 
@@ -1276,14 +1276,14 @@ static void sound_effect()
         for (uint16_t i = 10; i != 0; --i)
         {
             explode_snd_period -= explode_snd_period >> 3;
-            sound(explode_snd_period, 30);
+            sound(explode_snd_period, 16); // короче — меньше одноразовая заморозка кадра
         }
     }
 
     if (snd.loose) // Звук раскачивающегося мешка
     {
         static const uint16_t loose_periods[] = { 2500 / N, 3000 / N, 2500 / N, 2000 / N };
-        static const uint16_t loose_durances[] = { 24, 20, 24, 30 };
+        static const uint16_t loose_durances[] = { 14, 12, 14, 18 };
 
         if (!(snd.loose_snd_phase & 1))
         {
@@ -1315,14 +1315,14 @@ static void sound_effect()
             uint16_t period = (snd.money & 1) ? snd.money_period_2 : snd.money_period_1;
             snd.money_period_1 += snd.money_period_1 >> 4;
             snd.money_period_2 -= snd.money_period_2 >> 4;
-            sound(period, 25);
+            sound(period, 14); // короче — 10-нотный всплеск меньше морозит кадр
             snd.money--;
         }
     }
 
     if (snd.chase) // Звук включения бонус-режима
     {
-        uint16_t durance = 75;
+        uint16_t durance = 40; // короче — бонус-режим не тормозит игру каждый кадр
         snd.chase_flip = ~snd.chase_flip;
         if (snd.chase_flip) sound(1230 / N, durance);
         else sound(1513 / N, durance);
@@ -1352,7 +1352,7 @@ static void sound_effect()
                 if (c1_lb == 2) snd.bug_period_held = snd.bug_period - (snd.bug_period >> 4);
                 snd.bug_c1--;
                 snd.bug_period -= snd.bug_period >> 4;
-                sound(snd.bug_period_held / 16, 25);
+                sound(snd.bug_period_held / 16, 14); // короче — съедание врага меньше морозит
                 sounds--;
             }
             else
@@ -1370,7 +1370,7 @@ static void sound_effect()
 
     if (snd.life) // Звук получения жизни
     {
-        sound(14 + snd.life, 40);
+        sound(14 + snd.life, 22); // короче — меньше заморозка при получении жизни
         snd.life -= 2;
     }
 }
