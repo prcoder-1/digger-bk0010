@@ -1596,7 +1596,10 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                                 bag->state = BAG_FALLING; // Начать падение мешка
                                 bag->dir = DIR_DOWN;      // Направление движения мешка вниз
                                 bag->count = 0;           // Сбросить счётчик этажей
-                                snd.fall = 1;             // Включить звук падения мешка
+                                // Звук падения (и инициализацию fall_period) включает проверка
+                                // bags_fall ниже. Ставить snd.fall=1 здесь нельзя: при падении
+                                // двух мешков подряд это обходит инициализацию fall_period, и
+                                // sound(0) крутит 65536 итераций -> зависание со щелчками.
 
                                 break;
                             }
@@ -1651,7 +1654,8 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                     bag->state = BAG_FALLING; // Начать падение мешка
                     bag->dir = DIR_DOWN;      // Направление движения мешка - вниз
                     bag->count = 0;           // Сбросить счётчик этажей
-                    snd.fall = 1;             // Включить звук падения мешка
+                    // Звук падения (с инициализацией fall_period) включает проверка bags_fall
+                    // ниже — см. коммент выше про зависание при падении двух мешков.
                 }
 
                 break;
