@@ -365,14 +365,14 @@ void process_demo_state()
     if (hobbin_x)
     {
         paint_brick(hobbin_x + image_width, hobbin_y, 1, image_height, 0);
-        if (hobbin_mirror) sp_4_15_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_left[image_phase]);
+        if (hobbin_mirror) sp_4_15_h_mirror_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_right[image_phase]);
         else sp_4_15_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_right[image_phase]);
     }
 
     if (digger_x)
     {
         paint_brick(digger_x + image_width, digger_y, 1, image_height, 0);
-        if (digger_mirror) sp_4_15_put(digger_x, digger_y, (uint8_t *)image_digger_left[image_phase]);
+        if (digger_mirror) sp_4_15_h_mirror_put(digger_x, digger_y, (uint8_t *)image_digger_right[image_phase]);
         else sp_4_15_put(digger_x, digger_y, (uint8_t *)image_digger_right[image_phase]);
     }
 
@@ -579,11 +579,24 @@ static void load_and_run_digger(void)
         else p->NAME[i] = ' '; // Дополнение до 16 байт нулями
     }
 
-    // Загрузить файл с магнитофона через вызов EMT36
-    EMT_36((const char *)p);
+    // ВНИМАНИЕ: и сам вызов `emt 036`, и последующий переход `jmp @#01000` НЕЛЬЗЯ
+    // выполнять из кода заставки (001000..) — загружаемый DIGGER грузится с адреса
+    // 001000 и во время загрузки затирает эти самые инструкции, после чего возврат
+    // из EMT попадает уже на данные игры → срыв в монитор («перезагрузка»).
+    // Решение: копируем крошечный стаб «mov #параметры,r1; emt 036; jmp @#01000» в
+    // системное ОЗУ НИЖЕ 001000 (эта область загрузкой не затрагивается) и передаём
+    // управление туда — стаб переживает загрузку и корректно стартует игру.
+    enum { RUN_STUB_ADDR = 0400 }; // свободная системная ячейка: выше блока EMT (0320), ниже стека
+    static const uint16_t run_stub[] = {
+        0012701, SYS_EMT_36_PARAMS, // mov #0320, r1  — адрес блока параметров EMT 36
+        0104036,                    // emt 036        — загрузка DIGGER поверх 001000..
+        0000137, MEM_USER,          // jmp @#01000    — точка входа загруженной игры
+    };
+    uint16_t *stub = (uint16_t *)RUN_STUB_ADDR;
+    for (uint8_t i = 0; i < sizeof(run_stub) / sizeof(run_stub[0]); i++) stub[i] = run_stub[i];
 
-    // Перейти на entry-point загруженного файла игры
-    asm volatile ("jmp @#01000\n" ::: "memory");
+    // Передать управление стабу в системном ОЗУ (не возвращается)
+    asm volatile ("jmp (%0)\n" :: "r"((uint16_t)RUN_STUB_ADDR) : "memory");
     __builtin_unreachable();
 }
 
