@@ -535,7 +535,7 @@ static void play_note_env(uint16_t period, uint16_t durance)
     for (uint8_t s = 0; s < 4; ++s)
     {
         pw >>= 1;  // 1/2, 1/4, 1/8, 1/16 от периода
-        sound_pwm(period, base, pw);
+        sound_pwm(period, base, pw ? pw : 1); // pw>=1: pw==0 -> sob крутит 65536 итераций
     }
 }
 
@@ -573,10 +573,14 @@ static void load_and_run_digger(void)
     p->COMMAND  = EMT_36_FILE_READ;   // Считывание файла через EMT36
     p->DATA_PTR = (uint8_t *)nullptr; // Использовать адрес загрузки из заголовка файла
     p->SIZE     = 0;                  // Размер из заголовка, без ограничения (0)
-    for (uint8_t i = 0; i < 16; i++)  // Фромирование 16 байт имени файлв
+    // Формирование 16 байт имени файла: копируем символы до NUL, хвост добиваем
+    // ПРОБЕЛАМИ (не NUL). Драйвер EMT_36 сравнивает все 16 байт имени с паддингом
+    // пробелами; хвостовой NUL дал бы EMT_36_INCORRECT_NAME → игра не загрузилась бы.
+    for (uint8_t i = 0; i < 16; i++)
     {
-        if (i < sizeof(game_filename_str)) p->NAME[i] = game_filename_str[i]; // Копирование из статического поля с именем
-        else p->NAME[i] = ' '; // Дополнение до 16 байт нулями
+        p->NAME[i] = (i < sizeof(game_filename_str) - 1 && game_filename_str[i])
+                     ? game_filename_str[i] // Символ имени файла
+                     : ' ';                 // Паддинг пробелом до 16 байт
     }
 
     // ВНИМАНИЕ: и сам вызов `emt 036`, и последующий переход `jmp @#01000` НЕЛЬЗЯ
@@ -587,6 +591,9 @@ static void load_and_run_digger(void)
     // системное ОЗУ НИЖЕ 001000 (эта область загрузкой не затрагивается) и передаём
     // управление туда — стаб переживает загрузку и корректно стартует игру.
     enum { RUN_STUB_ADDR = 0400 }; // свободная системная ячейка: выше блока EMT (0320), ниже стека
+    // Стаб на 0400 не должен налезать на блок параметров EMT_36 (0320..)
+    static_assert(SYS_EMT_36_PARAMS + sizeof(struct EMT_36_PARAMS) <= RUN_STUB_ADDR,
+                  "run_stub overlaps EMT_36 parameter block");
     static const uint16_t run_stub[] = {
         0012701, SYS_EMT_36_PARAMS, // mov #0320, r1  — адрес блока параметров EMT 36
         0104036,                    // emt 036        — загрузка DIGGER поверх 001000..
