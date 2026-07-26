@@ -85,7 +85,8 @@ bin-files: aout2bin digger-out-file title-out-file
 
 g-mpi: bin-files
 	curl -i -o /dev/null -X POST -H "Content-Type: multipart/form-data" -F "storeas=${GMPI_UPLOAD_DIR}/${BIN_FILE_1}" -F "size=$(shell stat -c%s ${BIN_FILE_1})" -F "file=@${BIN_FILE_1}" "${GMPI_API_URL}/upload"
-	curl -i -s -o /dev/null "${GMPI_API_URL}/run?dev=file&emu10=no&fname=${GMPI_UPLOAD_DIR}/${BIN_FILE_1}"
+	curl -i -o /dev/null -X POST -H "Content-Type: multipart/form-data" -F "storeas=${GMPI_UPLOAD_DIR}/${BIN_FILE_2}" -F "size=$(shell stat -c%s ${BIN_FILE_2})" -F "file=@${BIN_FILE_2}" "${GMPI_API_URL}/upload"
+	curl -i -s -o /dev/null "${GMPI_API_URL}/run?dev=file&emu10=no&fname=${GMPI_UPLOAD_DIR}/${BIN_FILE_2}"
 
 docs:
 	doxygen Doxyfile
