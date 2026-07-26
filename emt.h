@@ -30,7 +30,7 @@ static inline char EMT_6()
     asm volatile (
         "emt 06\n"
         "mov r0, %0"
-        : "=r" (rv)
+        : "=r" (rv) : : "cc"
     );
 
     return rv;
@@ -105,7 +105,10 @@ static inline void EMT_16(char c)
     asm volatile (
         "mov %0, r0\n\t"
         "emt 016\n"
-        : : "r" (c) : "cc"
+        // Драйвер дисплея использует r0 (код символа) и r1/r2 (как и EMT 020),
+        // поэтому объявляем их как clobber — иначе вызывающий цикл, держащий
+        // переменную в r1/r2, получит её порчу на реальном БК.
+        : : "r" (c) : "r0", "r1", "r2", "cc", "memory"
     );
 }
 
@@ -177,7 +180,7 @@ static inline void EMT_22(char c, uint8_t pos)
 /**
  * @brief Установка курсора по координатам
  *
- * По данной команду производится цстановка символьного или графического курсора в позицию,
+ * По данной команду производится установка символьного или графического курсора в позицию,
  * заданную координатами X и Y переданными в параметрах. Значениям координат (0,0) соответствует
  * верхняя левая позиция в информационном поле экрана. Максимальные значения координат
  * зависят от размера поля, которое находится в данный момент в распоряжении пользователя.
@@ -192,7 +195,9 @@ static inline void EMT_24(uint8_t x, uint8_t y)
         "mov %0, r1\n\t"
         "mov %1, r2\n\t"
         "emt 024\n"
-        : : "r" (x), "r" (y) : "cc"
+        // Координаты передаются в r1/r2, драйвер их использует — объявляем
+        // clobber (в исходном варианте стояло только "cc", что некорректно).
+        : : "r" (x), "r" (y) : "r0", "r1", "r2", "cc", "memory"
     );
 }
 
@@ -213,7 +218,7 @@ static inline void EMT_26(uint8_t *x, uint8_t *y)
         "emt 026\n"
         "mov r1, @%0\n\t"
         "mov r2, @%1\n\t"
-        : "=r" (x), "=r" (y):  : "cc"
+        : : "r" (x), "r" (y) : "r1", "r2", "cc", "memory"
     );
 }
 
@@ -322,7 +327,7 @@ static inline union SSD EMT_34()
     asm volatile (
         "emt 34\n"
         "mov r0, %0"
-        : "=r" (rv.reg)
+        : "=r" (rv.reg) : : "cc"
     );
 
     return rv;
@@ -451,8 +456,8 @@ static inline void EMT_42(uint8_t byte)
 {
     asm volatile (
         "mov %0, r0\n\t"
-        "emt 040\n"
-        : : "r" (byte) : "cc"
+        "emt 042\n"
+        : : "r" (byte) : "r0", "cc"
     );
 }
 
@@ -480,7 +485,7 @@ static inline uint8_t EMT_44()
     asm volatile (
         "emt 044\n"
         "mov r0, %0"
-        : "=r" (rv)
+        : "=r" (rv) : : "cc"
     );
 
     return rv;
@@ -520,7 +525,7 @@ static inline void EMT_50(uint8_t *ptr, uint16_t len)
     asm volatile (
         "mov %0, r1\n\t"
         "mov %1, r2\n\t"
-        "emt 010\n"
-        : : "r" (ptr), "r" (len) : "cc"
+        "emt 050\n"
+        : : "r" (ptr), "r" (len) : "r1", "r2", "cc", "memory"
     );
 }
