@@ -32,12 +32,12 @@ constexpr uint8_t MAX_BAGS = 7; // Максимальное количество
 constexpr uint8_t MAX_BUGS = 5; // Максимальное количество врагов на уровне
 constexpr uint8_t MAX_LIVES = 6; // Максимальное количество жизней
 
-constexpr uint8_t MAN_START_X = 7; // Начльное положение Диггера по оси X (вклетках)
-constexpr uint8_t MAN_START_Y = 9; // Начльное положение Диггера по оси Y (вклетках)
+constexpr uint8_t MAN_START_X = 7; // Начальное положение Диггера по оси X (в клетках)
+constexpr uint8_t MAN_START_Y = 9; // Начальное положение Диггера по оси Y (в клетках)
 
 constexpr uint8_t LOOSE_WAIT = 15; // Время с момента начала покачивания до момента падения мешка
 
-constexpr uint32_t BONUS_LIFE_SCORE = 20000; // Количество очков для дополнительной жизни
+constexpr uint16_t BONUS_LIFE_SCORE = 20000; // Количество очков для дополнительной жизни (счёт 16-битный, потолок 65535)
 
 /**
  * @brief Перечисление типов врагов
@@ -90,7 +90,7 @@ enum bonus_state : uint8_t
     BONUS_OFF = 0, /**< Режим бонус ещё не включен */
     BONUS_READY,   /**< Режим бонус готов к активации (появилась вишенка) */
     BONUS_ON,      /**< Режим бонус включен */
-    BONUS_END      /**< Режим борус закончился */
+    BONUS_END      /**< Режим бонус закончился */
 };
 
 #pragma pack(push, 1)
@@ -178,7 +178,7 @@ struct
     uint8_t delay;         /// Задержка перед рождением врага (Ноббина)
     uint8_t delay_counter; /// Счётчик задержки перед рождением врага
     uint8_t active;        /// Количество активных врагов
-    uint8_t created;       /// Общее количество сщзданных врагов
+    uint8_t created;       /// Общее количество созданных врагов
 } bugs;
 
 // Переменные отвечающие за бонус-режим
@@ -187,7 +187,7 @@ struct {
     uint16_t time;          /// Время активности бонус-режима
     uint8_t  flash;         /// Время мерцания при включении/выключении Бонус-режима
     uint8_t  count;         /// Множитель очков в Бонус-режиме (умножается на два за каждого пойманного врага)
-    uint32_t life_score;    /// Количество очков для дополнительное жизни
+    uint16_t life_score;    /// Количество очков для дополнительной жизни
 } bonus;
 
 // Переменные отвечающие за выстрел
@@ -207,7 +207,7 @@ struct {
     uint16_t difficulty; /// Уровень сложности
     uint16_t level_no;   /// Текущий номер уровня
     int16_t  lives;      /// Текущее количество жизней
-    uint32_t score;      /// Количество очков
+    uint16_t score;      /// Количество очков
 } game;
 
 uint8_t broke_max; // Время через которое исчезнет разбившийся мешок
@@ -333,7 +333,7 @@ static void add_score(uint16_t score_add)
     game.score += score_add;
     print_dec(game.score, 0, SCREEN_Y_OFFSET + MOVE_Y_STEP);
 
-     // Если количество очков досигло бонусного для получения жизни
+     // Если количество очков достигло бонусного для получения жизни
     if (game.score >= bonus.life_score)
     {
         bonus.life_score += BONUS_LIFE_SCORE; // Количество очков до следующего бонуса в виде жизни
@@ -342,7 +342,7 @@ static void add_score(uint16_t score_add)
         if (game.lives < MAX_LIVES)
         {
             game.lives++; // Увеличичить количество жизней на единицу
-            print_lives(); // Вывесли количество жизней
+            print_lives(); // Вывести количество жизней
             snd.life = 24; // Издать звук получения жизни
         }
     }
@@ -430,14 +430,14 @@ static void init_level_state()
 
     if (game.difficulty > 6) bugs.max = 5;      // На уровне сложности 7 и выше максимально 5 врагов одновременно
     else if (game.difficulty > 0) bugs.max = 4; // На уровне сложности со 1 до 6 (включительно) до 4 врагов одновременно
-    else bugs.max = 3;                      // На первом уровне максимально три варага одновременно
+    else bugs.max = 3;                      // На первом уровне максимально три врага одновременно
 
     // Переменные относщиеся к созданию и управлению врагами
     bugs.total = game.difficulty + 6;         // Общее количество врагов на уровне - шесть плюс уровень сложности
     bugs.delay = 45 - (game.difficulty << 1); // Задержка появления врагов (с ростом сложности убывает)
     bugs.delay_counter = bugs.delay;     // Инициализация счётчика задержки врага исходным значением
     bugs.active = 0;                     // Количество активных врагов
-    bugs.created = 0;                    // Общее количество сщзданных врагов
+    bugs.created = 0;                    // Общее количество созданных врагов
 
     broke_max = 140 - game.difficulty * 10; // Время через которое исчезнет разбившийся мешок (с ростом сложности убывает)
 
@@ -923,10 +923,10 @@ static void move_bug(struct bug_info *bug)
         dir_1 = (man.x_graph < bug_x_graph) ? DIR_LEFT : DIR_RIGHT;
         dir_2 = (man.y_graph < bug_y_graph) ? DIR_UP   : DIR_DOWN;
 
-        // Если расстояние по горизонтали превышает расстояние по вертикали, то отдать приоритет оси X
+        // Если расстояние по вертикали превышает горизонтальное — отдать приоритет оси Y
         if (abs16(man.y_graph - bug_y_graph) > abs16(man.x_graph - bug_x_graph))
         {
-            // Если расстояние по вертикали превышает расстояние по горизонтали, то отдать приоритет оси Y
+            // Обмен dir_1 <-> dir_2 (XOR-swap): первичной становится ось Y
             dir_1 ^= dir_2;
             dir_2 ^= dir_1;
             dir_1 ^= dir_2;
@@ -1159,7 +1159,7 @@ static void stop_bag(struct bag_info *bag)
     bag->dir = DIR_STOP; // Остановить мешок
     bag->count = 0;
 
-    // TODO: Унчтожить все мешки под тем, который остановился
+    // Уничтожить все мешки под тем, который остановился
     for (uint16_t i = 0; i < MAX_BAGS; ++i)
     {
         struct bag_info *another_bag = &bags_state[i];  // Структура с информацией о мешке
@@ -1422,7 +1422,7 @@ static void process_bugs()
                         bug->state = CREATURE_STARTING; // Враг стартует
                         bug->count = 6;                 // Время до запуска врага
                         bug->wait = 0;                  // Враг не задержан
-                        bug->image_phase = 0;           // Начальная фаза орисовки спрайта
+                        bug->image_phase = 0;           // Начальная фаза отрисовки спрайта
                         bug->image_phase_inc = 1;       // Начальное направление изменения фазы
                         bug->x_graph = bug_start_x;     // Начальная графическая координата по оси X
                         bug->y_graph = bug_start_y;     // Начальная графическая координата по оси Y
@@ -1525,7 +1525,7 @@ static void process_bugs()
                 }
 
                 erase_4_15(bug->x_graph, bug->y_graph); // Стереть убитого врага
-                bug->state = CREATURE_INACTIVE;         // Декативировать убитого врага
+                bug->state = CREATURE_INACTIVE;         // Деактивировать убитого врага
                 bugs.active--;                          // Уменьшить количество активных врагов
 
                 // Количество оставшихся врагов (сколько осталось создать плюс количество активных)
@@ -1745,7 +1745,7 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
             {
                 uint16_t *v_scroll = (uint16_t *)REG_V_SCROLL;
 
-                // Анимация рабивающегося мешка (три фазы, пропуская один такт счётчика)
+                // Анимация разбивающегося мешка (три фазы, пропуская один такт счётчика)
                 if (bag->count++ < 6)
                 {
                     if (bag->count == 1)
@@ -2292,7 +2292,7 @@ static void man_rip()
         // Проверить, что враг оказался рядом с могилкой
         if (check_collision_4_15(man.x_graph, man.y_graph, bug->x_graph, bug->y_graph))
         {
-            bug->state = CREATURE_INACTIVE; // Декативировать врага убившего Диггера
+            bug->state = CREATURE_INACTIVE; // Деактивировать врага убившего Диггера
             erase_4_15(bug->x_graph, bug->y_graph); // Стереть деактивированного врага
         }
     }
@@ -2301,7 +2301,7 @@ static void man_rip()
     static const uint8_t music_dead_periods[]   = { C4, C4, C4, C4, DS4, D4, D4, C4, C4, B3, C4 };
     static const uint16_t music_dead_durations[] = { N6, NQ, NE, N6, NQ, NE, NQ, NE, NQ, NE, N12 };
 
-    // Фазы орисовки надгробного камня
+    // Фазы отрисовки надгробного камня
     static const uint8_t rip_frames[5][2] = {
         { 10,  4 }, // Верхушка надгробия только показалась
         {  8,  6 },
@@ -2394,7 +2394,7 @@ static void process_game_state()
         game.level_no++;
         game.level_no &= LEVELS_NUM - 1;
 
-        // Увеличение сложности после прохождения очередного уровня (максимальный уровень 9)
+        // Увеличение сложности после прохождения очередного уровня (клампится на 10)
         if (game.difficulty < 10) game.difficulty++;
 
         init_level(); // Инициализация нового уровня
@@ -2518,7 +2518,7 @@ void main()
 #endif
 
 #if defined(DEBUG)
-        // Рспечатать оставшееся свободное время
+        // Распечатать оставшееся свободное время
         print_dec(*((volatile uint16_t *)REG_TVE_COUNT), 0, MAX_Y_POS + 2 * POS_Y_STEP);
 #endif
         while ((tve_csr->reg & (1 << TVE_CSR_FL)) == 0); // Ожидать срабатывания таймера.

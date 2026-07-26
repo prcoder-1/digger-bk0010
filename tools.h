@@ -27,11 +27,11 @@ enum PSW_BITS
  */
 static inline uint16_t get_PSW()
 {
-    char rv;
+    uint16_t rv; // всё слово ССП: char усёк бы старший байт (приоритет/T/PA)
     asm volatile (
         "mfps\n"
         "mov r0, %0"
-        : "=r" (rv)
+        : "=r" (rv) : : "cc"
     );
 
     return rv;
@@ -56,7 +56,7 @@ static inline uint16_t SWAB(uint16_t word)
 {
     asm volatile (
         "swab %0\n\t"
-        : "=r" (word) : : "cc"
+        : "+r" (word) : : "cc" // +r: swab читает и пишет тот же регистр
     );
 
     return word;
