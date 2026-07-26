@@ -7,6 +7,7 @@
 #include "digger_music_title.h"
 #include "digger_full_font.h"
 #include "digger_title.h"
+#include "digger_credits.h"
 
 #define STR_(x) #x
 #define STR(x) STR_(x)
@@ -320,8 +321,8 @@ void process_demo_state()
 
         case bag_print_time:
         {
-            const char digger_str[] = "GOLD";
-            print_str(digger_str, bag_x + image_width * 2 - 1, bag_y);
+            const char gold_str[] = "GOLD";
+            print_str(gold_str, bag_x + image_width * 2 - 1, bag_y);
             break;
         }
 
@@ -397,8 +398,6 @@ void process_demo_state()
     while ((csr->reg & (1 << TVE_CSR_FL)) == 0);
     csr->reg = FRAME_TIMER_MODE;
 }
-
-extern void start();
 
 // Распаковщик ZX0
 static const uint8_t *zx0_src;
@@ -489,6 +488,64 @@ void zx0_decompress(const uint8_t *src, uint8_t *dst)
             while (length--) *dst++ = *p++;
             bit = zx0_read_bit();
         }
+    }
+}
+
+#define ROM_FONT      0112036 // Адрес массива графем ПЗУ монитора БК-0010
+#define CREDITS_Y0    30      // Верхняя строка растра блока (центрирован по вертикали)
+#define CREDITS_PITCH 11      // Межстрочный шаг в точках (10 точек глифа + промежуток)
+#define CREDITS_NROWS 10      // Сколько строк глифа выводить (весь глиф — без обрезки)
+#define CREDITS_CENTER 16     // Центр левой панели в байтах (между рамкой 0 и разделителем 32)
+
+/**
+ * @brief Вывод текста кредитов в левую панель полноразмерным шрифтом ПЗУ (строки центрированы)
+ */
+static void blit_credits()
+{
+    // Разворот полубайта (4 точки 1bpp) в байт (4 точки 2bpp), цвет = 0b10 (зелёный).
+    // Другой цвет — заменить таблицу: 0b01 синий, 0b11 красный.
+    static const uint8_t expand[16] = {
+        0x00, 0x02, 0x08, 0x0a, 0x20, 0x22, 0x28, 0x2a,
+        0x80, 0x82, 0x88, 0x8a, 0xa0, 0xa2, 0xa8, 0xaa,
+    };
+
+    // Буфер cover_zx0 после распаковки обложки не нужен — используем как scratch
+    uint8_t *buf = (uint8_t *)cover_zx0;
+    zx0_decompress(credits_zx0, buf);
+
+    // База графем со сложенным сдвигом индекса: адрес = (ROM_FONT - 020*10) + c*10
+    const uint8_t *font = (const uint8_t *)(ROM_FONT - 020 * 10);
+    uint8_t *p = buf;
+    uint16_t y = CREDITS_Y0;
+
+    while (*p)
+    {
+        // Длина строки (символов до '\n' или конца) — для центрирования
+        uint8_t *e = p;
+        while (*e && *e != '\n') ++e;
+        uint8_t len = (uint8_t)(e - p);
+
+        // Начало строки: центр панели минус половина ширины. Символ = 2 байта,
+        // половина ширины строки = len байт, поэтому смещение = CREDITS_CENTER - len.
+        // При len <= 15 смещение >= 1 — байт 0 (синяя рамка) не затрагивается.
+        uint8_t *d = (uint8_t *)MEM_VIDEO + y * SCREEN_BYTE_WIDTH + (CREDITS_CENTER - len);
+
+        while (p < e)
+        {
+            const uint8_t *g = font + *p++ * 10; // Графема символа (10 строк по 8 точек)
+            uint8_t *q = d;
+            for (uint8_t r = CREDITS_NROWS; r; --r) // Счёт вниз — компилятор эмитит sob
+            {
+                uint8_t b = *g++;
+                q[0] = expand[b & 15]; // Левые 4 точки строки глифа
+                q[1] = expand[b >> 4]; // Правые 4 точки строки глифа
+                q += SCREEN_BYTE_WIDTH;
+            }
+            d += 2; // Следующий столбец (символ = 2 байта = 8 точек)
+        }
+
+        if (*p == '\n') ++p; // Пропустить разделитель строк
+        y += CREDITS_PITCH;
     }
 }
 
@@ -586,7 +643,7 @@ static void load_and_run_digger(void)
     // ВНИМАНИЕ: и сам вызов `emt 036`, и последующий переход `jmp @#01000` НЕЛЬЗЯ
     // выполнять из кода заставки (001000..) — загружаемый DIGGER грузится с адреса
     // 001000 и во время загрузки затирает эти самые инструкции, после чего возврат
-    // из EMT попадает уже на данные игры → срыв в монитор («перезагрузка»).
+    // из EMT попадает уже на данные игры.
     // Решение: копируем крошечный стаб «mov #параметры,r1; emt 036; jmp @#01000» в
     // системное ОЗУ НИЖЕ 001000 (эта область загрузкой не затрагивается) и передаём
     // управление туда — стаб переживает загрузку и корректно стартует игру.
@@ -626,7 +683,8 @@ void main()
     // Воспроизвести музыку Popcorn
     play_popcorn();
 
-    init_demo(); // Инициализация демо
+    init_demo();    // Инициализация демо
+    blit_credits(); // Вывод кредитов в левую панель
     for (;;)
     {
         process_demo_state(); // Обработка состояний демо
