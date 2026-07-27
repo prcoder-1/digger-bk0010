@@ -7,7 +7,7 @@ OUT_FILE_1=${FILE_1}.out
 OUT_FILE_2=${FILE_2}.out
 OPT_FLAG=-Os -mlra
 XGCC=/home/prcoder/xgcc
-GCC_FLAGS=-std=gnu23 -fomit-frame-pointer -msoft-float -fcprop-registers -fPIC -nostartfiles -nodefaultlibs -nostdlib -m10 -m1801vm1 $(OPT_FLAG) -I$(XGCC)/include
+GCC_FLAGS=-std=gnu23 -fomit-frame-pointer -msoft-float -fcprop-registers -fPIC -nostartfiles -nodefaultlibs -nostdlib -m10 -m1801vm1 $(OPT_FLAG) -I$(XGCC)/include -DVERSION=${VERSION}
 GCC_ASM_FLAGS=-S -fverbose-asm
 AS_FLAGS=-mno-fpu -mlimited-eis -pic
 GMPI_API_URL=http://10.0.0.55/api
