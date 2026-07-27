@@ -341,97 +341,16 @@ static void process_demo_state()
     csr->reg = FRAME_TIMER_MODE;
 }
 
-// Распаковщик ZX0
-static const uint8_t *zx0_src;
-static uint8_t zx0_bit_mask;  //< Число оставшихся в `zx0_bit_value` бит (8..1)
-static uint8_t zx0_bit_value;
-static uint8_t zx0_last_byte;
-static uint8_t zx0_backtrack;
-
-/*
-    Активный бит всегда в позиции 7, поэтому возврат сводится к `value >> 7`
-    (для uint8_t это уже 0/1) — обходим баг кодогенерации gcc -Os -mlra на
-    идиоме `(a & b) ? 1 : 0`, где `neg`-флаг затирается следующим `clr` и
-    функция всегда возвращает 0.
-*/
-static uint8_t zx0_read_bit()
-{
-    uint8_t bit;
-    if (zx0_backtrack)
-    {
-        zx0_backtrack = 0;
-        return zx0_last_byte & 1;
-    }
-    if (!zx0_bit_mask)
-    {
-        zx0_bit_value = *zx0_src++;
-        zx0_bit_mask  = 8;
-    }
-    bit            = zx0_bit_value >> 7;
-    zx0_bit_value  = zx0_bit_value << 1;
-    zx0_bit_mask--;
-    return bit;
-}
-
-static uint16_t zx0_elias(uint8_t inverted)
-{
-    uint16_t value = 1;
-    while (!zx0_read_bit())
-    {
-        value = (value << 1) | (zx0_read_bit() ^ inverted);
-    }
-    return value;
-}
-
 /**
  * @brief Распаковка потока ZX0 в произвольную область памяти.
+ *
+ * Компактная PDP-11 реализация в `dzx0.s` (распаковщик reddie, 92 байта,
+ * + обвязка C ABI) — заметно короче прежней C-версии.
  *
  * @param src - указатель на сжатый поток ZX0
  * @param dst - указатель на буфер-приёмник; он же служит «историей» для ссылок по смещению
  */
-static void zx0_decompress(const uint8_t *src, uint8_t *dst)
-{
-    uint16_t last_offset = 1;
-    uint16_t length;
-    uint8_t *p;
-    uint8_t bit;
-
-    zx0_src       = src;
-    zx0_bit_mask  = 0;
-    zx0_backtrack = 0;
-
-    for (;;)
-    {
-        /* === LITERALS === */
-        length = zx0_elias(0);
-        while (length--) *dst++ = *zx0_src++;
-        bit = zx0_read_bit();
-
-        if (!bit)
-        {
-            /* === COPY_FROM_LAST_OFFSET === */
-            length = zx0_elias(0);
-            p = dst - last_offset;
-            while (length--) *dst++ = *p++;
-            bit = zx0_read_bit();
-        }
-
-        while (bit)
-        {
-            /* === COPY_FROM_NEW_OFFSET === */
-            uint16_t hi = zx0_elias(1);
-            if (hi == 256) return;             // Маркер конца потока
-
-            zx0_last_byte = *zx0_src++;
-            last_offset   = (hi << 7) - (zx0_last_byte >> 1);
-            zx0_backtrack = 1;                 // Бит 0 только что прочитанного байта — первый бит следующей гаммы
-            length = zx0_elias(0) + 1;
-            p = dst - last_offset;
-            while (length--) *dst++ = *p++;
-            bit = zx0_read_bit();
-        }
-    }
-}
+void zx0_decompress(const uint8_t *src, uint8_t *dst);
 
 #define CREDITS_ROW0   2  // Верхняя текстовая строка драйвера (подстройка на железе)
 #define CREDITS_MARGIN 1  // Левый столбец поля (столбец 0 занят синей рамкой)
