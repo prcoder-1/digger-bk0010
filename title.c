@@ -217,6 +217,23 @@ static const struct demo_item items[] = {
 
 constexpr uint8_t item_count = sizeof(items) / sizeof(items[0]); ///< Число статичных объектов демо
 
+static void play_note_env(uint16_t period, uint16_t durance); // Определена ниже, в блоке музыки
+
+// Длительность «событийной» ноты демо (~80 мс). Реальное время звучания ноты
+// пропорционально durance * period, поэтому durance выводится из периода
+// на этапе компиляции (одинаковая длительность независимо от высоты;
+// деления в рантайме нет — divhi в сборку не линкуется).
+#define DEMO_NOTE_DUR(p) ((uint16_t)(9500u / (p)))
+
+// Единая музыкальная последовательность конечных точек демо — лесенка
+// терциями вверх по хронологии событий: Ноббин, Хоббин, Диггер (индексы
+// ходоков 0..2), затем мешок, изумруд, вишенка (номер приза + walker_count).
+static const uint16_t demo_note_period[6] = { A4, C5, E5, G5, B5, D6 };
+static const uint16_t demo_note_durance[6] = {
+    DEMO_NOTE_DUR(A4), DEMO_NOTE_DUR(C5), DEMO_NOTE_DUR(E5),
+    DEMO_NOTE_DUR(G5), DEMO_NOTE_DUR(B5), DEMO_NOTE_DUR(D6),
+};
+
 /**
  * @brief Обработка общего состояния демо
  *
@@ -275,11 +292,24 @@ static void process_demo_state()
         }
         else if (t <= walker_move_end)
         {
-            if (!(demo_time & 7)) (*w->x)--;
+            if (!(demo_time & 7))
+            {
+                (*w->x)--;
+
+                // Щелчок шага: один короткий PWM-импульс динамика (~1 мс),
+                // высота чередуется через шаг — «тик-ток» как походка в
+                // оригинальном Digger. Импульс укладывается в кадровый бюджет
+                // 12.8 мс и темп демо не сдвигает.
+                constexpr uint16_t step_click_pw = 30; // Ширина импульса (ON-фаза, sob-такты)
+                sound_pwm((demo_time & 8) ? 90 : 60, 2, step_click_pw);
+            }
         }
         else if (t == walker_mirror)
         {
             if (w->mirror) *w->mirror = false;
+
+            // Ходок доехал: нота прибытия (для разворачивающихся — в момент разворота)
+            play_note_env(demo_note_period[i], demo_note_durance[i]);
         }
         else if (t == walker_print)
         {
@@ -299,6 +329,9 @@ static void process_demo_state()
         {
             const struct demo_item *it = &items[i];
             sp_put(digger_x, item_y + it->y_offset, image_width, it->height, it->image, nullptr);
+
+            // Появление приза: продолжение общей последовательности после ходоков
+            play_note_env(demo_note_period[i + walker_count], demo_note_durance[i + walker_count]);
         }
         else if (t == end_to_print)
         {
