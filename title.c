@@ -99,9 +99,14 @@ const char unpacking_str[] = "UNPACKING...";
 constexpr uint16_t unpacking_str_x_pos = (SCREEN_BYTE_WIDTH - char_width * sizeof(unpacking_str) + char_width) / 2;
 constexpr uint16_t unpacking_str_y_pos = (SCREEN_PIX_HEIGHT + str_height) / 2;
 
-const char version_str[] = "VER. " STR(VERSION);
+const char version_str[] = "VERSION " STR(VERSION);
 constexpr uint16_t version_str_x_pos = (SCREEN_BYTE_WIDTH - char_width * sizeof(version_str) + char_width) / 2;
 constexpr uint16_t version_str_y_pos = str_height + y_space + 2 + table_height + y_space;
+
+// Дата сборки в виде ДД.ММ.ГГГГ передаётся из Makefile (-DBUILD_DATE)
+const char build_date_str[] = STR(BUILD_DATE);
+constexpr uint16_t build_date_x_pos = (SCREEN_BYTE_WIDTH - char_width * sizeof(build_date_str) + char_width) / 2;
+constexpr uint16_t build_date_y_pos = version_str_y_pos + str_height + y_space;
 
 const char loading_str[] = "LOADING";
 constexpr uint16_t loading_str_x_pos = (SCREEN_BYTE_WIDTH - char_width * sizeof(loading_str) + char_width) / 2;
@@ -536,6 +541,11 @@ static void play_popcorn()
 static void load_and_run_digger(void) __attribute__((noreturn));
 static void load_and_run_digger(void)
 {
+    // Подчистить строки "VERSION"/даты сборки: "LOADING" и имя файла
+    // печатаются на тех же строках, но другой ширины — без очистки по краям
+    // оставались бы хвосты старого текста
+    paint_brick(0, loading_str_y_pos, SCREEN_BYTE_WIDTH, str_height * 2 + y_space, 0);
+
     // Показать строку "LOADING"
     print_str(loading_str, loading_str_x_pos, loading_str_y_pos);
 
@@ -612,6 +622,7 @@ void main()
     init_demo();    // Инициализация демо
     print_credits(); // Вывод кредитов в левую панель через EMT
     print_str(version_str, version_str_x_pos, version_str_y_pos);
+    print_str(build_date_str, build_date_x_pos, build_date_y_pos);
     for (;;)
     {
         process_demo_state(); // Обработка состояний демо
