@@ -1,12 +1,5 @@
 #include "digger_credits.h"
 
-#define RED   "\221"
-#define GREEN "\222"
-#define BLUE  "\223"
-#define BLACK "\224"
-
-// Строки уже разбиты по <= 15 символов; разделитель '\n'. Печатается через
-// драйвер дисплея ПЗУ (EMT) построчно с центрированием — см. print_credits().
 const char credits[] =
     "The Canadian\n"
     "studio \n"
@@ -17,9 +10,10 @@ const char credits[] =
     "his teammates\n"
     RED "Ray Ewan" GREEN " and\n"
     RED "Bill Montgomery" GREEN "\n"
-    "released " RED "Digger" GREEN "\n"
-    "in " BLUE "1983" GREEN " for\n"
-    RED "IBM PC" GREEN ".\n"
+    "released \n"
+    RED "Digger" GREEN " in " BLUE "1983" GREEN "\n"
+    "for " RED "IBM PC" GREEN ".\n"
+    "\n"
     "In " BLUE "2026" RED " Digger" GREEN "\n"
     "was converted\n"
     "to run on the\n"

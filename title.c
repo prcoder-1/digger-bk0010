@@ -352,10 +352,6 @@ static void process_demo_state()
  */
 void zx0_decompress(const uint8_t *src, uint8_t *dst);
 
-#define CREDITS_ROW0   2  // Верхняя текстовая строка драйвера (подстройка на железе)
-#define CREDITS_MARGIN 1  // Левый столбец поля (столбец 0 занят синей рамкой)
-#define CREDITS_FIELD  15 // Ширина поля центрирования в знакоместах (столбцы 1..15)
-
 /**
  * @brief Вывод текста кредитов в левую панель драйвером дисплея ПЗУ (EMT), строки центрированы
  */
