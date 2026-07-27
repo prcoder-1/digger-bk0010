@@ -95,9 +95,9 @@ constexpr uint16_t y_space = 6;
 constexpr uint16_t windmill_height = 42;
 constexpr uint16_t table_height = SCREEN_PIX_HEIGHT - (str_height + y_space) - windmill_height;
 
-const char unpacking_str[] = "UNPACKING...";
-constexpr uint16_t unpacking_str_x_pos = (SCREEN_BYTE_WIDTH - char_width * sizeof(unpacking_str) + char_width) / 2;
-constexpr uint16_t unpacking_str_y_pos = (SCREEN_PIX_HEIGHT + str_height) / 2;
+// const char unpacking_str[] = "UNPACKING...";
+// constexpr uint16_t unpacking_str_x_pos = (SCREEN_BYTE_WIDTH - char_width * sizeof(unpacking_str) + char_width) / 2;
+// constexpr uint16_t unpacking_str_y_pos = (SCREEN_PIX_HEIGHT + str_height) / 2;
 
 const char version_str[] = "VERSION " STR(VERSION);
 constexpr uint16_t version_str_x_pos = (SCREEN_BYTE_WIDTH - char_width * sizeof(version_str) + char_width) / 2;
@@ -530,7 +530,7 @@ void main()
     ((union KEY_STATE *)REG_KEY_STATE)->bits.INT_MASK = 1; // Отключить прерывание от клавиатуры
 
     // Отображение строки "UNPACKING..."
-    print_str(unpacking_str, unpacking_str_x_pos, unpacking_str_y_pos);
+    // print_str(unpacking_str, unpacking_str_x_pos, unpacking_str_y_pos);
 
     // Распаковать заставку в экранное ОЗУ
     zx0_decompress(cover_zx0, (uint8_t *)MEM_VIDEO);
