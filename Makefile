@@ -1,4 +1,5 @@
 VERSION=0.9
+BUILD_DATE=$(shell date +%d.%m.%Y)
 FILE_1=DIGGER_V${VERSION}
 FILE_2=DIGTIT_V${VERSION}
 BIN_FILE_1=${FILE_1}.BIN
@@ -7,7 +8,7 @@ OUT_FILE_1=${FILE_1}.out
 OUT_FILE_2=${FILE_2}.out
 OPT_FLAG=-Os -mlra
 XGCC=/home/prcoder/xgcc
-GCC_FLAGS=-std=gnu23 -fomit-frame-pointer -msoft-float -fcprop-registers -fPIC -nostartfiles -nodefaultlibs -nostdlib -m10 -m1801vm1 $(OPT_FLAG) -I$(XGCC)/include -DVERSION=${VERSION}
+GCC_FLAGS=-std=gnu23 -fomit-frame-pointer -msoft-float -fcprop-registers -fPIC -nostartfiles -nodefaultlibs -nostdlib -m10 -m1801vm1 $(OPT_FLAG) -I$(XGCC)/include -DVERSION=${VERSION} -DBUILD_DATE=${BUILD_DATE}
 GCC_ASM_FLAGS=-S -fverbose-asm
 AS_FLAGS=-mno-fpu -mlimited-eis -pic
 GMPI_API_URL=http://10.0.0.55/api
