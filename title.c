@@ -46,7 +46,7 @@ static void paint_brick(uint16_t x_graph, uint16_t y_graph, uint16_t x_width, ui
  * @param x_graph - координата X по которой будет осуществлён вывод числа
  * @param y_graph - координата Y по которой будет осуществлён вывод числа
  */
-void print_str(const char *str, uint16_t x_graph, uint16_t y_graph)
+static void print_str(const char *str, uint16_t x_graph, uint16_t y_graph)
 {
     while (*str)
     {
@@ -99,6 +99,10 @@ const char unpacking_str[] = "UNPACKING...";
 constexpr uint16_t unpacking_str_x_pos = (SCREEN_BYTE_WIDTH - char_width * sizeof(unpacking_str) + char_width) / 2;
 constexpr uint16_t unpacking_str_y_pos = (SCREEN_PIX_HEIGHT + str_height) / 2;
 
+const char version_str[] = "VER. " STR(VERSION);
+constexpr uint16_t version_str_x_pos = (SCREEN_BYTE_WIDTH - char_width * sizeof(version_str) + char_width) / 2;
+constexpr uint16_t version_str_y_pos = str_height + y_space + 2 + table_height + y_space;
+
 const char loading_str[] = "LOADING";
 constexpr uint16_t loading_str_x_pos = (SCREEN_BYTE_WIDTH - char_width * sizeof(loading_str) + char_width) / 2;
 constexpr uint16_t loading_str_y_pos = str_height + y_space + 2 + table_height + y_space;
@@ -121,7 +125,7 @@ uint16_t one_player_y;
 /**
  * @brief Инициализация демо
  */
-void init_demo()
+static void init_demo()
 {
     paint_brick(0, 0, SCREEN_BYTE_WIDTH, SCREEN_PIX_HEIGHT, 0); // Очистка экрана
 
@@ -168,213 +172,146 @@ uint16_t demo_time = 0;
 uint16_t nobbin_x = 0, nobbin_y = 0;
 uint16_t hobbin_x = 0, hobbin_y = 0;
 uint16_t digger_x = 0, digger_y = 0;
-uint16_t bag_x = 0, bag_y = 0;
-uint16_t emerald_x = 0, emerald_y = 0;
-uint16_t cherry_x = 0, cherry_y = 0;
 bool hobbin_mirror, digger_mirror;
 uint8_t image_phase;        ///< Фаза анимации при выводе спрайта
 int8_t image_phase_inc = 1; ///< Направление изменения фазы анимации при выводе спрайта (+1 или -1)
 
+// Таблица действующих лиц демо. Все трое проходят одинаковый таймлайн,
+// различаются только спрайтами, координатами, подписью и наличием разворота
+// (у Ноббина зеркального спрайта нет).
+struct demo_walker
+{
+    uint16_t *x, *y;
+    bool *mirror;                   ///< nullptr — актёр не разворачивается
+    const uint8_t (*frames)[15][4]; ///< 3 фазы анимации
+    const char *name;
+};
+
+static const struct demo_walker walkers[] = {
+    { &nobbin_x, &nobbin_y, nullptr,        image_nobbin,       "NOBBIN" },
+    { &hobbin_x, &hobbin_y, &hobbin_mirror, image_hobbin_right, "HOBBIN" },
+    { &digger_x, &digger_y, &digger_mirror, image_digger_right, "DIGGER" },
+};
+
+constexpr uint8_t walker_count = sizeof(walkers) / sizeof(walkers[0]); ///< Число действующих лиц демо
+
+// Таблица статичных объектов демо
+struct demo_item
+{
+    const uint8_t *image;
+    const char *name;
+    uint8_t height;   ///< Высота спрайта в строках
+    uint8_t y_offset; ///< Смещение спрайта в ячейке по оси Y
+};
+
+static const struct demo_item items[] = {
+    { (const uint8_t *)image_bag,    "GOLD",    sizeof(image_bag) / sizeof(image_bag[0]),    0 },
+    { (const uint8_t *)image_coin,   "EMERALD", sizeof(image_coin) / sizeof(image_coin[0]),  COIN_Y_OFFSET },
+    { (const uint8_t *)image_cherry, "BONUS",   sizeof(image_cherry) / sizeof(image_cherry[0]), 0 },
+};
+
+constexpr uint8_t item_count = sizeof(items) / sizeof(items[0]); ///< Число статичных объектов демо
+
 /**
  * @brief Обработка общего состояния демо
+ *
+ * Все шагающие актёры проходят один и тот же таймлайн внутри своего окна
+ * walker_span тактов: 0 — появление у правого края, 1..185 — движение влево,
+ * 186 — разворот (у кого есть зеркало), 202 — подпись. Призы — окно item_span:
+ * 0 — показ спрайта, 16 — подпись. Табличный код на ~400 байт короче
+ * развёрнутого switch по каждому актёру.
  */
-void process_demo_state()
+static void process_demo_state()
 {
     constexpr uint16_t image_width = sizeof(image_nobbin[0][0]);
     constexpr uint16_t image_height = sizeof(image_nobbin[0]) / sizeof(image_nobbin[0][0]); // Высота спрайта Ноббина
     constexpr uint16_t y_space = 8;
+    constexpr uint16_t row_step = image_height + y_space; // Шаг строк таблицы демо
     constexpr uint16_t move_start_pos = SCREEN_BYTE_WIDTH - 6;
 
-    constexpr uint16_t start_time = 0;
-    constexpr uint16_t start_delay = 128;
     constexpr uint16_t move_durance = 184;
     constexpr uint16_t end_to_print = 16;
-    constexpr uint16_t print_to_next = 128;
 
-    // Тайминги отображения Ноббина в демо
-    constexpr uint16_t nobbin_start_time = start_time + start_delay;
-    constexpr uint16_t nobbin_begin_time = nobbin_start_time + 1;
-    constexpr uint16_t nobbin_end_time = nobbin_begin_time + move_durance;
-    constexpr uint16_t nobbin_print_time = nobbin_end_time + end_to_print;
+    // Таймлайн шагающего актёра (смещения внутри его окна)
+    constexpr uint16_t walker_move_end = move_durance + 1;          // Конец движения
+    constexpr uint16_t walker_mirror = walker_move_end + 1;         // Разворот
+    constexpr uint16_t walker_print = walker_mirror + end_to_print; // Подпись
+    constexpr uint16_t walker_span = 330;                           // Окно актёра
+    constexpr uint16_t walkers_start = 128;                         // Старт первого актёра
 
-    // Тайминги отображения Хоббина в демо
-    constexpr uint16_t hobbin_start_time = nobbin_print_time + print_to_next;
-    constexpr uint16_t hobbin_begin_time = hobbin_start_time + 1;
-    constexpr uint16_t hobbin_end_time = hobbin_begin_time + move_durance;
-    constexpr uint16_t hobbin_mirror_time = hobbin_end_time + 1;
-    constexpr uint16_t hobbin_print_time = hobbin_mirror_time + end_to_print;
-
-    // Тайминги отображения Диггера в демо
-    constexpr uint16_t digger_start_time = hobbin_print_time + print_to_next;
-    constexpr uint16_t digger_begin_time = digger_start_time + 1;
-    constexpr uint16_t digger_end_time = digger_begin_time + move_durance;
-    constexpr uint16_t digger_mirror_time = digger_end_time + 1;
-    constexpr uint16_t digger_print_time = digger_mirror_time + end_to_print;
-
-    // Тайминги отображения мешка в демо
-    constexpr uint16_t bag_display_time = digger_print_time + move_durance;
-    constexpr uint16_t bag_print_time = bag_display_time + end_to_print;
-
-    // Тайминги отображения монеты в демо
-    constexpr uint16_t emerald_display_time = bag_print_time + move_durance;
-    constexpr uint16_t emerald_print_time = emerald_display_time + end_to_print;
-
-    // Тайминги отображения вишенки в демо
-    constexpr uint16_t cherry_display_time = emerald_print_time + move_durance;
-    constexpr uint16_t cherry_print_time = cherry_display_time + end_to_print;
+    // Таймлайн призов
+    constexpr uint16_t item_span = move_durance + end_to_print; // Окно приза
+    constexpr uint16_t items_start = walkers_start + (walker_count - 1) * walker_span + walker_print + move_durance;
 
     // Время до повтора демо
-    constexpr uint16_t demo_restart_time = cherry_print_time + 250;
+    constexpr uint16_t demo_restart_time = items_start + (item_count - 1) * item_span + end_to_print + 250;
 
-    switch (demo_time)
+    if (demo_time == 0)
     {
-        case start_time:
-        {
-            // Очистка области Demo
-            nobbin_x = hobbin_x = digger_x = 0;
-            constexpr uint16_t demo_height = table_height - (str_height + y_space * 2) * 2;
-            paint_brick(SCREEN_BYTE_WIDTH / 2 + 2, one_player_y, SCREEN_BYTE_WIDTH / 2 - 3, demo_height, 0);
-            break;
-        }
-
-        case nobbin_start_time:
-        {
-            nobbin_x = move_start_pos;
-            nobbin_y = one_player_y;
-            break;
-        }
-
-        case nobbin_begin_time ... nobbin_end_time:
-        {
-            if (!(demo_time & 7)) nobbin_x--;
-            break;
-        }
-
-        case nobbin_print_time:
-        {
-            const char nobbin_str[] = "NOBBIN";
-            print_str(nobbin_str, nobbin_x + image_width * 2 - 1, nobbin_y);
-            break;
-        }
-
-        case hobbin_start_time:
-        {
-            hobbin_mirror = true;
-            hobbin_x = move_start_pos;
-            hobbin_y = nobbin_y + image_height + y_space;
-            break;
-        }
-
-        case hobbin_begin_time ... hobbin_end_time:
-        {
-            if (!(demo_time & 7)) hobbin_x--;
-            break;
-        }
-
-        case hobbin_mirror_time:
-        {
-            hobbin_mirror = false;
-            break;
-        }
-
-        case hobbin_print_time:
-        {
-            const char hobbin_str[] = "HOBBIN";
-            print_str(hobbin_str, hobbin_x + image_width * 2 - 1, hobbin_y);
-            break;
-        }
-
-        case digger_start_time:
-        {
-            digger_mirror = true;
-            digger_x = move_start_pos;
-            digger_y = hobbin_y + image_height + y_space;
-            break;
-        }
-
-        case digger_begin_time ... digger_end_time:
-        {
-            if (!(demo_time & 7)) digger_x--;
-            break;
-        }
-
-        case digger_mirror_time:
-        {
-            digger_mirror = false;
-            break;
-        }
-
-        case digger_print_time:
-        {
-            const char digger_str[] = "DIGGER";
-            print_str(digger_str, digger_x + image_width * 2 - 1, digger_y);
-            break;
-        }
-
-        case bag_display_time:
-        {
-            bag_x = digger_x;
-            bag_y = digger_y + image_height + y_space;
-            sp_4_15_put(bag_x, bag_y, (uint8_t *)image_bag);
-            break;
-        }
-
-        case bag_print_time:
-        {
-            const char gold_str[] = "GOLD";
-            print_str(gold_str, bag_x + image_width * 2 - 1, bag_y);
-            break;
-        }
-
-        case emerald_display_time:
-        {
-            emerald_x = bag_x;
-            emerald_y = bag_y + image_height + y_space;
-            sp_put(emerald_x, emerald_y + COIN_Y_OFFSET, sizeof(image_coin[0]), sizeof(image_coin) / sizeof(image_coin[0]), (uint8_t *)image_coin, nullptr);
-            break;
-        }
-
-        case emerald_print_time:
-        {
-            const char emerald_str[] = "EMERALD";
-            print_str(emerald_str, emerald_x + image_width * 2 - 1, emerald_y);
-            break;
-        }
-
-        case cherry_display_time:
-        {
-            cherry_x = emerald_x;
-            cherry_y = emerald_y + image_height + y_space;
-            sp_4_15_put(cherry_x, cherry_y, (uint8_t *)image_cherry);
-            break;
-        }
-
-        case cherry_print_time:
-        {
-            const char bonus_str[] = "BONUS";
-            print_str(bonus_str, cherry_x + image_width * 2 - 1, cherry_y);
-            break;
-        }
+        // Очистка области Demo
+        nobbin_x = hobbin_x = digger_x = 0;
+        constexpr uint16_t demo_height = table_height - (str_height + y_space * 2) * 2;
+        paint_brick(SCREEN_BYTE_WIDTH / 2 + 2, one_player_y, SCREEN_BYTE_WIDTH / 2 - 3, demo_height, 0);
     }
 
-    if (nobbin_x)
+    // Шагающие актёры: t — смещение внутри окна очередного актёра.
+    // Для demo_time вне окон t уходит в большие значения (uint16) и не матчится.
+    uint16_t t = demo_time - walkers_start;
+    for (uint8_t i = 0; i < walker_count; i++, t -= walker_span)
     {
-        paint_brick(nobbin_x + image_width, nobbin_y, 1, image_height, 0);
-        sp_4_15_put(nobbin_x, nobbin_y, (uint8_t *)image_nobbin[image_phase]);
+        if (t >= walker_span) continue;
+        const struct demo_walker *w = &walkers[i];
+
+        if (t == 0)
+        {
+            *w->x = move_start_pos;
+            *w->y = one_player_y + i * row_step;
+            if (w->mirror) *w->mirror = true;
+        }
+        else if (t <= walker_move_end)
+        {
+            if (!(demo_time & 7)) (*w->x)--;
+        }
+        else if (t == walker_mirror)
+        {
+            if (w->mirror) *w->mirror = false;
+        }
+        else if (t == walker_print)
+        {
+            print_str(w->name, *w->x + image_width * 2 - 1, *w->y);
+        }
+        break;
     }
 
-    if (hobbin_x)
+    // Призы: появляются под Диггером со сдвигом в строку на каждый
+    t = demo_time - items_start;
+    for (uint8_t i = 0; i < item_count; i++, t -= item_span)
     {
-        paint_brick(hobbin_x + image_width, hobbin_y, 1, image_height, 0);
-        if (hobbin_mirror) sp_4_15_h_mirror_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_right[image_phase]);
-        else sp_4_15_put(hobbin_x, hobbin_y, (uint8_t *)image_hobbin_right[image_phase]);
+        if (t >= item_span) continue;
+        uint16_t item_y = digger_y + (i + 1) * row_step;
+
+        if (t == 0)
+        {
+            const struct demo_item *it = &items[i];
+            sp_put(digger_x, item_y + it->y_offset, image_width, it->height, it->image, nullptr);
+        }
+        else if (t == end_to_print)
+        {
+            print_str(items[i].name, digger_x + image_width * 2 - 1, item_y);
+        }
+        break;
     }
 
-    if (digger_x)
+    // Отрисовка шагающих актёров (пока x ненулевой — актёр на экране)
+    for (uint8_t i = 0; i < walker_count; i++)
     {
-        paint_brick(digger_x + image_width, digger_y, 1, image_height, 0);
-        if (digger_mirror) sp_4_15_h_mirror_put(digger_x, digger_y, (uint8_t *)image_digger_right[image_phase]);
-        else sp_4_15_put(digger_x, digger_y, (uint8_t *)image_digger_right[image_phase]);
+        const struct demo_walker *w = &walkers[i];
+        uint16_t x = *w->x;
+        if (!x) continue;
+
+        paint_brick(x + image_width, *w->y, 1, image_height, 0); // Подчистить след справа
+        if (w->mirror && *w->mirror) sp_4_15_h_mirror_put(x, *w->y, (const uint8_t *)w->frames[image_phase]);
+        else sp_4_15_put(x, *w->y, (const uint8_t *)w->frames[image_phase]);
     }
 
     if (!(demo_time & 7))
@@ -447,7 +384,7 @@ static uint16_t zx0_elias(uint8_t inverted)
  * @param src - указатель на сжатый поток ZX0
  * @param dst - указатель на буфер-приёмник; он же служит «историей» для ссылок по смещению
  */
-void zx0_decompress(const uint8_t *src, uint8_t *dst)
+static void zx0_decompress(const uint8_t *src, uint8_t *dst)
 {
     uint16_t last_offset = 1;
     uint16_t length;
@@ -491,24 +428,6 @@ void zx0_decompress(const uint8_t *src, uint8_t *dst)
     }
 }
 
-// ── Кредиты в левой панели ──────────────────────────────────────────────
-// Текст выводится ШТАТНЫМ драйвером дисплея ПЗУ БК через EMT 024 (установка
-// курсора: столбец, строка) + EMT 016 (вывод символа) — БЕЗ прямого чтения
-// знакогенератора из ПЗУ. Так вывод не зависит от адреса шрифта (на клонах и
-// БК-0011М он лежит иначе) и использует документированный интерфейс монитора.
-//
-// В цветном режиме знакоместо 8x10 точек: 32 столбца (0..31) и строки по 10
-// растровых линий. Левая панель — столбцы 0..15 (разделитель — байт 32 =
-// столбец 16). Столбец 0 занят синей рамкой, поэтому текст центрируется по полю
-// столбцов 1..15. Каждая строка позиционируется EMT 024 и печатается посимвольно.
-//
-// Драйвер полностью перерисовывает знакоместо (фон+глиф), поэтому текст чисто
-// ложится поверх чёрной панели. Позиционируем КАЖДУЮ строку явно (EMT 024), не
-// давая курсору «сползти» за нижнюю строку и вызвать прокрутку экрана (рулон).
-//
-// Цветной режим (32 симв.), зелёный цвет и гашение курсора включаются в main()
-// ДО отрисовки. CREDITS_ROW0 (стартовая строка драйвера) проверяется на живом
-// БК: строка 0 = y=0 при штатном смещении развёртки (crt0 ставит 0330).
 #define CREDITS_ROW0   2  // Верхняя текстовая строка драйвера (подстройка на железе)
 #define CREDITS_MARGIN 1  // Левый столбец поля (столбец 0 занят синей рамкой)
 #define CREDITS_FIELD  15 // Ширина поля центрирования в знакоместах (столбцы 1..15)
@@ -532,7 +451,11 @@ static void print_credits()
         }
 
         EMT_24(CREDITS_MARGIN + (CREDITS_FIELD - len) / 2, row);
-        while (p < e) EMT_16(*p++);
+        // Строка передаётся драйверу одним EMT 020 до разделителя '\n'
+        // (сам '\n' тоже уходит драйверу — безвредно, EMT_24 выше
+        // репозиционирует каждую строку). Лимит длины 255 — страховка.
+        EMT_20_l(p, ((uint16_t)'\n' << 8) | 255);
+        p = e;
 
         if (*p == '\n') ++p; // Пропустить разделитель строк
         ++row;
@@ -688,6 +611,7 @@ void main()
 
     init_demo();    // Инициализация демо
     print_credits(); // Вывод кредитов в левую панель через EMT
+    print_str(version_str, version_str_x_pos, version_str_y_pos);
     for (;;)
     {
         process_demo_state(); // Обработка состояний демо
