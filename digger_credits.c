@@ -24,4 +24,4 @@ const char credits[] =
     "was converted\n"
     "to run on the\n"
     "Soviet computer\n"
-    RED "\xE2\xEB-0010" GREEN ".\n";
+    RED "\xE2\xEB 0010-01" GREEN ".\n";
