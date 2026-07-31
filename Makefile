@@ -8,6 +8,7 @@ OUT_FILE_1=${FILE_1}.out
 OUT_FILE_2=${FILE_2}.out
 OPT_FLAG=-Os -mlra
 XGCC=/home/prcoder/xgcc
+LIBGCC=$(shell pdp11-aout-gcc -m10 -m1801vm1 -msoft-float $(OPT_FLAG) -print-libgcc-file-name)
 GCC_FLAGS=-std=gnu23 -fomit-frame-pointer -msoft-float -fcprop-registers -fPIC -nostartfiles -nodefaultlibs -nostdlib -m10 -m1801vm1 $(OPT_FLAG) -I$(XGCC)/include -DVERSION=${VERSION} -DBUILD_DATE=${BUILD_DATE}
 GCC_ASM_FLAGS=-S -fverbose-asm
 AS_FLAGS=-mno-fpu -mlimited-eis -pic
@@ -59,10 +60,8 @@ credits-file-title: digger_credits.c
 crt0:
 	pdp11-aout-as ${AS_FLAGS} crt0.s -o crt0.o
 
-libs: memory.s mulhi3.s xorhi3.s dzx0.s sprites.c sprites_extra.c sound.c sound_pwm.c sound_vibrato.c tools.c
+libs: memory.s dzx0.s sprites.c sprites_extra.c sound.c sound_pwm.c sound_vibrato.c tools.c
 	pdp11-aout-as ${AS_FLAGS} memory.s -o memory.o
-	pdp11-aout-as ${AS_FLAGS} mulhi3.s -o mulhi3.o
-	pdp11-aout-as ${AS_FLAGS} xorhi3.s -o xorhi3.o
 	pdp11-aout-as ${AS_FLAGS} dzx0.s -o dzx0.o
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o sprites.o sprites.c
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o sprites_extra.o sprites_extra.c
@@ -70,13 +69,13 @@ libs: memory.s mulhi3.s xorhi3.s dzx0.s sprites.c sprites_extra.c sound.c sound_
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o sound_pwm.o sound_pwm.c
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o sound_vibrato.o sound_vibrato.c
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o tools.o tools.c
-	pdp11-aout-ar rcs libs.a memory.o sprites.o sprites_extra.o sound.o sound_pwm.o sound_vibrato.o tools.o mulhi3.o xorhi3.o dzx0.o
+	pdp11-aout-ar rcs libs.a memory.o sprites.o sprites_extra.o sound.o sound_pwm.o sound_vibrato.o tools.o dzx0.o
 
 digger-out-file: crt0 digger-main-file sprites-file short-font-file levels-file libs
-	pdp11-aout-ld -T a.out.ld -Map digger.map -o ${OUT_FILE_1} crt0.o digger_sprites.o digger_short_font.o digger_levels.o digger.o libs.a
+	pdp11-aout-ld -T a.out.ld -Map digger.map -o ${OUT_FILE_1} crt0.o digger_sprites.o digger_short_font.o digger_levels.o digger.o libs.a $(LIBGCC)
 
 title-out-file: crt0 title-main-file sprites-file-title full-font-file music-file-title cover-file-title credits-file-title libs
-	pdp11-aout-ld -T a.out.ld -Map title.map -o ${OUT_FILE_2} crt0.o digger_sprites_title.o digger_full_font.o digger_music_title.o digger_title.o digger_credits.o title.o libs.a
+	pdp11-aout-ld -T a.out.ld -Map title.map -o ${OUT_FILE_2} crt0.o digger_sprites_title.o digger_full_font.o digger_music_title.o digger_title.o digger_credits.o title.o libs.a $(LIBGCC)
 
 aout2bin: aout2bin.c
 	gcc aout2bin.c -o aout2bin

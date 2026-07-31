@@ -1,5 +1,5 @@
---- a/gcc/config/pdp11/pdp11.opt	2026-06-01 23:01:27.349759647 +0300
-+++ b/gcc/config/pdp11/pdp11.opt	2026-06-01 23:01:33.093368052 +0300
+--- a/gcc/config/pdp11/pdp11.opt
++++ b/gcc/config/pdp11/pdp11.opt
 @@ -30,6 +30,10 @@
  Target Mask(45)
  Generate code for an 11/45.
@@ -11,8 +11,8 @@
  mac0
  Target Mask(AC0)
  Return floating-point results in ac0 (fr0 in Unix assembler syntax).
---- a/gcc/config/pdp11/pdp11.h	2026-06-01 23:01:27.350777718 +0300
-+++ b/gcc/config/pdp11/pdp11.h	2026-06-01 23:01:39.430247468 +0300
+--- a/gcc/config/pdp11/pdp11.h
++++ b/gcc/config/pdp11/pdp11.h
 @@ -55,6 +55,11 @@
  #define TARGET_40_PLUS		(TARGET_40 || TARGET_45)
  #define TARGET_10		(! TARGET_40_PLUS)
@@ -25,9 +25,137 @@
  #define TARGET_UNIX_ASM_DEFAULT	0
  
  /* "Dialect" just distinguishes between standard DEC mnemonics, which
---- a/gcc/config/pdp11/pdp11.cc	2024-08-01 11:17:14.000000000 +0300
-+++ b/gcc/config/pdp11/pdp11.cc	2026-06-01 23:02:36.516161171 +0300
-@@ -2063,8 +2063,18 @@
+@@ -142,6 +147,17 @@
+    when given unaligned data.  */
+ #define STRICT_ALIGNMENT 1
+ 
++/* Named bit-fields force the structure to be aligned to the field's
++   declared type, not to the (often QImode) bit-field container.  This
++   is the PCC convention and matches what -fstrict-volatile-bitfields
++   requires of the destination memory: a struct containing
++   "volatile unsigned : N" must end up HImode-aligned so the
++   strict-volatile path in expmed.cc can keep the access at HImode and
++   route it through our insvhi pattern -- otherwise the alignment
++   check (MEM_ALIGN >= modesize) bails out and we silently get byte
++   stores to an MMIO register, which can misbehave.  */
++#define PCC_BITFIELD_TYPE_MATTERS true
++
+ /* "HW_DIVIDE" actually means 64 by 32 bit divide.  While some PDP11
+    models have hardware divide, it is for 32 by 16 bits only, so we
+    call this platform "no hardware divide".  */
+--- a/gcc/config/pdp11/pdp11-protos.h
++++ b/gcc/config/pdp11/pdp11-protos.h
+@@ -38,6 +38,7 @@
+ extern machine_mode pdp11_cc_mode (enum rtx_code, rtx, rtx);
+ extern bool pdp11_expand_shift (rtx *, rtx (*) (rtx, rtx, rtx),
+ 				rtx (*) (rtx, rtx, rtx));
++extern bool pdp11_try_shift_shortcut (rtx *, machine_mode, enum rtx_code);
+ extern const char * pdp11_assemble_shift (rtx *, machine_mode, int);
+ extern int pdp11_shift_length (rtx *, machine_mode, int, bool);
+ extern int pdp11_cmp_length (rtx *, int);
+--- a/gcc/config/pdp11/pdp11.cc
++++ b/gcc/config/pdp11/pdp11.cc
+@@ -1927,6 +1927,99 @@
+   return (unsigned) n < 4;
+ }
+ 
++/* Try to expand a HImode constant-count shift by 8..10 using SWAB as a
++   fast first step, followed by at most two single-bit shifts.  This
++   beats both the unrolled (one ASR/ASL per bit) and the loop forms on
++   a no-EIS PDP-11 because SWAB does the bulk byte-swap in one insn.
++
++   The shift-by-8 cores live in pdp11.md as ashlhi3_by8 / ashrhi3_by8
++   / lshrhi3_by8 -- single insns whose asm template is two-line, so the
++   middle-end cannot decompose them and (importantly) cannot DCE the
++   "high byte fill-in" away based on subreg-write semantics.
++
++   Cases handled (all in HImode, all with constant shift counts):
++     ASHIFT   N == 8..10:  ashlhi3_by8 [+ ashifthi_sc by N-8]
++     ASHIFTRT N == 8..10:  ashrhi3_by8 [+ ashiftrthi_sc by N-8]
++     LSHIFTRT N == 8:      lshrhi3_by8
++
++   Returns true if the shift was emitted, false to fall back to
++   pdp11_expand_shift's generic loop/unroll path.  */
++bool
++pdp11_try_shift_shortcut (rtx *operands, machine_mode mode, enum rtx_code code)
++{
++  if (mode != HImode)
++    return false;
++  if (!CONST_INT_P (operands[2]))
++    return false;
++
++  HOST_WIDE_INT n = INTVAL (operands[2]);
++  if (n < 8)
++    return false;
++
++  /* Shift by 15 is the "extract sign" idiom -- emit it as a branched
++     CLR + TST + BGE + DEC/INC sequence instead of a 15-iteration loop.
++     Same size at -Os but ~15x faster.  */
++  if (n == 15 && (code == ASHIFTRT || code == LSHIFTRT))
++    {
++      rtx dst = REG_P (operands[0]) ? operands[0] : gen_reg_rtx (HImode);
++      if (code == ASHIFTRT)
++	emit_insn (gen_ashrhi3_by_15 (dst, operands[1]));
++      else
++	emit_insn (gen_lshrhi3_by_15 (dst, operands[1]));
++      if (dst != operands[0])
++	emit_move_insn (operands[0], dst);
++      return true;
++    }
++
++  /* Choose the cutoff per opcode to keep the unrolled form no larger
++     than the loop at -Os while still being faster at runtime.  */
++  HOST_WIDE_INT cutoff;
++  switch (code)
++    {
++    case ASHIFT:
++    case ASHIFTRT:
++      cutoff = 10;
++      break;
++    case LSHIFTRT:
++      cutoff = 8;
++      break;
++    default:
++      return false;
++    }
++  if (n > cutoff)
++    return false;
++
++  HOST_WIDE_INT rest = n - 8;
++  rtx tmp = (rest == 0 && REG_P (operands[0]))
++	    ? operands[0] : gen_reg_rtx (HImode);
++
++  switch (code)
++    {
++    case ASHIFT:
++      emit_insn (gen_ashlhi3_by8 (tmp, operands[1]));
++      if (rest > 0)
++	emit_insn (gen_ashifthi_sc (tmp, tmp, GEN_INT (rest)));
++      break;
++
++    case ASHIFTRT:
++      emit_insn (gen_ashrhi3_by8 (tmp, operands[1]));
++      if (rest > 0)
++	emit_insn (gen_ashiftrthi_sc (tmp, tmp, GEN_INT (rest)));
++      break;
++
++    case LSHIFTRT:
++      emit_insn (gen_lshrhi3_by8 (tmp, operands[1]));
++      break;
++
++    default:
++      gcc_unreachable ();
++    }
++
++  if (tmp != operands[0])
++    emit_move_insn (operands[0], tmp);
++  return true;
++}
++
+ /* Expand a shift insn.  Returns true if the expansion was done,
+    false if it needs to be handled by the caller.  */
+ bool
+@@ -2063,8 +2156,18 @@
    if (!small)
      {
        /* Loop case, emit the count-down and branch if not done.  */
@@ -48,7 +176,7 @@
      }
    return "";
  }
-@@ -2084,12 +2094,12 @@
+@@ -2084,12 +2187,12 @@
      shift_size *= 2;
  
    /* If shifting by a small constant, the loop is unrolled by the
@@ -64,9 +192,53 @@
  
    /* Logical right shift takes one more instruction (CLC).  */
    if (code == LSHIFTRT)
---- a/gcc/config/pdp11/pdp11.md	2024-08-01 11:17:14.000000000 +0300
-+++ b/gcc/config/pdp11/pdp11.md	2026-06-01 23:02:20.801460207 +0300
-@@ -333,7 +333,7 @@
+@@ -2306,6 +2409,18 @@
+       targetm.asm_out.open_paren  = "<";
+       targetm.asm_out.close_paren = ">";
+     }
++
++  /* The primary use-case for this tree is bare-metal code talking to
++     BK-0010 / KP1801VM1 MMIO registers, where a "volatile unsigned int
++     : N" field must be accessed in the declared (HImode) width or the
++     hardware may misbehave -- some registers latch on the write edge
++     of a full word, others are read-only / write-only and reject byte
++     access entirely.  Default to -fstrict-volatile-bitfields so the
++     middle-end never decomposes a volatile bit-field write into two
++     byte stores.  Users who really want the byte-narrowing behaviour
++     can still pass -fno-strict-volatile-bitfields.  */
++  if (flag_strict_volatile_bitfields < 0)
++    flag_strict_volatile_bitfields = 1;
+ }
+ 
+ static void
+--- a/gcc/config/pdp11/pdp11.md
++++ b/gcc/config/pdp11/pdp11.md
+@@ -246,6 +246,24 @@
+    cmp<PDPint:isfx>\t%0,%1"
+   [(set_attr "length" "2,2,4,4,4,6")])
+ 
++;; Bit test: BIT computes (src & dst) for the condition codes only,
++;; without writing back.  Used by combine to fold the canonical
++;; "tmp = x & MASK; if (tmp ?? 0)" sequence -- which on PDP-11 would
++;; otherwise be COM + BIC + TST (because AND is implemented via BIC)
++;; -- into a single BIT instruction.  Also covers branch-on-bit and
++;; the (x & mask) test patterns that arise from MMIO/flags code.
++;; BIT sets N and Z from the result and clears V; C is unchanged.
++;; That matches CCNZ mode (only N and Z are meaningful).
++(define_insn "*bit<mode>"
++  [(set (reg:CCNZ CC_REGNUM)
++	(compare:CCNZ (and:PDPint
++		         (match_operand:PDPint 0 "general_operand" "rR,rR,Q,Qi")
++		         (match_operand:PDPint 1 "general_operand" "rR,Qi,rR,Qi"))
++		      (const_int 0)))]
++  ""
++  "bit<PDPint:isfx>\t%0,%1"
++  [(set_attr "length" "2,4,4,6")])
++
+ ;; Two word compare
+ (define_insn "cmpsi"
+   [(set (reg:CC CC_REGNUM)
+@@ -333,7 +351,7 @@
  	      (set (match_dup 0)
  		   (plus:HI (match_dup 0)
  			 (const_int -1)))])]
@@ -75,7 +247,7 @@
    "{
      if (GET_MODE (operands[0]) != HImode)
        FAIL;
-@@ -351,7 +351,7 @@
+@@ -351,7 +369,7 @@
     (set (match_dup 0)
  	(plus:HI (match_dup 0)
  		 (const_int -1)))]
@@ -84,7 +256,7 @@
    "#"
    "&& reload_completed"
    [(parallel [(set (pc)
-@@ -380,7 +380,7 @@
+@@ -380,7 +398,7 @@
  	(plus:HI (match_dup 0)
  	      (const_int -1)))
     (clobber (reg:CC CC_REGNUM))]
@@ -93,7 +265,41 @@
    "*
  {
   rtx lb[1];
-@@ -746,7 +746,7 @@
+@@ -434,6 +452,33 @@
+ 		      (pc)))]
+   "")
+ 
++;; cbranch on (X & Y) == 0 / != 0 -- combine produces this form after
++;; folding "tmp = X & MASK; if (tmp) ..." through PDP-11's BIC-shaped
++;; AND.  Splits into BIT + cond_branch instead of BIC + cond_branch,
++;; saving the redundant write-back and (for variable masks) the COM
++;; that BIC would otherwise need.
++(define_insn_and_split "*cbranch_bit<mode>"
++  [(set (pc)
++	(if_then_else (match_operator 0 "ccnz_operator"
++		       [(and:PDPint
++			   (match_operand:PDPint 1 "general_operand" "g")
++			   (match_operand:PDPint 2 "general_operand" "g"))
++			(const_int 0)])
++		      (label_ref (match_operand 3 "" ""))
++		      (pc)))]
++  ""
++  "#"
++  "reload_completed"
++  [(set (reg:CCNZ CC_REGNUM)
++	(compare:CCNZ (and:PDPint (match_dup 1) (match_dup 2))
++		      (const_int 0)))
++   (set (pc)
++	(if_then_else (match_op_dup 0
++		       [(reg:CCNZ CC_REGNUM) (const_int 0)])
++		      (label_ref (match_dup 3))
++		      (pc)))]
++  "")
++
+ (define_insn_and_split "cbranch<mode>4"
+   [(set (pc)
+ 	(if_then_else (match_operator 0 "ordered_comparison_operator"
+@@ -746,7 +791,7 @@
      output_asm_insn (\"mov\t(%1)+,(%0)+\", operands);
    else
      output_asm_insn (\"movb\t(%1)+,(%0)+\", operands);
@@ -102,7 +308,7 @@
      output_asm_insn (\"sob\t%0,%l1\", lb);
    else
      {
-@@ -756,7 +756,7 @@
+@@ -756,7 +801,7 @@
    return \"\";
  }"
    [(set (attr "length")
@@ -111,7 +317,7 @@
  		      (const_int 4)
  		      (const_int 6)))])
  
-@@ -1541,7 +1541,7 @@
+@@ -1541,7 +1586,7 @@
    [(set (match_operand:HI 0 "nonimmediate_operand" "=rR,Q")
  	(xor:HI (match_operand:HI 1 "general_operand" "%0,0")
  		(match_operand:HI 2 "register_operand" "r,r")))]
@@ -120,7 +326,7 @@
    "#"
    "&& reload_completed"
    [(parallel [(set (match_dup 0)
-@@ -1555,7 +1555,7 @@
+@@ -1555,7 +1600,7 @@
  	(xor:HI (match_operand:HI 1 "general_operand" "%0,0")
  	     (match_operand:HI 2 "register_operand" "r,r")))
     (clobber (reg:CC CC_REGNUM))]
@@ -129,3 +335,540 @@
    "xor\t%2,%0"
    [(set_attr "length" "2,4")])
  
+@@ -1581,6 +1626,166 @@
+   "com<PDPint:isfx>\t%0"
+   [(set_attr "length" "2,4")])
+ 
++;;- Bit-field insert and extract.
++;;
++;; The base PDP-11 (KP1801BM1 / BK-0010 target) has no EIS, so the
++;; generic bit-field lowering in expmed.cc -- which expresses every
++;; access as shifts plus masks -- unrolls into one ASL/ASR per bit (or
++;; a SOB loop).  But the PDP-11 already has BIC and BIS instructions
++;; that operate memory-to-memory in a single insn, plus SWAB and MOVB
++;; for the byte-aligned cases.  Here we recognize the common cases
++;; (constant field value for insv, byte-aligned cases for extv/extzv)
++;; and emit a BIC+BIS pair, a SWAB+BIC, or a MOVB directly.  Cases we
++;; cannot improve on FAIL back to the generic shift+mask lowering.
++
++(define_expand "insvhi"
++  [(set (zero_extract:HI (match_operand:HI 0 "nonimmediate_operand" "")
++			 (match_operand:SI 1 "const_int_operand" "")
++			 (match_operand:SI 2 "const_int_operand" ""))
++	(match_operand:HI 3 "general_operand" ""))]
++  ""
++{
++  HOST_WIDE_INT width = INTVAL (operands[1]);
++  HOST_WIDE_INT pos = INTVAL (operands[2]);
++  HOST_WIDE_INT field_mask, set_bits;
++
++  if (width <= 0 || pos < 0 || width + pos > 16)
++    FAIL;
++
++  /* If the field fits entirely within one byte of the HImode container,
++     FAIL so the middle-end narrows to QImode -- generic QImode lowering
++     then emits a single BICB/BISB pair on memory, which beats our
++     HImode load-modify-store sequence.
++     EXCEPTION: when the destination is a volatile MEM (i.e. an MMIO
++     register), the middle-end is required to keep the access at the
++     declared HImode width and cannot narrow.  Falling back there would
++     give us a generic shift+mask sequence (very long without EIS); so
++     for volatile destinations stay on the BIC+BIS path here.  */
++  if (pos / 8 == (pos + width - 1) / 8
++      && !(MEM_P (operands[0]) && MEM_VOLATILE_P (operands[0])))
++    FAIL;
++
++  /* Whole-word write is a plain move.  */
++  if (width == 16 && pos == 0)
++    {
++      emit_move_insn (operands[0], operands[3]);
++      DONE;
++    }
++
++  /* Only the constant-value case is a win on a no-EIS PDP-11; for a
++     variable value the position shift dominates and we cannot beat
++     the generic lowering.  */
++  if (!CONST_INT_P (operands[3]))
++    FAIL;
++
++  field_mask = (((HOST_WIDE_INT) 1 << width) - 1) << pos;
++  set_bits = ((INTVAL (operands[3]) & (((HOST_WIDE_INT) 1 << width) - 1))
++	      << pos);
++
++  /* If the new field bits are all 1s, BIS alone sets them, so the BIC
++     would be redundant.  */
++  if (set_bits != field_mask)
++    emit_insn (gen_andhi3 (operands[0],
++			   gen_int_mode (~field_mask, HImode),
++			   operands[0]));
++  if (set_bits != 0)
++    emit_insn (gen_iorhi3 (operands[0],
++			   operands[0],
++			   gen_int_mode (set_bits, HImode)));
++  DONE;
++})
++
++(define_expand "extzvhi"
++  [(set (match_operand:HI 0 "nonimmediate_operand" "")
++	(zero_extract:HI (match_operand:HI 1 "nonimmediate_operand" "")
++			 (match_operand:SI 2 "const_int_operand" "")
++			 (match_operand:SI 3 "const_int_operand" "")))]
++  ""
++{
++  HOST_WIDE_INT width = INTVAL (operands[2]);
++  HOST_WIDE_INT pos = INTVAL (operands[3]);
++  HOST_WIDE_INT mask;
++
++  if (width <= 0 || pos < 0 || width + pos > 16)
++    FAIL;
++
++  /* Whole-word extract is a move.  */
++  if (width == 16 && pos == 0)
++    {
++      emit_move_insn (operands[0], operands[1]);
++      DONE;
++    }
++
++  /* High-byte field: SWAB brings byte 1 into byte 0; then a BIC clears
++     the high half.  Two insns instead of eight ASR plus an AND.  */
++  if (pos == 8 && width <= 8)
++    {
++      rtx tmp = gen_reg_rtx (HImode);
++      mask = ((HOST_WIDE_INT) 1 << width) - 1;
++      emit_move_insn (tmp, operands[1]);
++      emit_insn (gen_bswaphi2 (tmp, tmp));
++      emit_insn (gen_andhi3 (operands[0],
++			     gen_int_mode (mask, HImode),
++			     tmp));
++      DONE;
++    }
++
++  FAIL;
++})
++
++(define_expand "extvhi"
++  [(set (match_operand:HI 0 "nonimmediate_operand" "")
++	(sign_extract:HI (match_operand:HI 1 "nonimmediate_operand" "")
++			 (match_operand:SI 2 "const_int_operand" "")
++			 (match_operand:SI 3 "const_int_operand" "")))]
++  ""
++{
++  HOST_WIDE_INT width = INTVAL (operands[2]);
++  HOST_WIDE_INT pos = INTVAL (operands[3]);
++
++  if (width <= 0 || pos < 0 || width + pos > 16)
++    FAIL;
++
++  /* Whole-word extract is a move.  */
++  if (width == 16 && pos == 0)
++    {
++      emit_move_insn (operands[0], operands[1]);
++      DONE;
++    }
++
++  /* Low-byte signed field: MOVB sign-extends QImode to HImode in one
++     instruction.  */
++  if (pos == 0 && width == 8)
++    {
++      rtx dst = operands[0];
++      bool need_copy = !register_operand (dst, HImode);
++      if (need_copy)
++	dst = gen_reg_rtx (HImode);
++      emit_insn (gen_extendqihi2 (dst, gen_lowpart (QImode, operands[1])));
++      if (need_copy)
++	emit_move_insn (operands[0], dst);
++      DONE;
++    }
++
++  /* High-byte signed field: SWAB then MOVB on the low half.  */
++  if (pos == 8 && width == 8)
++    {
++      rtx tmp = gen_reg_rtx (HImode);
++      rtx dst = operands[0];
++      bool need_copy = !register_operand (dst, HImode);
++      if (need_copy)
++	dst = gen_reg_rtx (HImode);
++      emit_move_insn (tmp, operands[1]);
++      emit_insn (gen_bswaphi2 (tmp, tmp));
++      emit_insn (gen_extendqihi2 (dst, gen_lowpart (QImode, tmp)));
++      if (need_copy)
++	emit_move_insn (operands[0], dst);
++      DONE;
++    }
++
++  FAIL;
++})
++
+ ;;- arithmetic shift instructions
+ ;;
+ ;; There is a fair amount of complexity here because with -m10
+@@ -1712,6 +1917,140 @@
+   [(set_attr "length" "2,4")
+    (set_attr "base_cost" "8")])
+ 
++;; SWAB-based shift-by-8 short-cuts.  Each emits a two-instruction
++;; sequence: SWAB does the bulk byte-swap (= shift by 8 with garbage in
++;; one byte), then a finisher cleans up the other byte.  These are
++;; modelled as single insns -- not as separate (set ... swab ...) /
++;; (set ... clrb ...) RTL -- so that DCE cannot delete the SWAB on the
++;; grounds that the CLRB/MOVB looks like it would clobber the whole
++;; register on its own.
++;;
++;; ASHIFT  by 8: SWAB then CLRB clears the low byte.
++;; ASHIFTRT by 8: SWAB then MOVB r,r sign-extends the (now-low) byte.
++;; LSHIFTRT by 8: SWAB then BIC clears the high half.
++
++(define_insn_and_split "ashlhi3_by8"
++  [(set (match_operand:HI 0 "register_operand" "=r")
++	(ashift:HI (match_operand:HI 1 "general_operand" "0")
++		   (const_int 8)))]
++  ""
++  "#"
++  "reload_completed"
++  [(parallel [(set (match_dup 0) (ashift:HI (match_dup 1) (const_int 8)))
++	      (clobber (reg:CC CC_REGNUM))])]
++  ""
++  [(set_attr "length" "4")])
++
++(define_insn "*ashlhi3_by8_cc"
++  [(set (match_operand:HI 0 "register_operand" "=r")
++	(ashift:HI (match_operand:HI 1 "general_operand" "0")
++		   (const_int 8)))
++   (clobber (reg:CC CC_REGNUM))]
++  "reload_completed"
++  "swab\t%0\;clrb\t%0"
++  [(set_attr "length" "4")])
++
++(define_insn_and_split "ashrhi3_by8"
++  [(set (match_operand:HI 0 "register_operand" "=r")
++	(ashiftrt:HI (match_operand:HI 1 "general_operand" "0")
++		     (const_int 8)))]
++  ""
++  "#"
++  "reload_completed"
++  [(parallel [(set (match_dup 0) (ashiftrt:HI (match_dup 1) (const_int 8)))
++	      (clobber (reg:CC CC_REGNUM))])]
++  ""
++  [(set_attr "length" "4")])
++
++(define_insn "*ashrhi3_by8_cc"
++  [(set (match_operand:HI 0 "register_operand" "=r")
++	(ashiftrt:HI (match_operand:HI 1 "general_operand" "0")
++		     (const_int 8)))
++   (clobber (reg:CC CC_REGNUM))]
++  "reload_completed"
++  "swab\t%0\;movb\t%0,%0"
++  [(set_attr "length" "4")])
++
++(define_insn_and_split "lshrhi3_by8"
++  [(set (match_operand:HI 0 "register_operand" "=r")
++	(lshiftrt:HI (match_operand:HI 1 "general_operand" "0")
++		     (const_int 8)))]
++  ""
++  "#"
++  "reload_completed"
++  [(parallel [(set (match_dup 0) (lshiftrt:HI (match_dup 1) (const_int 8)))
++	      (clobber (reg:CC CC_REGNUM))])]
++  ""
++  [(set_attr "length" "6")])
++
++(define_insn "*lshrhi3_by8_cc"
++  [(set (match_operand:HI 0 "register_operand" "=r")
++	(lshiftrt:HI (match_operand:HI 1 "general_operand" "0")
++		     (const_int 8)))
++   (clobber (reg:CC CC_REGNUM))]
++  "reload_completed"
++  "swab\t%0\;bic\t$0177400,%0"
++  [(set_attr "length" "6")])
++
++;; Shift-by-15 short-cuts.  KP1801VM1 lacks SXT (and EIS in general),
++;; so the upstream backend would emit a 15-iteration ASR/ROR loop.
++;; A branched "test sign, fill with 0 or +-1" sequence is 8 bytes
++;; (same as the loop) but executes in 3-4 cycles instead of ~62.
++;;
++;; ASHIFTRT  -> {x<0 ? -1 : 0}  via CLR + TST + BGE + DEC.
++;; LSHIFTRT  -> {x<0 ?  1 : 0}  via CLR + TST + BGE + INC.
++
++;; Operand 0 is earlyclobber ("=&r"): the asm template CLRs the destination
++;; %0 *before* it TSTs the source %1, so %0 and %1 must live in different
++;; registers.  Without "&" the allocator is free to tie them (it does, e.g.
++;; both -> r0), and then "clr r0" wipes the value before "tst r0" reads it --
++;; the branch always sees zero, so the result is unconditionally 0.  This is
++;; the root cause of the KP1801VM1 "comparison materialized as bool is always
++;; false" miscompile (e.g. (x != 0), (m == 0) via the (+-x) >> 15 idiom).
++(define_insn_and_split "ashrhi3_by_15"
++  [(set (match_operand:HI 0 "register_operand" "=&r,&r")
++	(ashiftrt:HI (match_operand:HI 1 "general_operand" "rR,Q")
++		     (const_int 15)))]
++  ""
++  "#"
++  "reload_completed"
++  [(parallel [(set (match_dup 0)
++		   (ashiftrt:HI (match_dup 1) (const_int 15)))
++	      (clobber (reg:CC CC_REGNUM))])]
++  ""
++  [(set_attr "length" "8,10")])
++
++(define_insn "*ashrhi3_by_15_cc"
++  [(set (match_operand:HI 0 "register_operand" "=&r,&r")
++	(ashiftrt:HI (match_operand:HI 1 "general_operand" "rR,Q")
++		     (const_int 15)))
++   (clobber (reg:CC CC_REGNUM))]
++  "reload_completed"
++  "clr\t%0\;tst\t%1\;bge\t.+4\;dec\t%0"
++  [(set_attr "length" "8,10")])
++
++(define_insn_and_split "lshrhi3_by_15"
++  [(set (match_operand:HI 0 "register_operand" "=&r,&r")
++	(lshiftrt:HI (match_operand:HI 1 "general_operand" "rR,Q")
++		     (const_int 15)))]
++  ""
++  "#"
++  "reload_completed"
++  [(parallel [(set (match_dup 0)
++		   (lshiftrt:HI (match_dup 1) (const_int 15)))
++	      (clobber (reg:CC CC_REGNUM))])]
++  ""
++  [(set_attr "length" "8,10")])
++
++(define_insn "*lshrhi3_by_15_cc"
++  [(set (match_operand:HI 0 "register_operand" "=&r,&r")
++	(lshiftrt:HI (match_operand:HI 1 "general_operand" "rR,Q")
++		     (const_int 15)))
++   (clobber (reg:CC CC_REGNUM))]
++  "reload_completed"
++  "clr\t%0\;tst\t%1\;bge\t.+4\;inc\t%0"
++  [(set_attr "length" "8,10")])
++
+ ;; Now the expanders that produce the insns defined above. 
+ (define_expand "ashl<mode>3"
+   [(match_operand:QHSint 0 "nonimmediate_operand" "")
+@@ -1722,6 +2061,10 @@
+ {
+   rtx r;
+ 
++  /* HImode constant shifts by 8..10 are best done as SWAB + tail.  */
++  if (pdp11_try_shift_shortcut (operands, <QHSint:mname>, ASHIFT))
++    DONE;
++
+   if (!pdp11_expand_shift (operands, gen_ashift<mode>_sc, gen_ashift<mode>_base))
+     {
+       if (<QHSint:e_mname> == E_QImode)
+@@ -1747,6 +2090,10 @@
+ {
+   rtx r;
+ 
++  /* HImode constant shifts by 8..10 are best done as SWAB + tail.  */
++  if (pdp11_try_shift_shortcut (operands, <QHSint:mname>, ASHIFTRT))
++    DONE;
++
+   if (!pdp11_expand_shift (operands, gen_ashiftrt<mode>_sc, gen_ashiftrt<mode>_base))
+     {
+       operands[2] = negate_rtx (HImode, operands[2]);
+@@ -1773,6 +2120,10 @@
+ {
+   rtx r, n;
+ 
++  /* HImode constant shift by 8 is best done as SWAB + BIC.  */
++  if (pdp11_try_shift_shortcut (operands, <QHSint:mname>, LSHIFTRT))
++    DONE;
++
+   if (!pdp11_expand_shift (operands, gen_lshiftrt<mode>_sc, gen_lshiftrt<mode>_base))
+     {
+       if (<QHSint:e_mname> == E_QImode)
+--- a/gcc/common/config/pdp11/pdp11-common.cc
++++ b/gcc/common/config/pdp11/pdp11-common.cc
+@@ -39,7 +39,8 @@
+   switch (code)
+     {
+     case OPT_m10:
+-      opts->x_target_flags &= ~(MASK_40 | MASK_45 | MASK_FPU | MASK_AC0 | MASK_SPLIT);
++      opts->x_target_flags &= ~(MASK_40 | MASK_45 | MASK_1801VM1
++				| MASK_FPU | MASK_AC0 | MASK_SPLIT);
+       return true;
+ 
+     case OPT_m40:
+@@ -85,8 +86,12 @@
+ }
+ 
+ #undef TARGET_DEFAULT_TARGET_FLAGS
++/* This tree targets the KP1801BM1 / BK-0010 -- a PDP-11/10-class core
++   that implements SOB and XOR but lacks EIS and FPU.  Default to that
++   CPU; upstream's MASK_FPU | MASK_45 default would silently emit ash /
++   ashc instructions that do not exist on this hardware.  */
+ #define TARGET_DEFAULT_TARGET_FLAGS \
+-  (MASK_FPU | MASK_45 | TARGET_UNIX_ASM_DEFAULT)
++  (MASK_1801VM1 | TARGET_UNIX_ASM_DEFAULT)
+ #undef TARGET_HANDLE_OPTION
+ #define TARGET_HANDLE_OPTION pdp11_handle_option
+ #undef TARGET_OPTION_INIT_STRUCT
+--- a/libgcc/config/pdp11/t-pdp11
++++ b/libgcc/config/pdp11/t-pdp11
+@@ -8,5 +8,12 @@
+ 	  $(srcdir)/memmove.c \
+ 	  $(srcdir)/memset.c
+ 
++# HImode multiply and signed division/remainder for CPUs without EIS
++# (e.g. -m10 / KP1801VM1): the backend emits __mulhi3 / __divhi3 / __modhi3
++# libcalls that generic libgcc does not supply.  (The unsigned __udivhi3 /
++# __umodhi3 / __udivmodhi4 come from udivhi3.c / udivmodhi4.c above.)
++LIB2ADD += $(srcdir)/config/pdp11/mulhi3.S \
++	   $(srcdir)/config/pdp11/divmodhi3.c
++
+ # Small machine, optimize for size
+ HOST_LIBGCC2_CFLAGS += -Os
+--- a/libgcc/config/pdp11/mulhi3.S
++++ b/libgcc/config/pdp11/mulhi3.S
+@@ -0,0 +1,68 @@
++/* 16-bit integer multiply for PDP-11 targets without the EIS MUL
++   instruction (e.g. -m10 / KP1801VM1).  On such CPUs GCC emits a
++   __mulhi3 libcall for any HImode multiply it cannot open-code, but the
++   generic libgcc does not provide one, so a bare link fails with
++   "undefined reference to __mulhi3".
++
++   This is written in assembly on purpose: a shift-and-add loop expressed
++   in C is recognised by the optimiser (at -Os, which libgcc uses) as a
++   multiplication and rewritten into a __mulhi3 call -- i.e. the routine
++   would recurse infinitely into itself.  Hand assembly is immune to that
++   idiom recognition (the same reason libgcc's mem* and other primitives
++   are, or are built, this way).
++
++   ABI: arguments and result are HImode.  The product's low 16 bits are
++   identical for signed and unsigned operands, so this single routine
++   serves both the smul and umul optabs.  r0/r1 are call-clobbered
++   scratch; r2 is call-saved and therefore preserved.  Result in r0.
++
++Copyright (C) 2024 Free Software Foundation, Inc.
++
++This file is part of GCC.
++
++GCC is free software; you can redistribute it and/or modify it under
++the terms of the GNU General Public License as published by the Free
++Software Foundation; either version 3, or (at your option) any later
++version.
++
++GCC is distributed in the hope that it will be useful, but WITHOUT ANY
++WARRANTY; without even the implied warranty of MERCHANTABILITY or
++FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
++for more details.
++
++Under Section 7 of GPL version 3, you are granted additional
++permissions described in the GCC Runtime Library Exception, version
++3.1, as published by the Free Software Foundation.
++
++You should have received a copy of the GNU General Public License and
++a copy of the GCC Runtime Library Exception along with this program;
++see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
++<http://www.gnu.org/licenses/>.  */
++
++#define CONCAT1(a, b) CONCAT2(a, b)
++#define CONCAT2(a, b) a ## b
++#define SYM(x) CONCAT1(__USER_LABEL_PREFIX__, x)
++
++	.text
++	.even
++	.globl	SYM(__mulhi3)
++SYM(__mulhi3):
++	mov	r2, -(sp)	/* preserve call-saved r2                  */
++	clr	r2		/* r2 = accumulated product                */
++	mov	04(sp), r0	/* r0 = multiplier (first argument)        */
++	mov	06(sp), r1	/* r1 = multiplicand (second argument)     */
++	tst	r0
++	beq	2f		/* multiplier == 0 -> product 0            */
++1:
++	clc			/* shift multiplier right, LSB -> C        */
++	ror	r0
++	bcc	3f		/* that bit clear -> skip the add          */
++	add	r1, r2		/* bit set -> add the shifted multiplicand */
++3:
++	asl	r1		/* multiplicand <<= 1 for the next bit     */
++	tst	r0
++	bne	1b		/* more multiplier bits remain             */
++2:
++	mov	r2, r0		/* return product in r0                    */
++	mov	(sp)+, r2
++	rts	pc
+--- a/libgcc/config/pdp11/divmodhi3.c
++++ b/libgcc/config/pdp11/divmodhi3.c
+@@ -0,0 +1,81 @@
++/* Signed 16-bit division and remainder for PDP-11 targets without the
++   EIS DIV instruction (e.g. -m10 / KP1801VM1).  These mirror the SImode
++   __divsi3 / __modsi3 in libgcc's generic divmod.c, but for HImode and
++   built on __udivmodhi4, which pdp11's libgcc already provides
++   (via udivmodhi4.c in t-pdp11).  Without them a bare link fails with
++   "undefined reference to __divhi3 / __modhi3".
++
++Copyright (C) 2024 Free Software Foundation, Inc.
++
++This file is part of GCC.
++
++GCC is free software; you can redistribute it and/or modify it under
++the terms of the GNU General Public License as published by the Free
++Software Foundation; either version 3, or (at your option) any later
++version.
++
++GCC is distributed in the hope that it will be useful, but WITHOUT ANY
++WARRANTY; without even the implied warranty of MERCHANTABILITY or
++FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
++for more details.
++
++Under Section 7 of GPL version 3, you are granted additional
++permissions described in the GCC Runtime Library Exception, version
++3.1, as published by the Free Software Foundation.
++
++You should have received a copy of the GNU General Public License and
++a copy of the GCC Runtime Library Exception along with this program;
++see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
++<http://www.gnu.org/licenses/>.  */
++
++extern unsigned short __udivmodhi4 (unsigned short num, unsigned short den,
++				    int modwanted);
++
++short
++__divhi3 (short a, short b)
++{
++  int neg = 0;
++  short res;
++
++  if (a < 0)
++    {
++      a = -a;
++      neg = !neg;
++    }
++
++  if (b < 0)
++    {
++      b = -b;
++      neg = !neg;
++    }
++
++  res = __udivmodhi4 (a, b, 0);
++
++  if (neg)
++    res = -res;
++
++  return res;
++}
++
++short
++__modhi3 (short a, short b)
++{
++  int neg = 0;
++  short res;
++
++  if (a < 0)
++    {
++      a = -a;
++      neg = 1;
++    }
++
++  if (b < 0)
++    b = -b;
++
++  res = __udivmodhi4 (a, b, 1);
++
++  if (neg)
++    res = -res;
++
++  return res;
++}
