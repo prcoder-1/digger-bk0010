@@ -241,17 +241,6 @@ static const uint8_t pop_notes[] = {
     7, 9, 10, 9, 10, 7, 9, 7, 9, 8, 7, 8, 6, 8, 20, 255
 };
 
-// Состояние проигрывателя фоновой музыки
-struct {
-    uint16_t pos;     /// Индекс текущей ноты в мелодии
-    uint16_t period;  /// Период текущей ноты (со сдвигом строя)
-    uint16_t pw;      /// Текущая ширина импульса (громкость)
-    uint16_t left;    /// Полупериодов осталось в текущей стадии огибающей
-    uint16_t eighth;  /// 1/8 длительности текущей ноты
-    uint8_t  stage;   /// 0=hold, 1..4=спад, 5=пауза; >=6 -> нужна новая нота
-    uint8_t  rest;    /// Текущая нота — пауза (звучит тишиной)
-} mus = { .pw = 1, .stage = 6 };
-
 struct {
     uint8_t  loose;               /// Флаг, означающий, что звук качающегося мешка включен
     uint16_t loose_snd_phase;     /// Фаза звука качающегося мешка
@@ -284,6 +273,17 @@ struct {
     uint8_t  life;                /// Счётчик 0..24 - звук получения дополнительной жизни
     uint8_t  done;                /// Флаг, означающий, что звук завершения уровня включен
 } snd;
+
+// Состояние проигрывателя фоновой музыки
+struct {
+    uint16_t pos;     /// Индекс текущей ноты в мелодии
+    uint16_t period;  /// Период текущей ноты (со сдвигом строя)
+    uint16_t pw;      /// Текущая ширина импульса (громкость)
+    uint16_t left;    /// Полупериодов осталось в текущей стадии огибающей
+    uint16_t eighth;  /// 1/8 длительности текущей ноты
+    uint8_t  stage;   /// 0=звук (полная громкость), 1=пауза; >=2 -> нужна новая нота
+    uint8_t  rest;    /// Текущая нота — пауза (звучит тишиной)
+} mus = { .pw = 1, .stage = 6 };
 
 #if defined(MINIMAP)
 /**
@@ -2493,27 +2493,20 @@ static void process_game_state()
     }
 }
 
-// Настроить длительность стадии mus.left и громкость mus.pw под текущую стадию mus.stage
+// Настроить длительность стадии mus.left и громкость mus.pw под текущую стадию mus.stage.
+// БЕЗ огибающей: нота звучит на ПОЛНОЙ громкости (pw = period) первые 7/8 длительности,
+// затем 1/8 — пауза (артикуляция между нотами).
 static void music_stage(void)
 {
-    uint16_t pw;
-    switch (mus.stage)
-    {
-        case 0:  mus.left = mus.eighth + mus.eighth + mus.eighth; pw = mus.period;      break; // hold 3/8
-        case 1:  mus.left = mus.eighth; pw = mus.period >> 1; break;
-        case 2:  mus.left = mus.eighth; pw = mus.period >> 2; break;
-        case 3:  mus.left = mus.eighth; pw = mus.period >> 3; break;
-        case 4:  mus.left = mus.eighth; pw = mus.period >> 4; break;
-        default: mus.left = mus.eighth; pw = 1;             break; // 5 = пауза (почти тишина)
-    }
-    mus.pw = (mus.rest || pw == 0) ? 1 : pw;
+    if (mus.stage == 0) { mus.left = (mus.eighth << 3) - mus.eighth; mus.pw = mus.rest ? 1 : mus.period; } // звук 7/8
+    else                { mus.left = mus.eighth;                     mus.pw = 1; }                          // пауза 1/8
 }
 
 // Проиграть ОДИН кусочек текущей ноты; на границе ноты — перейти к следующей.
 // Вызывается несколько раз за кадр в свободное время.
 void music_tick(void)
 {
-    if (mus.stage >= 6) // текущая нота доиграна -> взять следующую
+    if (mus.stage >= 2) // текущая нота доиграна -> взять следующую
     {
         uint8_t n = pop_notes[mus.pos];
         if (++mus.pos >= sizeof(pop_notes)) mus.pos = 0;
@@ -2538,7 +2531,7 @@ void music_tick(void)
     if (mus.left == 0) // стадия закончилась -> следующая стадия (или конец ноты)
     {
         ++mus.stage;
-        if (mus.stage < 6) music_stage();
+        if (mus.stage < 2) music_stage();
     }
 }
 
