@@ -214,40 +214,20 @@ uint8_t broke_max; // Время через которое исчезнет ра
 
 // Переменные отвечающие за вывод звуков.
 uint16_t snd_effects = 1;    /// Флаг, показывающий, что звуковые эффекты включены
-
-// Фоновая музыка «Popcorn» — та же полная мелодия, что и на заставке
-// (popcorn_periods в digger_music_title.c), с паузами по фразам. Воспроизводится
-// с амплитудной огибающей и длительностью/темпом нот как на заставке. Хранится
-// компактно: pop_notes[] — индексы нот (255 = пауза) в pop_period/pop_durance.
-//
-// Проблема: нота нужной (заставочной) длины (~260 мс) длиннее кадра (~90 мс) и,
-// сыгранная целиком, растянула бы кадр. Поэтому нота играется ПО КУСОЧКАМ
-// (chunk по MUSIC_CHUNK полупериодов): за кадр в свободное время проигрывается
-// столько кусочков, сколько влезает (гейт по кадровому таймеру), а огибающая
-// разворачивается через кадры. Нота звучит долго и непрерывно, кадр не тормозится.
-// Темп задаётся длиной ноты (POP_REF — как REF_P=200 на заставке).
-uint16_t music_on = 1;       /// Флаг, показывающий, что фоновая музыка включена
+uint16_t music_on = 0;       /// Флаг, показывающий, что фоновая музыка включена
 
 // Периоды нот мелодии (шкала sound_pwm, макросы из digger_music.h)
 static const uint16_t pop_period[] = { D4, C4, A3, F3, D3, E4, F4, A4, G4, B4, C5, AS3, D5 };
-// Длительности нот: реальное время ноты ≈ NE*POP_REF sob-тактов (durance ∝
-// 1/period); соотношение NE/NQ сохраняется. POP_REF задаёт ТЕМП фоновой музыки:
-// 200 = как на заставке (~3.8 нот/сек), 120 = быстрее (~5.8 нот/сек).
-// Меньше POP_REF -> быстрее.
-#define POP_REF 120u
-#define PDUR(p) ((uint16_t)((unsigned long)NE * POP_REF / (p)))
+constexpr uint16_t POP_REF=120u;
+#define PDUR(p) ((uint16_t)((uint16_t)NE * POP_REF / (p)))
 // Один кусочек ноты — MUSIC_CHUNK полупериодов. Ниже MUSIC_CHUNK_COUNTS отсчётов
 // кадра новый кусочек не начинаем — он гарантированно влезет и не переполнит кадр.
-#define MUSIC_CHUNK 6u
-#define MUSIC_CHUNK_COUNTS 120u
+constexpr uint16_t MUSIC_CHUNK=6u;
+constexpr uint16_t MUSIC_CHUNK_COUNTS=120u;
 static const uint16_t pop_durance[] = {
     PDUR(D4), PDUR(C4), PDUR(A3), PDUR(F3), PDUR(D3),
     PDUR(E4), PDUR(F4), PDUR(A4), PDUR(G4), PDUR(B4), PDUR(C5), PDUR(AS3), PDUR(D5)
 };
-// Мелодия Popcorn — полная версия С ЗАСТАВКИ (145 нот, popcorn_periods) с
-// паузами по фразам ([7][7][15]). Индекс ноты в pop_period/pop_durance: 0..12 —
-// обычная (NE) нота; +13 (13..25) — ДЛИННАЯ (NQ) нота, звучит вдвое дольше (как
-// на заставке — часть нот держится дольше); 255 = пауза. Всего 160 записей.
 static const uint8_t pop_notes[] = {
     0, 1, 0, 2, 3, 2, 17, 255, 0, 1, 0, 2, 3, 2, 17, 255,
     0, 5, 6, 5, 6, 0, 5, 0, 5, 1, 0, 1, 0, 11, 13, 255,
@@ -260,9 +240,7 @@ static const uint8_t pop_notes[] = {
     12, 10, 7, 6, 1, 6, 15, 255, 7, 8, 7, 6, 1, 6, 15, 255,
     7, 9, 10, 9, 10, 7, 9, 7, 9, 8, 7, 8, 6, 8, 20, 255
 };
-// Состояние инкрементального проигрывателя (огибающая по стадиям, как на заставке:
-// hold 3/8 на полной громкости, затем 4 ступени спада делением pw пополам, затем
-// 1/8 паузы). Нота длится 8*m_eighth полупериодов, играется кусочками через кадры.
+
 static uint16_t pop_pos = 0;     /// Индекс текущей ноты в мелодии
 static uint16_t m_period = 0;    /// Период текущей ноты (со сдвигом строя)
 static uint16_t m_pw = 1;        /// Текущая ширина импульса (громкость)
@@ -271,57 +249,6 @@ static uint16_t m_eighth = 0;    /// 1/8 длительности текущей
 static uint8_t  m_stage = 6;     /// 0=hold, 1..4=спад, 5=пауза; >=6 -> нужна новая нота
 static uint8_t  m_rest = 0;      /// Текущая нота — пауза (звучит тишиной)
 
-// Настроить длительность стадии m_left и громкость m_pw под текущую стадию m_stage
-static void music_stage(void)
-{
-    uint16_t pw;
-    switch (m_stage)
-    {
-        case 0:  m_left = m_eighth + m_eighth + m_eighth; pw = m_period;      break; // hold 3/8
-        case 1:  m_left = m_eighth; pw = m_period >> 1; break;
-        case 2:  m_left = m_eighth; pw = m_period >> 2; break;
-        case 3:  m_left = m_eighth; pw = m_period >> 3; break;
-        case 4:  m_left = m_eighth; pw = m_period >> 4; break;
-        default: m_left = m_eighth; pw = 1;             break; // 5 = пауза (почти тишина)
-    }
-    m_pw = (m_rest || pw == 0) ? 1 : pw;
-}
-
-// Начать мелодию Popcorn сначала
-void music_start(void) { pop_pos = 0; m_stage = 6; }
-
-// Проиграть ОДИН кусочек текущей ноты; на границе ноты — перейти к следующей.
-// Вызывается несколько раз за кадр в свободное время (см. главный цикл).
-void music_tick(void)
-{
-    if (m_stage >= 6) // текущая нота доиграна -> взять следующую
-    {
-        uint8_t n = pop_notes[pop_pos];
-        if (++pop_pos >= sizeof(pop_notes)) pop_pos = 0;
-        if (n == 255) { m_rest = 1; m_period = pop_period[0]; m_eighth = pop_durance[0] >> 3; }
-        else
-        {
-            m_rest = 0;
-            uint16_t dur;
-            if (n >= 13) { n -= 13; dur = pop_durance[n] << 1; } // длинная (NQ) нота — вдвое дольше
-            else dur = pop_durance[n];
-            uint16_t p = pop_period[n];
-            m_period = p + (p >> 5);
-            m_eighth = dur >> 3;
-        }
-        if (m_eighth == 0) m_eighth = 1;
-        m_stage = 0;
-        music_stage();
-    }
-    uint16_t chunk = (MUSIC_CHUNK > m_left) ? m_left : MUSIC_CHUNK;
-    if (chunk) sound_pwm(m_period, chunk, m_pw);
-    m_left -= chunk;
-    if (m_left == 0) // стадия закончилась -> следующая стадия (или конец ноты)
-    {
-        ++m_stage;
-        if (m_stage < 6) music_stage();
-    }
-}
 struct {
     uint8_t  loose;               /// Флаг, означающий, что звук качающегося мешка включен
     uint16_t loose_snd_phase;     /// Фаза звука качающегося мешка
@@ -685,6 +612,10 @@ static void init_level()
     }
 
     init_level_state();  // Инициализировать состояние уровня
+
+    // Инициализировать фоновую музыку
+    pop_pos = 0;
+    m_stage = 6;
 }
 
 /**
@@ -2559,6 +2490,55 @@ static void process_game_state()
     }
 }
 
+// Настроить длительность стадии m_left и громкость m_pw под текущую стадию m_stage
+static void music_stage(void)
+{
+    uint16_t pw;
+    switch (m_stage)
+    {
+        case 0:  m_left = m_eighth + m_eighth + m_eighth; pw = m_period;      break; // hold 3/8
+        case 1:  m_left = m_eighth; pw = m_period >> 1; break;
+        case 2:  m_left = m_eighth; pw = m_period >> 2; break;
+        case 3:  m_left = m_eighth; pw = m_period >> 3; break;
+        case 4:  m_left = m_eighth; pw = m_period >> 4; break;
+        default: m_left = m_eighth; pw = 1;             break; // 5 = пауза (почти тишина)
+    }
+    m_pw = (m_rest || pw == 0) ? 1 : pw;
+}
+
+// Проиграть ОДИН кусочек текущей ноты; на границе ноты — перейти к следующей.
+// Вызывается несколько раз за кадр в свободное время.
+void music_tick(void)
+{
+    if (m_stage >= 6) // текущая нота доиграна -> взять следующую
+    {
+        uint8_t n = pop_notes[pop_pos];
+        if (++pop_pos >= sizeof(pop_notes)) pop_pos = 0;
+        if (n == 255) { m_rest = 1; m_period = pop_period[0]; m_eighth = pop_durance[0] >> 3; }
+        else
+        {
+            m_rest = 0;
+            uint16_t dur;
+            if (n >= 13) { n -= 13; dur = pop_durance[n] << 1; } // длинная (NQ) нота — вдвое дольше
+            else dur = pop_durance[n];
+            uint16_t p = pop_period[n];
+            m_period = p + (p >> 5);
+            m_eighth = dur >> 3;
+        }
+        if (m_eighth == 0) m_eighth = 1;
+        m_stage = 0;
+        music_stage();
+    }
+    uint16_t chunk = (MUSIC_CHUNK > m_left) ? m_left : MUSIC_CHUNK;
+    if (chunk) sound_pwm(m_period, chunk, m_pw);
+    m_left -= chunk;
+    if (m_left == 0) // стадия закончилась -> следующая стадия (или конец ноты)
+    {
+        ++m_stage;
+        if (m_stage < 6) music_stage();
+    }
+}
+
 extern void start();
 
 /**
@@ -2587,9 +2567,7 @@ void main()
     constexpr uint16_t FPS = 11; // Частота обновления кадров
     *t_limit = 3000000 / 128 / 4 / FPS;
 
-    init_game(); // Начальная инициализация игры
-
-    music_start(); // Запустить фоновую музыку с начала темы
+    init_game(); // Начальная инициализация игры (init_level стартует музыку с начала)
 
     for (;;) // Основной бесконечный цикл игры
     {
@@ -2638,9 +2616,7 @@ void main()
         print_dec(*((volatile uint16_t *)REG_TVE_COUNT), 0, MAX_Y_POS + 2 * POS_Y_STEP);
 #endif
         // Фоновая музыка: свободное время кадра заполняем кусочками текущей ноты
-        // Popcorn. Огибающая длинной ноты разворачивается через кадры; ни один
-        // кусочек не переполняет кадр (гейт по таймеру), поэтому кадр не тормозится,
-        // а музыка звучит непрерывно с заставочными длиной/темпом нот.
+        // Popcorn. Огибающая длинной ноты разворачивается через кадры.
         volatile uint16_t *t_count = (volatile uint16_t *)REG_TVE_COUNT;
         while (music_on && *t_count > MUSIC_CHUNK_COUNTS && (tve_csr->reg & (1 << TVE_CSR_FL)) == 0)
             music_tick();
