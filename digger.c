@@ -241,13 +241,16 @@ static const uint8_t pop_notes[] = {
     7, 9, 10, 9, 10, 7, 9, 7, 9, 8, 7, 8, 6, 8, 20, 255
 };
 
-static uint16_t pop_pos = 0;     /// Индекс текущей ноты в мелодии
-static uint16_t m_period = 0;    /// Период текущей ноты (со сдвигом строя)
-static uint16_t m_pw = 1;        /// Текущая ширина импульса (громкость)
-static uint16_t m_left = 0;      /// Полупериодов осталось в текущей стадии огибающей
-static uint16_t m_eighth = 0;    /// 1/8 длительности текущей ноты
-static uint8_t  m_stage = 6;     /// 0=hold, 1..4=спад, 5=пауза; >=6 -> нужна новая нота
-static uint8_t  m_rest = 0;      /// Текущая нота — пауза (звучит тишиной)
+// Состояние проигрывателя фоновой музыки
+struct {
+    uint16_t pos;     /// Индекс текущей ноты в мелодии
+    uint16_t period;  /// Период текущей ноты (со сдвигом строя)
+    uint16_t pw;      /// Текущая ширина импульса (громкость)
+    uint16_t left;    /// Полупериодов осталось в текущей стадии огибающей
+    uint16_t eighth;  /// 1/8 длительности текущей ноты
+    uint8_t  stage;   /// 0=hold, 1..4=спад, 5=пауза; >=6 -> нужна новая нота
+    uint8_t  rest;    /// Текущая нота — пауза (звучит тишиной)
+} mus = { .pw = 1, .stage = 6 };
 
 struct {
     uint8_t  loose;               /// Флаг, означающий, что звук качающегося мешка включен
@@ -614,8 +617,8 @@ static void init_level()
     init_level_state();  // Инициализировать состояние уровня
 
     // Инициализировать фоновую музыку
-    pop_pos = 0;
-    m_stage = 6;
+    mus.pos = 0;
+    mus.stage = 6;
 }
 
 /**
@@ -2490,52 +2493,52 @@ static void process_game_state()
     }
 }
 
-// Настроить длительность стадии m_left и громкость m_pw под текущую стадию m_stage
+// Настроить длительность стадии mus.left и громкость mus.pw под текущую стадию mus.stage
 static void music_stage(void)
 {
     uint16_t pw;
-    switch (m_stage)
+    switch (mus.stage)
     {
-        case 0:  m_left = m_eighth + m_eighth + m_eighth; pw = m_period;      break; // hold 3/8
-        case 1:  m_left = m_eighth; pw = m_period >> 1; break;
-        case 2:  m_left = m_eighth; pw = m_period >> 2; break;
-        case 3:  m_left = m_eighth; pw = m_period >> 3; break;
-        case 4:  m_left = m_eighth; pw = m_period >> 4; break;
-        default: m_left = m_eighth; pw = 1;             break; // 5 = пауза (почти тишина)
+        case 0:  mus.left = mus.eighth + mus.eighth + mus.eighth; pw = mus.period;      break; // hold 3/8
+        case 1:  mus.left = mus.eighth; pw = mus.period >> 1; break;
+        case 2:  mus.left = mus.eighth; pw = mus.period >> 2; break;
+        case 3:  mus.left = mus.eighth; pw = mus.period >> 3; break;
+        case 4:  mus.left = mus.eighth; pw = mus.period >> 4; break;
+        default: mus.left = mus.eighth; pw = 1;             break; // 5 = пауза (почти тишина)
     }
-    m_pw = (m_rest || pw == 0) ? 1 : pw;
+    mus.pw = (mus.rest || pw == 0) ? 1 : pw;
 }
 
 // Проиграть ОДИН кусочек текущей ноты; на границе ноты — перейти к следующей.
 // Вызывается несколько раз за кадр в свободное время.
 void music_tick(void)
 {
-    if (m_stage >= 6) // текущая нота доиграна -> взять следующую
+    if (mus.stage >= 6) // текущая нота доиграна -> взять следующую
     {
-        uint8_t n = pop_notes[pop_pos];
-        if (++pop_pos >= sizeof(pop_notes)) pop_pos = 0;
-        if (n == 255) { m_rest = 1; m_period = pop_period[0]; m_eighth = pop_durance[0] >> 3; }
+        uint8_t n = pop_notes[mus.pos];
+        if (++mus.pos >= sizeof(pop_notes)) mus.pos = 0;
+        if (n == 255) { mus.rest = 1; mus.period = pop_period[0]; mus.eighth = pop_durance[0] >> 3; }
         else
         {
-            m_rest = 0;
+            mus.rest = 0;
             uint16_t dur;
             if (n >= 13) { n -= 13; dur = pop_durance[n] << 1; } // длинная (NQ) нота — вдвое дольше
             else dur = pop_durance[n];
             uint16_t p = pop_period[n];
-            m_period = p + (p >> 5);
-            m_eighth = dur >> 3;
+            mus.period = p + (p >> 5);
+            mus.eighth = dur >> 3;
         }
-        if (m_eighth == 0) m_eighth = 1;
-        m_stage = 0;
+        if (mus.eighth == 0) mus.eighth = 1;
+        mus.stage = 0;
         music_stage();
     }
-    uint16_t chunk = (MUSIC_CHUNK > m_left) ? m_left : MUSIC_CHUNK;
-    if (chunk) sound_pwm(m_period, chunk, m_pw);
-    m_left -= chunk;
-    if (m_left == 0) // стадия закончилась -> следующая стадия (или конец ноты)
+    uint16_t chunk = (MUSIC_CHUNK > mus.left) ? mus.left : MUSIC_CHUNK;
+    if (chunk) sound_pwm(mus.period, chunk, mus.pw);
+    mus.left -= chunk;
+    if (mus.left == 0) // стадия закончилась -> следующая стадия (или конец ноты)
     {
-        ++m_stage;
-        if (m_stage < 6) music_stage();
+        ++mus.stage;
+        if (mus.stage < 6) music_stage();
     }
 }
 
