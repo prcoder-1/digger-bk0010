@@ -278,12 +278,11 @@ struct {
 struct {
     uint16_t pos;     /// Индекс текущей ноты в мелодии
     uint16_t period;  /// Период текущей ноты (со сдвигом строя)
-    uint16_t pw;      /// Текущая ширина импульса (громкость)
-    uint16_t left;    /// Полупериодов осталось в текущей стадии огибающей
+    uint16_t pw;      /// Ширина импульса (громкость): period/4 — тон, 1 — тишина
+    uint16_t left;    /// Полупериодов осталось в текущей фазе (тон / пауза)
     uint16_t eighth;  /// 1/8 длительности текущей ноты
-    uint8_t  stage;   /// 0=звук (полная громкость), 1=пауза; >=2 -> нужна новая нота
-    uint8_t  rest;    /// Текущая нота — пауза (звучит тишиной)
-} mus = { .pw = 1, .stage = 6 };
+    uint8_t  stage;   /// 0 = фаза тона; иначе (пауза/сброс) при left==0 берётся новая нота
+} mus = { .stage = 1 };
 
 #if defined(MINIMAP)
 /**
@@ -502,7 +501,8 @@ static void init_level_state()
 
     // Фоновая музыка — с начала (при старте уровня и при возрождении после смерти Диггера)
     mus.pos = 0;
-    mus.stage = 2; // >=2 -> при следующем тике взять первую ноту мелодии
+    mus.stage = 1; // не 0 + left==0 -> при следующем тике берётся первая нота мелодии
+    mus.left = 0;
 }
 
 /**
@@ -2493,46 +2493,50 @@ static void process_game_state()
     }
 }
 
-// Настроить длительность стадии mus.left и громкость mus.pw под текущую стадию mus.stage.
-// БЕЗ огибающей: нота звучит на ПОЛНОЙ громкости (pw = period) первые 7/8 длительности,
-// затем 1/8 — пауза (артикуляция между нотами).
-static void music_stage(void)
-{
-    if (mus.stage == 0) { mus.left = (mus.eighth << 3) - mus.eighth; mus.pw = mus.rest ? 1 : mus.period; } // звук 7/8
-    else                { mus.left = mus.eighth;                     mus.pw = 1; }                          // пауза 1/8
-}
-
-// Проиграть ОДИН кусочек текущей ноты; на границе ноты — перейти к следующей.
-// Вызывается несколько раз за кадр в свободное время.
+// Проиграть ОДИН кусочек текущей ноты фоновой музыки; на границе фазы/ноты — перейти дальше.
+// Без огибающей: нота = тон на четверти громкости (pw = period/4) первые 7/8 длительности,
+// затем 1/8 — пауза (артикуляция). Вызывается многократно за кадр в свободное время;
+// горячий путь (без смены фазы) — только min, sound_pwm и вычитание.
 void music_tick(void)
 {
-    if (mus.stage >= 2) // текущая нота доиграна -> взять следующую
+    if (mus.left == 0) // текущая фаза доиграна
     {
-        uint8_t n = pop_notes[mus.pos];
-        if (++mus.pos >= sizeof(pop_notes)) mus.pos = 0;
-        if (n == 255) { mus.rest = 1; mus.period = pop_period[0]; mus.eighth = pop_durance[0] >> 3; }
-        else
+        if (mus.stage == 0) // отзвучал тон -> короткая пауза 1/8
         {
-            mus.rest = 0;
-            uint16_t dur;
-            if (n >= 13) { n -= 13; dur = pop_durance[n] << 1; } // длинная (NQ) нота — вдвое дольше
-            else dur = pop_durance[n];
-            uint16_t p = pop_period[n];
-            mus.period = p + (p >> 5);
-            mus.eighth = dur >> 3;
+            mus.stage = 1;
+            mus.left = mus.eighth;
+            mus.pw = 1;
         }
-        if (mus.eighth == 0) mus.eighth = 1;
-        mus.stage = 0;
-        music_stage();
+        else // пауза (или сброс) -> взять следующую ноту
+        {
+            uint8_t n = pop_notes[mus.pos];
+            if (++mus.pos >= sizeof(pop_notes)) mus.pos = 0;
+            uint16_t dur;
+            if (n == 255) // пауза-нота — тишина
+            {
+                dur = pop_durance[0];
+                mus.period = pop_period[0]; // безопасный ненулевой период (звучит тишиной, pw=1)
+                mus.pw = 1;
+            }
+            else
+            {
+                if (n >= 13) { n -= 13; dur = pop_durance[n] << 1; } // длинная (NQ) нота — вдвое дольше
+                else dur = pop_durance[n];
+                uint16_t p = pop_period[n];
+                p += p >> 5;     // период со сдвигом строя (+1/32)
+                mus.period = p;
+                mus.pw = p >> 5;
+            }
+            uint16_t eighth = dur >> 3;
+            if (eighth == 0) eighth = 1;
+            mus.eighth = eighth;
+            mus.left = (eighth << 3) - eighth; // тон 7/8 длительности
+            mus.stage = 0;
+        }
     }
-    uint16_t chunk = (MUSIC_CHUNK > mus.left) ? mus.left : MUSIC_CHUNK;
-    if (chunk) sound_pwm(mus.period, chunk, mus.pw);
+    uint16_t chunk = (MUSIC_CHUNK < mus.left) ? MUSIC_CHUNK : mus.left;
+    sound_pwm(mus.period, chunk, mus.pw);
     mus.left -= chunk;
-    if (mus.left == 0) // стадия закончилась -> следующая стадия (или конец ноты)
-    {
-        ++mus.stage;
-        if (mus.stage < 2) music_stage();
-    }
 }
 
 extern void start();
