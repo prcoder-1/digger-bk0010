@@ -39,6 +39,11 @@ constexpr uint8_t LOOSE_WAIT = 15; // Время с момента начала 
 
 constexpr uint16_t BONUS_LIFE_SCORE = 20000; // Количество очков для дополнительной жизни (счёт 16-битный, потолок 65535)
 
+constexpr uint16_t music_chunk = 6u; // Один кусочек ноты — music_chunk полупериодов.
+constexpr uint16_t music_chunk_counts = 120u; // Ниже music_chunk_counts отсчётов кадра новый кусочек не начинаем.
+constexpr uint16_t music_chunks_per_frame = 4u; // Максимум кусочков музыки за кадр.
+
+
 /**
  * @brief Перечисление типов врагов
  */
@@ -216,27 +221,20 @@ uint8_t broke_max; // Время через которое исчезнет ра
 uint16_t snd_effects = 1;    /// Флаг, показывающий, что звуковые эффекты включены
 uint16_t music_on = 0;       /// Флаг, показывающий, что фоновая музыка включена
 
-// Периоды нот мелодии (шкала sound_pwm, макросы из digger_music.h)
-static const uint16_t pop_period[] = { D4, C4, A3, F3, D3, E4, F4, A4, G4, B4, C5, AS3, D5 };
-constexpr uint16_t POP_REF=120u;
-#define PDUR(p) ((uint16_t)((uint16_t)NE * POP_REF / (p)))
-// Один кусочек ноты — MUSIC_CHUNK полупериодов. Ниже MUSIC_CHUNK_COUNTS отсчётов
-// кадра новый кусочек не начинаем — он гарантированно влезет и не переполнит кадр.
-constexpr uint16_t MUSIC_CHUNK=6u;
-constexpr uint16_t MUSIC_CHUNK_COUNTS=120u;
-// Максимум кусочков музыки за кадр. Кадр синхронизирован по таймеру (постоянная
-// длительность), а мелодия продвигается ровно на MUSIC_CHUNKS_PER_FRAME*MUSIC_CHUNK
-// полупериодов за кадр — значит темп постоянен и НЕ зависит от загрузки кадра.
-// Без этого лимита в простое (нет врагов, Диггер стоит) свободного времени много
-// и музыка убегает вперёд; при движении и врагах на экране — замедляется.
-// Значение подобрано под самый загруженный кадр (столько кусочков он успевает) —
-// подстраивать на слух: больше = быстрее темп, меньше = медленнее.
-constexpr uint16_t MUSIC_CHUNKS_PER_FRAME=4u;
-static const uint16_t pop_durance[] = {
+constexpr uint16_t popcorn_ref = 120u;
+#define PDUR(p) ((uint16_t)((uint16_t)NE * popcorn_ref / (p)))
+
+// Периоды нот мелодии Popcorn
+static const uint16_t popcorn_period[] = { D4, C4, A3, F3, D3, E4, F4, A4, G4, B4, C5, AS3, D5 };
+
+// Длительности нот мелодии Popcorn
+static const uint16_t popcorn_durance[] = {
     PDUR(D4), PDUR(C4), PDUR(A3), PDUR(F3), PDUR(D3),
     PDUR(E4), PDUR(F4), PDUR(A4), PDUR(G4), PDUR(B4), PDUR(C5), PDUR(AS3), PDUR(D5)
 };
-static const uint8_t pop_notes[] = {
+
+// Индексы нот мелодии Popcorn
+static const uint8_t popcorn_notes[] = {
     0, 1, 0, 2, 3, 2, 17, 255, 0, 1, 0, 2, 3, 2, 17, 255,
     0, 5, 6, 5, 6, 0, 5, 0, 5, 1, 0, 1, 0, 11, 13, 255,
     0, 1, 0, 2, 3, 2, 17, 255, 0, 1, 0, 2, 3, 2, 17, 255,
@@ -507,9 +505,9 @@ static void init_level_state()
     snd.coin_note = -1;
     snd.coin_time = 0;
 
-    // Фоновая музыка — с начала (при старте уровня и при возрождении после смерти Диггера)
+    // Инициализация aоновой музыки
     mus.pos = 0;
-    mus.stage = 1; // не 0 + left==0 -> при следующем тике берётся первая нота мелодии
+    mus.stage = 1;
     mus.left = 0;
 }
 
@@ -2458,8 +2456,8 @@ static void process_game_state()
 
     if (man.state == CREATURE_RIP)
     {
-        game.lives--;                    // Уменьшить количество жизней
-        print_lives();              // Вывести количество жизней
+        game.lives--;  // Уменьшить количество жизней
+        print_lives(); // Вывести количество жизней
 
         if (game.lives > 0) // Проверить остались ли ещё жизни
         {
@@ -2491,7 +2489,7 @@ static void process_game_state()
 
             sp_put(go_x, go_y, go_width, go_height, (uint8_t *)game_over, 0); // Вывод написи Game Over
 
-             // Ожидание нажатия клавиши или кнопки джойстика
+            // Ожидание нажатия клавиши или кнопки джойстика
             while(((union EXT_DEV *)REG_EXT_DEV)->bits.MAG_KEY &&
                   !(*((uint16_t *)REG_PAR_INTERF) & ((1 << PAR_INTERF_LEFT_BUTTON) | (1 << PAR_INTERF_RIGHT_BUTTON))));
             (void)*(volatile uint8_t *)REG_KEY_DATA; // Очистка буфера клавиатуры
@@ -2501,37 +2499,37 @@ static void process_game_state()
     }
 }
 
-// Проиграть ОДИН кусочек текущей ноты фоновой музыки; на границе фазы/ноты — перейти дальше.
-// Без огибающей: нота = тон на четверти громкости (pw = period/4) первые 7/8 длительности,
-// затем 1/8 — пауза (артикуляция). Вызывается многократно за кадр в свободное время;
-// горячий путь (без смены фазы) — только min, sound_pwm и вычитание.
+// Проиграть ОДИН кусочек текущей ноты фоновой музыки
 void music_tick(void)
 {
     if (mus.left == 0) // текущая фаза доиграна
     {
-        if (mus.stage == 0) // отзвучал тон -> короткая пауза 1/8
+        if (mus.stage == 0)
         {
+            // Короткая пауза 1/8 длительности
             mus.stage = 1;
             mus.left = mus.eighth;
             mus.pw = 1;
         }
-        else // пауза (или сброс) -> взять следующую ноту
+        else
         {
-            uint8_t n = pop_notes[mus.pos];
-            if (++mus.pos >= sizeof(pop_notes)) mus.pos = 0;
+            // Следующая нота
+            uint8_t n = popcorn_notes[mus.pos];
+            if (++mus.pos >= sizeof(popcorn_notes)) mus.pos = 0;
             uint16_t dur;
-            if (n == 255) // пауза-нота — тишина
+            if (n == 255)
             {
-                dur = pop_durance[0];
-                mus.period = pop_period[0]; // безопасный ненулевой период (звучит тишиной, pw=1)
-                mus.pw = 1;
+                // Нота - пауза
+                dur = popcorn_durance[0];
+                mus.period = popcorn_period[0]; // <езопасный ненулевой период
+                mus.pw = 1; // Звучит тишиной, pw=1
             }
             else
             {
-                if (n >= 13) { n -= 13; dur = pop_durance[n] << 1; } // длинная (NQ) нота — вдвое дольше
-                else dur = pop_durance[n];
-                uint16_t p = pop_period[n];
-                p += p >> 5;     // период со сдвигом строя (+1/32)
+                if (n >= 13) { n -= 13; dur = popcorn_durance[n] << 1; } // длинная (NQ) нота — вдвое дольше
+                else dur = popcorn_durance[n];
+                uint16_t p = popcorn_period[n];
+                p += p >> 5;
                 mus.period = p;
                 mus.pw = p >> 5;
             }
@@ -2542,7 +2540,7 @@ void music_tick(void)
             mus.stage = 0;
         }
     }
-    uint16_t chunk = (MUSIC_CHUNK < mus.left) ? MUSIC_CHUNK : mus.left;
+    uint16_t chunk = (music_chunk < mus.left) ? music_chunk : mus.left;
     sound_pwm(mus.period, chunk, mus.pw);
     mus.left -= chunk;
 }
@@ -2554,10 +2552,6 @@ extern void start();
  */
 void main()
 {
-    // EMT_14();
-    // EMT_16(0233);
-    // EMT_16(0236);
-
     typedef void (*vector)();
     *((volatile vector *)VEC_STOP) = start; // Установить вектор клавиши "СТОП" на _start
 
@@ -2615,7 +2609,7 @@ void main()
         process_game_state();
 
 #if defined(MINIMAP)
-        draw_coin_minimap(); // Нарисовать мини-карту монеток
+        draw_coin_minimap(); // Нарисовать мини-карту монеток (камешков)
         draw_bg_minimap();   // Нарисовать мини-карту ячеек фона
 #endif
 
@@ -2623,13 +2617,12 @@ void main()
         // Распечатать оставшееся свободное время
         print_dec(*((volatile uint16_t *)REG_TVE_COUNT), 0, MAX_Y_POS + 2 * POS_Y_STEP);
 #endif
-        // Фоновая музыка: свободное время кадра заполняем кусочками текущей ноты
-        // Popcorn. Огибающая длинной ноты разворачивается через кадры.
+        // Фоновая музыка: свободное время кадра заполняем кусочками текущей ноты Popcorn.
         volatile uint16_t *t_count = (volatile uint16_t *)REG_TVE_COUNT;
         // Лимит кусочков за кадр держит темп постоянным: даже если свободного
         // времени вагон (простой), мелодия продвинется не больше положенного.
-        uint16_t music_budget = MUSIC_CHUNKS_PER_FRAME;
-        while (music_on && music_budget && *t_count > MUSIC_CHUNK_COUNTS && (tve_csr->reg & (1 << TVE_CSR_FL)) == 0)
+        uint16_t music_budget = music_chunks_per_frame;
+        while (music_on && music_budget && *t_count > music_chunk_counts && (tve_csr->reg & (1 << TVE_CSR_FL)) == 0)
         {
             music_tick();
             --music_budget;
