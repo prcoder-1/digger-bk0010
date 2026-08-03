@@ -224,6 +224,14 @@ constexpr uint16_t POP_REF=120u;
 // кадра новый кусочек не начинаем — он гарантированно влезет и не переполнит кадр.
 constexpr uint16_t MUSIC_CHUNK=6u;
 constexpr uint16_t MUSIC_CHUNK_COUNTS=120u;
+// Максимум кусочков музыки за кадр. Кадр синхронизирован по таймеру (постоянная
+// длительность), а мелодия продвигается ровно на MUSIC_CHUNKS_PER_FRAME*MUSIC_CHUNK
+// полупериодов за кадр — значит темп постоянен и НЕ зависит от загрузки кадра.
+// Без этого лимита в простое (нет врагов, Диггер стоит) свободного времени много
+// и музыка убегает вперёд; при движении и врагах на экране — замедляется.
+// Значение подобрано под самый загруженный кадр (столько кусочков он успевает) —
+// подстраивать на слух: больше = быстрее темп, меньше = медленнее.
+constexpr uint16_t MUSIC_CHUNKS_PER_FRAME=4u;
 static const uint16_t pop_durance[] = {
     PDUR(D4), PDUR(C4), PDUR(A3), PDUR(F3), PDUR(D3),
     PDUR(E4), PDUR(F4), PDUR(A4), PDUR(G4), PDUR(B4), PDUR(C5), PDUR(AS3), PDUR(D5)
@@ -2618,8 +2626,14 @@ void main()
         // Фоновая музыка: свободное время кадра заполняем кусочками текущей ноты
         // Popcorn. Огибающая длинной ноты разворачивается через кадры.
         volatile uint16_t *t_count = (volatile uint16_t *)REG_TVE_COUNT;
-        while (music_on && *t_count > MUSIC_CHUNK_COUNTS && (tve_csr->reg & (1 << TVE_CSR_FL)) == 0)
+        // Лимит кусочков за кадр держит темп постоянным: даже если свободного
+        // времени вагон (простой), мелодия продвинется не больше положенного.
+        uint16_t music_budget = MUSIC_CHUNKS_PER_FRAME;
+        while (music_on && music_budget && *t_count > MUSIC_CHUNK_COUNTS && (tve_csr->reg & (1 << TVE_CSR_FL)) == 0)
+        {
             music_tick();
+            --music_budget;
+        }
         // Добрать оставшееся время до конца кадра.
         while ((tve_csr->reg & (1 << TVE_CSR_FL)) == 0);
     }
