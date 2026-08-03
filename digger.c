@@ -39,10 +39,9 @@ constexpr uint8_t LOOSE_WAIT = 15; // Время с момента начала 
 
 constexpr uint16_t BONUS_LIFE_SCORE = 20000; // Количество очков для дополнительной жизни (счёт 16-битный, потолок 65535)
 
-constexpr uint16_t music_chunk = 6u; // Один кусочек ноты — music_chunk полупериодов.
-constexpr uint16_t music_chunk_counts = 120u; // Ниже music_chunk_counts отсчётов кадра новый кусочек не начинаем.
+constexpr uint16_t music_chunk = 8u; // Один кусочек ноты — music_chunk полупериодов.
+constexpr uint16_t music_chunk_counts = 150u; // Ниже music_chunk_counts отсчётов кадра новый кусочек не начинаем.
 constexpr uint16_t music_chunks_per_frame = 4u; // Максимум кусочков музыки за кадр.
-
 
 /**
  * @brief Перечисление типов врагов
@@ -219,7 +218,7 @@ uint8_t broke_max; // Время через которое исчезнет ра
 
 // Переменные отвечающие за вывод звуков.
 uint16_t snd_effects = 1;    /// Флаг, показывающий, что звуковые эффекты включены
-uint16_t music_on = 0;       /// Флаг, показывающий, что фоновая музыка включена
+uint16_t music_on = 1;       /// Флаг, показывающий, что фоновая музыка включена
 
 constexpr uint16_t popcorn_ref = 120u;
 #define PDUR(p) ((uint16_t)((uint16_t)NE * popcorn_ref / (p)))
