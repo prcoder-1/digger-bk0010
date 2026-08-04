@@ -218,7 +218,7 @@ uint8_t broke_max; // Время через которое исчезнет ра
 
 // Переменные отвечающие за вывод звуков.
 uint16_t snd_effects = 1;    /// Флаг, показывающий, что звуковые эффекты включены
-uint16_t music_on = 1;       /// Флаг, показывающий, что фоновая музыка включена
+uint16_t music_on = 0;       /// Флаг, показывающий, что фоновая музыка включена
 
 constexpr uint16_t popcorn_ref = 120u;
 #define PDUR(p) ((uint16_t)((uint16_t)NE * popcorn_ref / (p)))
@@ -282,10 +282,10 @@ struct {
 // Состояние проигрывателя фоновой музыки
 struct {
     uint16_t pos;     /// Индекс текущей ноты в мелодии
-    uint16_t period;  /// Период текущей ноты (со сдвигом строя)
-    uint16_t pw;      /// Ширина импульса (громкость): period/4 — тон, 1 — тишина
+    uint16_t period;  /// Период текущей ноты
     uint16_t left;    /// Полупериодов осталось в текущей фазе (тон / пауза)
-    uint16_t eighth;  /// 1/8 длительности текущей ноты
+    uint16_t eighth;  /// 1/8 длительности ноты - пауза после тона (0 = паузы не будет)
+    uint8_t  silent;  /// Текущая фаза беззвучная (пауза между нотами или нота-пауза)
 } mus;
 
 #if defined(MINIMAP)
@@ -506,6 +506,7 @@ static void init_level_state()
     // Инициализация aоновой музыки
     mus.pos = 0;
     mus.left = 0;
+    mus.eighth = 0;
 }
 
 /**
@@ -1297,7 +1298,7 @@ static void sound_effect()
     {
         static const uint16_t coin_periods[] = { C5, D5, E5, F5, G5, A5, B5, C6 };
         uint16_t period = coin_periods[snd.coin_note & 7];
-        sound(period, 16); // короче — чтобы съедание камней не тормозило движение
+        sound(period, 16);
         snd.coin--;
     }
 
@@ -1321,7 +1322,7 @@ static void sound_effect()
         for (uint16_t i = 10; i != 0; --i)
         {
             explode_snd_period -= explode_snd_period >> 3;
-            sound(explode_snd_period, 16); // короче — меньше одноразовая заморозка кадра
+            sound(explode_snd_period, 16);
         }
     }
 
@@ -1360,14 +1361,14 @@ static void sound_effect()
             uint16_t period = (snd.money & 1) ? snd.money_period_2 : snd.money_period_1;
             snd.money_period_1 += snd.money_period_1 >> 4;
             snd.money_period_2 -= snd.money_period_2 >> 4;
-            sound(period, 14); // короче — 10-нотный всплеск меньше морозит кадр
+            sound(period, 14);
             snd.money--;
         }
     }
 
     if (snd.chase) // Звук включения бонус-режима
     {
-        uint16_t durance = 40; // короче — бонус-режим не тормозит игру каждый кадр
+        uint16_t durance = 40;
         snd.chase_flip = ~snd.chase_flip;
         if (snd.chase_flip) sound(1230 / N, durance);
         else sound(1513 / N, durance);
@@ -1397,7 +1398,7 @@ static void sound_effect()
                 if (c1_lb == 2) snd.bug_period_held = snd.bug_period - (snd.bug_period >> 4);
                 snd.bug_c1--;
                 snd.bug_period -= snd.bug_period >> 4;
-                sound(snd.bug_period_held / 16, 14); // короче — съедание врага меньше морозит
+                sound(snd.bug_period_held / 16, 14);
                 sounds--;
             }
             else
@@ -1415,7 +1416,7 @@ static void sound_effect()
 
     if (snd.life) // Звук получения жизни
     {
-        sound(14 + snd.life, 22); // короче — меньше заморозка при получении жизни
+        sound(14 + snd.life, 22);
         snd.life -= 2;
     }
 }
@@ -1641,11 +1642,6 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                                 bag->state = BAG_FALLING; // Начать падение мешка
                                 bag->dir = DIR_DOWN;      // Направление движения мешка вниз
                                 bag->count = 0;           // Сбросить счётчик этажей
-                                // Звук падения (и инициализацию fall_period) включает проверка
-                                // bags_fall ниже. Ставить snd.fall=1 здесь нельзя: при падении
-                                // двух мешков подряд это обходит инициализацию fall_period, и
-                                // sound(0) крутит 65536 итераций -> зависание со щелчками.
-
                                 break;
                             }
                         }
@@ -2496,40 +2492,47 @@ static void process_game_state()
     }
 }
 
-// Проиграть ОДИН кусочек текущей ноты фоновой музыки
+// Проиграть один кусочек текущей ноты фоновой музыки
 void music_tick(void)
 {
     if (mus.left == 0) // текущая фаза доиграна
     {
-        // Следующая нота
-        uint8_t n = popcorn_notes[mus.pos];
-        if (++mus.pos >= sizeof(popcorn_notes)) mus.pos = 0;
-
-        uint16_t dur;
-        if (n == 255)
+        if (mus.eighth) // тон доиграл - пауза 1/8 длительности перед следующей нотой
         {
-            // Нота - пауза
-            dur = PDUR(D4);
-            mus.period = D4; // Безопасный ненулевой период
-            mus.pw = 1;
+            mus.left = mus.eighth;
+            mus.eighth = 0;
+            mus.silent = 1;
         }
         else
         {
-            if (n >= 13) { n -= 13; dur = popcorn_durance[n] << 1; } // длинная (NQ) нота — вдвое дольше
-            else dur = popcorn_durance[n];
-            uint16_t p = popcorn_period[n];
-            mus.period = p;
-            mus.pw = p;
-        }
+            // Следующая нота
+            uint8_t n = popcorn_notes[mus.pos];
+            if (++mus.pos >= sizeof(popcorn_notes)) mus.pos = 0;
 
-        uint16_t eighth = dur >> 3;
-        if (eighth == 0) eighth = 1;
-        mus.eighth = eighth;
-        mus.left = (eighth << 3) - eighth; // тон 7/8 длительности
+            if (n == REST)
+            {
+                // Нота-пауза: звучит всю свою длительность тишиной, доп. паузы после неё нет
+                mus.left = popcorn_durance[0];
+                mus.silent = 1;
+            }
+            else
+            {
+                uint16_t dur;
+                if (n >= 13) { n -= 13; dur = popcorn_durance[n] << 1; } // длинная (NQ) нота — вдвое дольше
+                else dur = popcorn_durance[n];
+                mus.period = popcorn_period[n];
+
+                uint16_t eighth = dur >> 3;
+                if (eighth == 0) eighth = 1;
+                mus.eighth = eighth;               // пауза 1/8 после тона
+                mus.left = (eighth << 3) - eighth; // тон 7/8 длительности
+                mus.silent = 0;
+            }
+        }
     }
 
     uint16_t chunk = (music_chunk < mus.left) ? music_chunk : mus.left;
-    sound_pwm(mus.period, chunk, mus.pw);
+    if (!mus.silent) sound_pwm(mus.period, chunk, 1);
     mus.left -= chunk;
 }
 
