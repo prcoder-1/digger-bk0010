@@ -286,8 +286,7 @@ struct {
     uint16_t pw;      /// Ширина импульса (громкость): period/4 — тон, 1 — тишина
     uint16_t left;    /// Полупериодов осталось в текущей фазе (тон / пауза)
     uint16_t eighth;  /// 1/8 длительности текущей ноты
-    uint8_t  stage;   /// 0 = фаза тона; иначе (пауза/сброс) при left==0 берётся новая нота
-} mus = { .stage = 1 };
+} mus;
 
 #if defined(MINIMAP)
 /**
@@ -506,7 +505,6 @@ static void init_level_state()
 
     // Инициализация aоновой музыки
     mus.pos = 0;
-    mus.stage = 1;
     mus.left = 0;
 }
 
@@ -2503,42 +2501,33 @@ void music_tick(void)
 {
     if (mus.left == 0) // текущая фаза доиграна
     {
-        if (mus.stage == 0)
+        // Следующая нота
+        uint8_t n = popcorn_notes[mus.pos];
+        if (++mus.pos >= sizeof(popcorn_notes)) mus.pos = 0;
+
+        uint16_t dur;
+        if (n == 255)
         {
-            // Короткая пауза 1/8 длительности
-            mus.stage = 1;
-            mus.left = mus.eighth;
+            // Нота - пауза
+            dur = PDUR(D4);
+            mus.period = D4; // Безопасный ненулевой период
             mus.pw = 1;
         }
         else
         {
-            // Следующая нота
-            uint8_t n = popcorn_notes[mus.pos];
-            if (++mus.pos >= sizeof(popcorn_notes)) mus.pos = 0;
-            uint16_t dur;
-            if (n == 255)
-            {
-                // Нота - пауза
-                dur = popcorn_durance[0];
-                mus.period = popcorn_period[0]; // <езопасный ненулевой период
-                mus.pw = 1; // Звучит тишиной, pw=1
-            }
-            else
-            {
-                if (n >= 13) { n -= 13; dur = popcorn_durance[n] << 1; } // длинная (NQ) нота — вдвое дольше
-                else dur = popcorn_durance[n];
-                uint16_t p = popcorn_period[n];
-                p += p >> 5;
-                mus.period = p;
-                mus.pw = p >> 5;
-            }
-            uint16_t eighth = dur >> 3;
-            if (eighth == 0) eighth = 1;
-            mus.eighth = eighth;
-            mus.left = (eighth << 3) - eighth; // тон 7/8 длительности
-            mus.stage = 0;
+            if (n >= 13) { n -= 13; dur = popcorn_durance[n] << 1; } // длинная (NQ) нота — вдвое дольше
+            else dur = popcorn_durance[n];
+            uint16_t p = popcorn_period[n];
+            mus.period = p;
+            mus.pw = p;
         }
+
+        uint16_t eighth = dur >> 3;
+        if (eighth == 0) eighth = 1;
+        mus.eighth = eighth;
+        mus.left = (eighth << 3) - eighth; // тон 7/8 длительности
     }
+
     uint16_t chunk = (music_chunk < mus.left) ? music_chunk : mus.left;
     sound_pwm(mus.period, chunk, mus.pw);
     mus.left -= chunk;
