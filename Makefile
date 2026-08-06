@@ -51,6 +51,9 @@ sprites-file-title: digger_sprites_title.c
 music-file-title: digger_music_title.c
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o digger_music_title.o digger_music_title.c
 
+music-file-background: digger_music_background.c
+	pdp11-aout-gcc ${GCC_FLAGS} -c -o digger_music_background.o digger_music_background.c
+
 cover-file-title: digger_title.c
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o digger_title.o digger_title.c
 
@@ -71,8 +74,8 @@ libs: memory.s dzx0.s sprites.c sprites_extra.c sound.c sound_pwm.c sound_vibrat
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o tools.o tools.c
 	pdp11-aout-ar rcs libs.a memory.o sprites.o sprites_extra.o sound.o sound_pwm.o sound_vibrato.o tools.o dzx0.o
 
-digger-out-file: crt0 digger-main-file sprites-file short-font-file levels-file libs
-	pdp11-aout-ld -T a.out.ld -Map digger.map -o ${OUT_FILE_1} crt0.o digger_sprites.o digger_short_font.o digger_levels.o digger.o libs.a $(LIBGCC)
+digger-out-file: crt0 digger-main-file sprites-file short-font-file levels-file music-file-background libs
+	pdp11-aout-ld -T a.out.ld -Map digger.map -o ${OUT_FILE_1} crt0.o digger_sprites.o digger_short_font.o digger_levels.o digger_music_background.o digger.o libs.a $(LIBGCC)
 
 title-out-file: crt0 title-main-file sprites-file-title full-font-file music-file-title cover-file-title credits-file-title libs
 	pdp11-aout-ld -T a.out.ld -Map title.map -o ${OUT_FILE_2} crt0.o digger_sprites_title.o digger_full_font.o digger_music_title.o digger_title.o digger_credits.o title.o libs.a $(LIBGCC)
