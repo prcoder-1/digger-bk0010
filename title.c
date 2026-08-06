@@ -95,10 +95,6 @@ constexpr uint16_t y_space = 6;
 constexpr uint16_t windmill_height = 42;
 constexpr uint16_t table_height = SCREEN_PIX_HEIGHT - (str_height + y_space) - windmill_height;
 
-// const char unpacking_str[] = "UNPACKING...";
-// constexpr uint16_t unpacking_str_x_pos = (SCREEN_BYTE_WIDTH - char_width * sizeof(unpacking_str) + char_width) / 2;
-// constexpr uint16_t unpacking_str_y_pos = (SCREEN_PIX_HEIGHT + str_height) / 2;
-
 const char version_str[] = "VERSION " STR(VERSION);
 constexpr uint16_t version_str_x_pos = (SCREEN_BYTE_WIDTH - char_width * sizeof(version_str) + char_width) / 2;
 constexpr uint16_t version_str_y_pos = str_height + y_space + 2 + table_height + y_space;
@@ -217,6 +213,56 @@ static const struct demo_item items[] = {
 
 constexpr uint8_t item_count = sizeof(items) / sizeof(items[0]); ///< Число статичных объектов демо
 
+bool panel_keys = false; ///< Какую панель показывать в этом цикле демо: false — кредиты, true — клавиши
+
+static const char blank_row[CREDITS_FIELD + 1] = "               "; // Пробелы на всю ширину поля панели
+
+/**
+ * @brief Вывод текстовой панели (кредиты / описание клавиш) в левое поле
+ *        драйвером дисплея ПЗУ (EMT), строки центрированы
+ *
+ * Панели разной длины и с разной шириной строк, поэтому каждая из CREDITS_ROWS
+ * строк поля сначала гасится печатью пробелов — это ровно те же знакоместа,
+ * что занимает текст, без привязки к пиксельной геометрии знакоместа драйвера
+ * (paint_brick задел бы верхнюю линию рамки).
+ *
+ * @param p - текст панели: строки <= CREDITS_FIELD знакомест, разделитель '\n'
+ */
+static void print_panel(const char *p)
+{
+    for (uint8_t i = 0; i < CREDITS_ROWS; ++i)
+    {
+        uint8_t row = CREDITS_ROW0 + i;
+
+        // Гашение строки поля
+        EMT_24(CREDITS_MARGIN, row);
+        EMT_20_l(blank_row, CREDITS_FIELD);
+
+        if (!*p) continue; // Текст кончился — строка остаётся пустой
+
+        const char *e = p;
+        uint8_t len = 0;
+        while (*e && *e != '\n')
+        {
+            uint8_t b = (uint8_t)*e++;
+            if (b < 0200 || b > 0237) ++len; // печатаемый символ (не управляющий код)
+        }
+
+        EMT_24(CREDITS_MARGIN + (CREDITS_FIELD - len) / 2, row);
+        // Строка передаётся драйверу одним EMT 020 до разделителя '\n'
+        // (сам '\n' тоже уходит драйверу — безвредно, EMT_24 выше
+        // репозиционирует каждую строку). Лимит длины 255 — страховка.
+        EMT_20_l(p, ((uint16_t)'\n' << 8) | 255);
+        p = e;
+
+        if (*p == '\n') ++p; // Пропустить разделитель строк
+    }
+
+    // Вывод текста заново включает курсор — гасим его (стираем блок в конце текста).
+    // 0232 переключает курсор, поэтому шлём только если он сейчас включён.
+    if (!EMT_34().bits.CURSOR_OFF) EMT_16(0232);
+}
+
 /**
  * @brief Обработка общего состояния демо
  *
@@ -257,10 +303,15 @@ static void process_demo_state()
         nobbin_x = hobbin_x = digger_x = 0;
         constexpr uint16_t demo_height = table_height - (str_height + y_space * 2) * 2;
         paint_brick(SCREEN_BYTE_WIDTH / 2 + 2, one_player_y, SCREEN_BYTE_WIDTH / 2 - 3, demo_height, 0);
+
+        // Левая панель чередуется по циклам демо: кредиты - клавиши - кредиты
+        print_panel(panel_keys ? keys_help : credits);
+        panel_keys = !panel_keys;
     }
 
     // Шагающие актёры: t — смещение внутри окна очередного актёра.
-    // Для demo_time вне окон t уходит в большие значения (uint16) и не матчится.
+    constexpr uint16_t step_click_pw = 10; // Ширина импульса
+
     uint16_t t = demo_time - walkers_start;
     for (uint8_t i = 0; i < walker_count; i++, t -= walker_span)
     {
@@ -278,8 +329,6 @@ static void process_demo_state()
             if (!(demo_time & 7))
             {
                 (*w->x)--;
-
-                constexpr uint16_t step_click_pw = 30; // Ширина импульса (ON-фаза, sob-такты)
                 sound_pwm((demo_time & 8) ? 90 : 60, 2, step_click_pw);
             }
         }
@@ -305,6 +354,8 @@ static void process_demo_state()
         {
             const struct demo_item *it = &items[i];
             sp_put(digger_x, item_y + it->y_offset, image_width, it->height, it->image, nullptr);
+            sound_pwm(60, 7, step_click_pw);
+            sound_pwm(90, 5, step_click_pw);
         }
         else if (t == end_to_print)
         {
@@ -357,40 +408,6 @@ static void process_demo_state()
  * @param dst - указатель на буфер-приёмник; он же служит «историей» для ссылок по смещению
  */
 void zx0_decompress(const uint8_t *src, uint8_t *dst);
-
-/**
- * @brief Вывод текста кредитов в левую панель драйвером дисплея ПЗУ (EMT), строки центрированы
- */
-static void print_credits()
-{
-    const char *p = credits;
-    uint8_t row = CREDITS_ROW0;
-
-    while (*p)
-    {
-        const char *e = p;
-        uint8_t len = 0;
-        while (*e && *e != '\n')
-        {
-            uint8_t b = (uint8_t)*e++;
-            if (b < 0200 || b > 0237) ++len; // печатаемый символ (не управляющий код)
-        }
-
-        EMT_24(CREDITS_MARGIN + (CREDITS_FIELD - len) / 2, row);
-        // Строка передаётся драйверу одним EMT 020 до разделителя '\n'
-        // (сам '\n' тоже уходит драйверу — безвредно, EMT_24 выше
-        // репозиционирует каждую строку). Лимит длины 255 — страховка.
-        EMT_20_l(p, ((uint16_t)'\n' << 8) | 255);
-        p = e;
-
-        if (*p == '\n') ++p; // Пропустить разделитель строк
-        ++row;
-    }
-
-    // Вывод текста заново включает курсор — гасим его (стираем блок в конце текста).
-    // 0232 переключает курсор, поэтому шлём только если он сейчас включён.
-    if (!EMT_34().bits.CURSOR_OFF) EMT_16(0232);
-}
 
 /**
  * @brief Проверка нажатия любой клавиши клавиатуры или кнопки джойстика
@@ -540,8 +557,7 @@ void main()
     // Воспроизвести музыку Popcorn
     play_popcorn();
 
-    init_demo();    // Инициализация демо
-    print_credits(); // Вывод кредитов в левую панель через EMT
+    init_demo();    // Инициализация демо (панель печатается первым же вызовом process_demo_state при demo_time == 0)
     print_str(version_str, version_str_x_pos, version_str_y_pos);
     print_str(build_date_str, build_date_x_pos, build_date_y_pos);
     for (;;)
