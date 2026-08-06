@@ -9,7 +9,7 @@
 #include "digger_music.h"
 #include "digger_music_background.h"
 
-// #define DEBUG // Режим отладки включен
+// #define DEBUG   // Режим отладки включен
 // #define MINIMAP // Включить отладочные карты уровня
 
 constexpr uint8_t POS_X_STEP = 4;      // Шаг клеток по оси X (в байтах)
@@ -465,7 +465,7 @@ static void init_level_state()
     snd.coin_note = -1;
     snd.coin_time = 0;
 
-    bg_music_init(); // Инициализация aоновой музыки
+    bg_music_track(BG_MUSIC_POPCORN); // Начать фоновую музыку (Popcorn) с начала
 }
 
 /**
@@ -2366,10 +2366,12 @@ static void process_bonus()
                 bonus.flash--;
                 snd.chase = bonus.flash;
 
+                // Мигание при включении закончилось - переключиться на музыку бонус-режима.
+                // Срабатывает ровно один раз: на финальном мигании счётчик уходит в 255.
+                if (bonus.flash == 0) bg_music_track(BG_MUSIC_BONUS);
+
                 // Мигание при включении бонус-режима
                 bonus_indicator((bonus.time & 1) ? (bonus.flash ? 0xFFFF : 0xAAAA) : 0x0000);
-
-                // TODO: Включить музыку бонус-режима
             }
         }
         else
@@ -2378,7 +2380,7 @@ static void process_bonus()
             snd.chase = 0; // Выключить звук включения/выключения бонус-режима
             bugs.delay_counter = 0; // Враги начинают появляться сразу же после окончания бонус-режима
 
-            // TODO: Включить музыку Popcorn
+            bg_music_track(BG_MUSIC_POPCORN); // Вернуть музыку Popcorn
         }
     }
 }
