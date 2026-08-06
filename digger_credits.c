@@ -19,3 +19,20 @@ const char credits[] =
     "to run on the\n"
     "Soviet computer\n"
     RED "\xE2\xEB 0010-01" GREEN ".\n";
+
+// Названия клавиш БК заданы байтами KOI-8: "\xF3\xE2\xF2" = СБР, "\xF3\xF4\xEF\xF0" = СТОП
+const char keys_help[] =
+    BLUE "Controls:\n" GREEN "\n"
+    "\n"
+    RED "ARROWS" GREEN " or\n"
+    RED "Joystick" GREEN " -\n"
+    "Move Digger\n"
+    "\n"
+    RED "SPACE" GREEN " or\n"
+    RED "Joy Button" GREEN " -\n"
+    "Fireball\n"
+    "\n"
+    RED "   S" GREEN " - Sound FX\n"
+    RED "   M" GREEN " - Music   \n"
+    RED " \xF3\xE2\xF2" GREEN " - Pause   \n"
+    RED "\xF3\xF4\xEF\xF0" GREEN " - Restart \n";
