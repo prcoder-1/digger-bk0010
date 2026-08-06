@@ -39,9 +39,16 @@ constexpr uint8_t LOOSE_WAIT = 15; // Время с момента начала 
 
 constexpr uint16_t BONUS_LIFE_SCORE = 20000; // Количество очков для дополнительной жизни (счёт 16-битный, потолок 65535)
 
-constexpr uint16_t music_chunk = 8u; // Один кусочек ноты — music_chunk полупериодов.
-constexpr uint16_t music_chunk_counts = 150u; // Ниже music_chunk_counts отсчётов кадра новый кусочек не начинаем.
-constexpr uint16_t music_chunks_per_frame = 4u; // Максимум кусочков музыки за кадр.
+// Темп фоновой музыки. Единица времени — "слот" (один кусочек ноты); за кадр
+// их выдаётся ровно music_chunks_per_frame, поэтому 1/8 нота = music_slots_ne /
+// music_chunks_per_frame = 2 кадра = 181.6 мс (165 BPM, в оригинале 178.5 мс).
+constexpr uint16_t music_slots_ne = 8u;         // Слотов в 1/8 ноте
+constexpr uint16_t music_chunks_per_frame = 4u; // Слотов музыки за кадр — задаёт темп
+// Размер кусочка = music_chunk_ref/period полупериодов, т.е. его РЕАЛЬНОЕ время
+// (~9.5 мс) почти не зависит от высоты ноты. Иначе (при фиксированном числе
+// полупериодов) низкие ноты съедали бы кадр целиком, а высокие были бы еле слышны.
+constexpr uint16_t music_chunk_ref = 1400u;
+constexpr uint16_t music_chunk_counts = 60u; // Ниже music_chunk_counts отсчётов кадра новый кусочек не начинаем.
 
 /**
  * @brief Перечисление типов врагов
@@ -220,16 +227,16 @@ uint8_t broke_max; // Время через которое исчезнет ра
 uint16_t snd_effects = 1;    /// Флаг, показывающий, что звуковые эффекты включены
 uint16_t music_on = 0;       /// Флаг, показывающий, что фоновая музыка включена
 
-constexpr uint16_t popcorn_ref = 120u;
-#define PDUR(p) ((uint16_t)((uint16_t)NE * popcorn_ref / (p)))
-
 // Периоды нот мелодии Popcorn
 static const uint16_t popcorn_period[] = { D4, C4, A3, F3, D3, E4, F4, A4, G4, B4, C5, AS3, D5 };
 
-// Длительности нот мелодии Popcorn
-static const uint16_t popcorn_durance[] = {
-    PDUR(D4), PDUR(C4), PDUR(A3), PDUR(F3), PDUR(D3),
-    PDUR(E4), PDUR(F4), PDUR(A4), PDUR(G4), PDUR(B4), PDUR(C5), PDUR(AS3), PDUR(D5)
+// Размер кусочка (в полупериодах) для каждой ноты: music_chunk_ref/period, но не
+// меньше одного полного цикла. Считается компилятором - деления в коде нет.
+#define PCHUNK(p) ((uint8_t)((music_chunk_ref / (p)) < 2 ? 2 : (music_chunk_ref / (p))))
+
+static const uint8_t popcorn_chunk[] = {
+    PCHUNK(D4), PCHUNK(C4), PCHUNK(A3), PCHUNK(F3), PCHUNK(D3),
+    PCHUNK(E4), PCHUNK(F4), PCHUNK(A4), PCHUNK(G4), PCHUNK(B4), PCHUNK(C5), PCHUNK(AS3), PCHUNK(D5)
 };
 
 // Индексы нот мелодии Popcorn
@@ -283,8 +290,9 @@ struct {
 struct {
     uint16_t pos;     /// Индекс текущей ноты в мелодии
     uint16_t period;  /// Период текущей ноты
-    uint16_t left;    /// Полупериодов осталось в текущей фазе (тон / пауза)
-    uint16_t eighth;  /// 1/8 длительности ноты - пауза после тона (0 = паузы не будет)
+    uint16_t chunk;   /// Полупериодов в одном кусочке текущей ноты (постоянное реальное время)
+    uint16_t left;    /// Слотов осталось в текущей фазе (тон / пауза)
+    uint16_t eighth;  /// 1/8 длительности ноты в слотах - пауза после тона (0 = паузы не будет)
     uint8_t  silent;  /// Текущая фаза беззвучная (пауза между нотами или нота-пауза)
 } mus;
 
@@ -2492,7 +2500,7 @@ static void process_game_state()
     }
 }
 
-// Проиграть один кусочек текущей ноты фоновой музыки
+// Проиграть один слот (кусочек) текущей ноты фоновой музыки
 void music_tick(void)
 {
     if (mus.left == 0) // текущая фаза доиграна
@@ -2512,28 +2520,25 @@ void music_tick(void)
             if (n == REST)
             {
                 // Нота-пауза: звучит всю свою длительность тишиной, доп. паузы после неё нет
-                mus.left = popcorn_durance[0];
+                mus.left = music_slots_ne;
                 mus.silent = 1;
             }
             else
             {
-                uint16_t dur;
-                if (n >= 13) { n -= 13; dur = popcorn_durance[n] << 1; } // длинная (NQ) нота — вдвое дольше
-                else dur = popcorn_durance[n];
+                uint16_t slots = music_slots_ne;
+                if (n >= 13) { n -= 13; slots <<= 1; } // длинная (NQ) нота — вдвое дольше
                 mus.period = popcorn_period[n];
+                mus.chunk = popcorn_chunk[n];
 
-                uint16_t eighth = dur >> 3;
-                if (eighth == 0) eighth = 1;
-                mus.eighth = eighth;               // пауза 1/8 после тона
-                mus.left = (eighth << 3) - eighth; // тон 7/8 длительности
+                mus.eighth = slots >> 3;       // пауза 1/8 после тона
+                mus.left = slots - mus.eighth; // тон 7/8 длительности
                 mus.silent = 0;
             }
         }
     }
 
-    uint16_t chunk = (music_chunk < mus.left) ? music_chunk : mus.left;
-    if (!mus.silent) sound_pwm(mus.period, chunk, 1);
-    mus.left -= chunk;
+    if (!mus.silent) sound_pwm(mus.period, mus.chunk, 1);
+    --mus.left;
 }
 
 extern void start();
@@ -2610,8 +2615,9 @@ void main()
 #endif
         // Фоновая музыка: свободное время кадра заполняем кусочками текущей ноты Popcorn.
         volatile uint16_t *t_count = (volatile uint16_t *)REG_TVE_COUNT;
-        // Лимит кусочков за кадр держит темп постоянным: даже если свободного
-        // времени вагон (простой), мелодия продвинется не больше положенного.
+        // Лимит кусочков за кадр И ЕСТЬ темп: ровно music_chunks_per_frame слотов
+        // за кадр, music_slots_ne слотов на 1/8 ноту — независимо от высоты ноты
+        // и от того, сколько свободного времени в кадре осталось.
         uint16_t music_budget = music_chunks_per_frame;
         while (music_on && music_budget && *t_count > music_chunk_counts && (tve_csr->reg & (1 << TVE_CSR_FL)) == 0)
         {
