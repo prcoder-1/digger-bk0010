@@ -38,7 +38,10 @@ constexpr uint8_t MAN_START_Y = 9; // Начальное положение Ди
 
 constexpr uint8_t LOOSE_WAIT = 15; // Время с момента начала покачивания до момента падения мешка
 
-constexpr uint16_t BONUS_LIFE_SCORE = 20000; // Количество очков для дополнительной жизни (счёт 16-битный, потолок 65535)
+constexpr uint32_t BONUS_LIFE_SCORE = 20000; // Количество очков для дополнительной жизни
+
+constexpr uint8_t SCORE_DIGITS = 6; // Количество выводимых десятичных знаков счёта (как в оригинале)
+constexpr uint32_t MAX_SCORE = 999999UL; // Потолок счёта: при превышении счёт обнуляется (как в оригинале)
 
 /**
  * @brief Перечисление типов врагов
@@ -188,7 +191,7 @@ struct {
     uint16_t time;          /// Время активности бонус-режима
     uint8_t  flash;         /// Время мерцания при включении/выключении Бонус-режима
     uint8_t  count;         /// Множитель очков в Бонус-режиме (умножается на два за каждого пойманного врага)
-    uint16_t life_score;    /// Количество очков для дополнительной жизни
+    uint32_t life_score;    /// Количество очков для дополнительной жизни
 } bonus;
 
 // Переменные отвечающие за выстрел
@@ -208,7 +211,7 @@ struct {
     uint16_t difficulty; /// Уровень сложности
     uint16_t level_no;   /// Текущий номер уровня
     int16_t  lives;      /// Текущее количество жизней
-    uint16_t score;      /// Количество очков
+    uint32_t score;      /// Количество очков
 } game;
 
 uint8_t broke_max; // Время через которое исчезнет разбившийся мешок
@@ -271,26 +274,39 @@ static void draw_coin_minimap()
 static int remove_coin(uint8_t x_log, uint8_t y_log);
 
 /**
- * @brief Вывод 16-битного десятичного числа
+ * @brief Вывод 32-битного десятичного числа в SCORE_DIGITS знаков с ведущими нулями
  *
  * @param number - число для вывода
  * @param x_graph - координата X по которой будет осуществлён вывод числа
  * @param y_graph - координата Y по которой будет осуществлён вывод числа
  */
-static void print_dec(uint16_t number, uint16_t x_graph, uint16_t y_graph)
+static void print_dec(uint32_t number, uint16_t x_graph, uint16_t y_graph)
 {
-    constexpr char zero = '0';
     constexpr uint16_t row_w = sizeof(digit_rows[0]); // 3 байта на строку
     constexpr uint16_t row_n = sizeof(digit_indices[0]) / sizeof(digit_indices[0][0]); // 12 строк на цифру
-    char buf[5] = { zero, zero, zero, zero, zero }; // Буфер для 5 десятичных знаков
 
-    char *ptr = &buf[sizeof(buf)];
-    uint_to_str(number, &ptr);
+    // Разряды выделяются вычитанием степеней десяти (не более 9 вычитаний на разряд).
+    // Деление здесь тянуло бы из libgcc 32-битный __udivsi3, а вычитание по единице
+    // (как в uint_to_str) на шестизначном счёте дало бы до 111 тысяч итераций.
+    static const uint32_t pow_10[SCORE_DIGITS] = { 100000UL, 10000UL, 1000UL, 100UL, 10UL, 1UL };
+
+    // Таблица обходится указателем, а не индексом: на индексе gcc грузит слова
+    // 32-битного элемента как "mov tbl(r0),r0 / mov tbl+2(r0),r1" и затирает
+    // индекс первым же mov, отчего в старшие разряды попадают чужие константы.
+    const uint32_t *pw = pow_10;
 
     uint8_t digit_buf[row_n * row_w];
-    for (uint8_t i = 0; i < sizeof(buf); ++i)
+    for (uint8_t i = 0; i < SCORE_DIGITS; ++i)
     {
-        const uint8_t *idx_row = digit_indices[buf[i] - zero];
+        const uint32_t p = *pw++;
+        uint8_t digit = 0;
+        while (number >= p)
+        {
+            number -= p;
+            ++digit;
+        }
+
+        const uint8_t *idx_row = digit_indices[digit];
         uint8_t *dst = digit_buf;
         for (uint8_t r = 0; r < row_n; ++r)
         {
@@ -309,7 +325,7 @@ static void print_dec(uint16_t number, uint16_t x_graph, uint16_t y_graph)
  */
 static void print_lives()
 {
-    uint16_t man_x_offset = sizeof(digit_rows[0]) * 5 + 1; // Смещение шириной в пять символов '0' плюс один байт (4 пикселя)
+    uint16_t man_x_offset = sizeof(digit_rows[0]) * SCORE_DIGITS + 1; // Смещение шириной в счётчик очков плюс один байт (4 пикселя)
     constexpr uint16_t man_y_offset = SCREEN_Y_OFFSET + 2; // Смещение спрайта Диггера по оси Y
     constexpr uint16_t one_pos_width = sizeof(image_digger_right[1][0]) + 1; // Ширина спрайта Диггера плюс один байт
     constexpr uint16_t height = sizeof(image_digger_right[1]) / sizeof(image_digger_right[1][0]); // Высота спрайта Диггера
@@ -334,6 +350,7 @@ static void print_lives()
 static void add_score(uint16_t score_add)
 {
     game.score += score_add;
+    if (game.score > MAX_SCORE) game.score = 0; // Счёт шестизначный: при переполнении обнуляется (как в оригинале)
     print_dec(game.score, 0, SCREEN_Y_OFFSET + MOVE_Y_STEP);
 
      // Если количество очков достигло бонусного для получения жизни
