@@ -1,5 +1,4 @@
 #include "tools.h"
-#include "memory.h"
 
 void delay_ms(uint16_t time) // TODO: калибровка задержки
 {
@@ -23,28 +22,3 @@ uint16_t rand()
 
     return lfsr;
 }
-
-/*
-uint8_t int_to_str(uint16_t value, uint8_t base, uint8_t width, char pad_char, char *str)
-{
-    char buffer[16];
-
-    uint8_t i = 0;
-
-    do
-    {
-        uint16_t reminder = value % base;
-        if (reminder > 9) reminder += 'A' - '9';
-        buffer[i++] = '0' + reminder;
-        value /= base;
-    }
-    while(value);
-
-    while (i < width) buffer[i++] = pad_char;
-
-    uint8_t rv = i;
-    while(i) *str++ = buffer[--i];
-
-    return rv;
-}
-*/
