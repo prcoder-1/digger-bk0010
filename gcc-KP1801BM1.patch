@@ -81,19 +81,19 @@
 +     be in the middle of the destination group, so no single part order
 +     works and we have to permute the emission instead.
 +
-+     Only a side effect free address may be permuted: for an auto increment
-+     or auto decrement source every word shares one rtx and the order is
-+     what advances the pointer.  Such an address cannot overlap a register
-+     destination anyway, since that would be a second assignment to the
-+     base register in the same insn, which auto-inc-dec.cc refuses to
-+     create.
++     Only a side effect free source may be permuted: a volatile reference
++     has to keep its program order, and for an auto increment or decrement
++     source every word shares one rtx and the order is what advances the
++     pointer.  Such an address could not overlap a register destination
++     anyway, since that would be a second assignment to the base register
++     in the same insn, which auto-inc-dec.cc refuses to create.
 +
 +     pdp11_legitimate_address_p rejects (MEM (MEM ...)) for modes wider
 +     than 16 bits, so an SI or DI address holds at most one register and
 +     at most one word can match.  */
 +  last = -1;
 +  if (REG_P (operands[0]) && MEM_P (operands[1])
-+      && !side_effects_p (XEXP (operands[1], 0)))
++      && !side_effects_p (operands[1]))
 +    for (i = 0; i < words; i++)
 +      if (REG_P (exops[i][0]) && MEM_P (exops[i][1])
 +	  && reg_overlap_mentioned_p (exops[i][0], XEXP (exops[i][1], 0)))
