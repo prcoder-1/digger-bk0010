@@ -152,8 +152,3 @@ uint16_t rand();
  * @return - количество символов в строке со значением числа
  */
 // uint8_t int_to_str(uint16_t value, uint8_t base, uint8_t width, char pad_char, char *str);
-
-/**
- * @brief Преобразует значение целого числа в строку в десятичной системе счисления
- */
-void uint_to_str(uint16_t value, char **str);
