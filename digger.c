@@ -274,9 +274,11 @@ static void draw_coin_minimap()
 static int remove_coin(uint8_t x_log, uint8_t y_log);
 
 /**
- * @brief Вывод 32-битного десятичного числа в SCORE_DIGITS знаков с ведущими нулями
+ * @brief Вывод десятичного числа в диапазоне 0..MAX_SCORE в SCORE_DIGITS знаков с ведущими нулями
  *
- * @param number - число для вывода
+ * @param number - число для вывода; ограничить его сверху значением MAX_SCORE обязан вызывающий:
+ *                 на большем значении старший разряд получится больше девяти и индексация
+ *                 digit_indices[digit] уйдёт за границу таблицы
  * @param x_graph - координата X по которой будет осуществлён вывод числа
  * @param y_graph - координата Y по которой будет осуществлён вывод числа
  */
@@ -350,7 +352,10 @@ static void print_lives()
 static void add_score(uint16_t score_add)
 {
     game.score += score_add;
-    if (game.score > MAX_SCORE) game.score = 0; // Счёт шестизначный: при переполнении обнуляется (как в оригинале)
+    // Счёт шестизначный: при переполнении обнуляется (как в оригинале). bonus.life_score при этом
+    // намеренно не сбрасывается - в оригинале bonus растёт сквозь обнуление счёта,
+    // поэтому после переполнения бонусные жизни до конца партии не выдаются.
+    if (game.score > MAX_SCORE) game.score = 0;
     print_dec(game.score, 0, SCREEN_Y_OFFSET + MOVE_Y_STEP);
 
      // Если количество очков достигло бонусного для получения жизни

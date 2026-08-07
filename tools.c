@@ -24,29 +24,6 @@ uint16_t rand()
     return lfsr;
 }
 
-void uint_to_str(uint16_t value, char **str)
-{
-    asm(
-        "mov %[str], r3\n\t"
-        "mov (r3), r1\n\t"
-        "mov %[value], r0\n\t"
-".l1_%=:\n\t"
-        "clr r2\n"
-".l2_%=:\n\t"
-        "inc r2\n\t"
-        "sub $10, r0\n\t"
-        "bhis .l2_%=\n\t"
-        "add $58, r0\n\t"
-        "movb r0, -(r1)\n\t"
-        "mov r2, r0\n\t"
-        "sob r0, .l1_%=\n\t"
-        "mov r1, (r3)\n\t"
-        :
-        : [value]"r" (value), [str]"m"(str)
-        : "r0", "r1", "r2", "r3", "cc", "memory"
-    );
-}
-
 /*
 uint8_t int_to_str(uint16_t value, uint8_t base, uint8_t width, char pad_char, char *str)
 {
