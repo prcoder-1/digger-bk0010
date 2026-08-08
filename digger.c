@@ -414,10 +414,24 @@ static inline enum level_symbols getLevelSymbol(uint8_t y_log, uint8_t x_log)
 static void bonus_indicator(uint16_t color);
 
 /**
+ * @brief Вернуть экран в нормальное положение
+ *
+ * Анимация разбивающегося мешка "проваливает" экран на один кадр. Если в этот момент
+ * Диггер погиб, мешок деактивируется вместе с остальным состоянием уровня и вернуть
+ * регистр на место будет уже некому.
+ */
+static void reset_v_scroll()
+{
+    *((volatile uint16_t *)REG_V_SCROLL) = 0330 | (1 << V_SCROLL_EXT_MEMORY);
+}
+
+/**
  * @brief Инициализация переменных состояния перед старом уровня
  */
 static void init_level_state()
 {
+    reset_v_scroll(); // Вернуть экран в нормальное положение
+
     // Отключить бонус-режим
     bonus.state = BONUS_OFF;
 
@@ -1200,6 +1214,40 @@ static void stop_bag(struct bag_info *bag)
 }
 
 /**
+ * @brief Перерисовать покоящиеся мешки, попавшие в стёртый блок 4x15
+ *
+ * Стирание надгробного камня Диггера или трупа врага, погибшего под упавшим на него
+ * мешком, затирает и сам мешок: они находятся в одной клетке. Стационарный мешок и
+ * золото из разбитого мешка сами себя больше не перерисовывают, поэтому их надо
+ * вернуть на экран (падающий и раскачивающийся мешки рисуются каждый кадр сами).
+ *
+ * @param x_graph - координата X стёртого блока
+ * @param y_graph - координата Y стёртого блока
+ */
+static void redraw_bags(uint8_t x_graph, uint8_t y_graph)
+{
+    for (uint8_t i = 0; i < MAX_BAGS; ++i)
+    {
+        struct bag_info *bag = &bags_state[i]; // Структура с информацией о мешке
+
+        if ((bag->state != BAG_STATIONARY) && (bag->state != BAG_BROKEN)) continue;
+
+        // Проверить, что мешок попал в стёртый блок
+        if (!check_collision_4_15(x_graph, y_graph, bag->x_graph, bag->y_graph)) continue;
+
+        if (bag->state == BAG_STATIONARY)
+        {
+            sp_4_15_mask(bag->x_graph, bag->y_graph, image_bag[0], outline_bag[0]); // Мешок с золотом
+        }
+        else
+        {
+            // Последняя фаза анимации - золото из разбитого мешка
+            sp_4_15_put(bag->x_graph, bag->y_graph, (uint8_t *)image_bag_broke[2]);
+        }
+    }
+}
+
+/**
  * @brief Подпрограмма отрисовки Диггера
  */
 static void draw_man()
@@ -1549,6 +1597,7 @@ static void process_bugs()
                 }
 
                 erase_4_15(bug->x_graph, bug->y_graph); // Стереть убитого врага
+                redraw_bags(bug->x_graph, bug->y_graph); // Вернуть мешок, под которым погиб враг
                 bug->state = CREATURE_INACTIVE;         // Деактивировать убитого врага
                 bugs.active--;                          // Уменьшить количество активных врагов
 
@@ -1625,10 +1674,14 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                         }
                     }
 
-                    bag->dir = DIR_STOP; // Остановить мешок
+                    // Остановить мешок. Начавшему падать мешку направление не сбрасывать:
+                    // по DIR_DOWN обработчик гибели определяет, что мешок ещё летит, и Диггер
+                    // падает вместе с ним, а не гибнет сразу (см. CREATURE_DEAD_MONEY_BAG).
+                    if (bag->state != BAG_FALLING) bag->dir = DIR_STOP;
                 }
 
-                if (bag->dir != DIR_STOP) // Если мешок не остановлен
+                // Если мешок не остановлен (и не начал падать - падение обработается на следующем кадре)
+                if ((bag->state == BAG_STATIONARY) && (bag->dir != DIR_STOP))
                 {
                     move_bag(bag, bag->dir); // Перемещать мешок
                 }
@@ -1717,10 +1770,23 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
 
                 remove_coin(bag_x_log, bag_y_log); // Удалить монету в клетке куда попал мешок
 
-                // Нарисовать падающий мешок
-                sp_4_15_put(bag_x_graph, bag_y_graph, (uint8_t *)image_bag_fall);
-                // sp_put(bag_x_graph, bag_y_graph, sizeof(image_bag_fall[0]), sizeof(image_bag_fall) / sizeof(image_bag_fall[0]),
-                //         (uint8_t *)image_bag_fall, (uint8_t *)outline_bag_fall);
+                if (bag->state == BAG_FALLING)
+                {
+                    // Нарисовать падающий мешок
+                    sp_4_15_put(bag_x_graph, bag_y_graph, (uint8_t *)image_bag_fall);
+                    // sp_put(bag_x_graph, bag_y_graph, sizeof(image_bag_fall[0]), sizeof(image_bag_fall) / sizeof(image_bag_fall[0]),
+                    //         (uint8_t *)image_bag_fall, (uint8_t *)outline_bag_fall);
+                }
+                else
+                {
+                    // Мешок только что остановлен процедурой stop_bag - вернуть ему вид стоящего
+                    // на месте (иначе на экране так и остался бы спрайт падающего мешка).
+                    // outline_bag перекрывает outline_bag_fall во всех строках, поэтому маска
+                    // стирает остатки спрайта падающего мешка целиком.
+                    // Для разбивающегося мешка (BAG_BREAKS) это кадр перед началом анимации,
+                    // как и в оригинале (stop_bag там рисует стационарный мешок).
+                    sp_4_15_mask(bag_x_graph, bag_y_graph, image_bag[0], outline_bag[0]);
+                }
 
                 if (man.state == CREATURE_ALIVE) //  Если Диггер жив
                 {
@@ -2271,6 +2337,8 @@ static void man_rip()
     // Последовательность высоты на которую подпрыгивает перевёрнутый Диггер
     static uint8_t bounce[8] = { 3, 5, 6, 6, 5, 4, 3, 0 };
 
+    reset_v_scroll(); // Чтобы анимация гибели не проигрывалась на "провалившемся" экране
+
     uint16_t prev_y_graph = 0;
     uint16_t period = 19000 / N;
     uint16_t i = 0;
@@ -2319,6 +2387,7 @@ static void man_rip()
         {
             bug->state = CREATURE_INACTIVE; // Деактивировать врага убившего Диггера
             erase_4_15(bug->x_graph, bug->y_graph); // Стереть деактивированного врага
+            redraw_bags(bug->x_graph, bug->y_graph); // Вернуть задетый стиранием мешок
         }
     }
 
@@ -2351,6 +2420,7 @@ static void man_rip()
     }
 
     erase_4_15(man.x_graph, man.y_graph); // Стереть надгробный камень
+    redraw_bags(man.x_graph, man.y_graph); // Вернуть мешок, под которым погиб Диггер
 
     (void)*(volatile uint8_t *)REG_KEY_DATA;
 
