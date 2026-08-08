@@ -9,8 +9,7 @@
 #include "digger_music.h"
 #include "digger_music_background.h"
 
-// #define DEBUG   // Режим отладки включен
-// #define MINIMAP // Включить отладочные карты уровня
+#define MINIMAP // Включить отладочные карты уровня
 
 constexpr uint8_t POS_X_STEP = 4;      // Шаг клеток по оси X (в байтах)
 constexpr uint8_t POS_Y_STEP = 16;     // Шаг клеток по оси Y (в строках)
