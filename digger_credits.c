@@ -34,7 +34,7 @@ const char keys_help[] =
     "\n"
     RED "   S" GREEN " - Sound FX\n"
     RED "   M" GREEN " - Music   \n"
-#if defined(DEBUG)
+#ifdef DEBUG
     RED "   D" GREEN " - Difficul\n"
     RED "   L" GREEN " - Life    \n"
     RED "   N" GREEN " - Next Lev\n"
