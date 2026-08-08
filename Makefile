@@ -1,7 +1,7 @@
 VERSION=1.1
-# DEBUG=true
-# MINIMAP=true
 BUILD_DATE=$(shell date +%d.%m.%Y)
+# DEBUG=-DDEBUG
+# MINIMAP=-DMINIMAP
 FILE_1=DIGGER_V${VERSION}
 FILE_2=DIGTIT_V${VERSION}
 BIN_FILE_1=${FILE_1}.BIN
@@ -11,7 +11,7 @@ OUT_FILE_2=${FILE_2}.out
 OPT_FLAG=-Os -mlra
 XGCC=/home/prcoder/xgcc
 LIBGCC=$(shell pdp11-aout-gcc -m10 -m1801vm1 -msoft-float $(OPT_FLAG) -print-libgcc-file-name)
-GCC_FLAGS=-std=gnu23 -fomit-frame-pointer -msoft-float -fcprop-registers -nostartfiles -nodefaultlibs -nostdlib -m10 -m1801vm1 $(OPT_FLAG) -I$(XGCC)/include -DVERSION=${VERSION}  -DBUILD_DATE=${BUILD_DATE} -DDEBUG=${DEBUG} -DMINIMA=${MINIMA}
+GCC_FLAGS=-std=gnu23 -fomit-frame-pointer -msoft-float -fcprop-registers -nostartfiles -nodefaultlibs -nostdlib -m10 -m1801vm1 $(OPT_FLAG) -I$(XGCC)/include -DVERSION=${VERSION}  -DBUILD_DATE=${BUILD_DATE} ${DEBUG} ${MINIMAP}
 GCC_ASM_FLAGS=-S -fverbose-asm
 AS_FLAGS=-mno-fpu -mlimited-eis -pic
 GMPI_API_URL=http://10.0.0.55/api

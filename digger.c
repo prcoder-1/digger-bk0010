@@ -9,8 +9,6 @@
 #include "digger_music.h"
 #include "digger_music_background.h"
 
-#define MINIMAP // Включить отладочные карты уровня
-
 constexpr uint8_t POS_X_STEP = 4;      // Шаг клеток по оси X (в байтах)
 constexpr uint8_t POS_Y_STEP = 16;     // Шаг клеток по оси Y (в строках)
 constexpr uint8_t MOVE_X_STEP = 1;     // Шаг перемещения по оси X (в байтах)
@@ -252,7 +250,7 @@ struct {
     uint8_t  done;                /// Флаг, означающий, что звук завершения уровня включен
 } snd;
 
-#if defined(MINIMAP)
+#ifdef MINIMAP
 /**
  * @brief Отладочная процедура отображения мини-карты состояния фона
  */
@@ -2044,7 +2042,7 @@ static void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
                         music_on = !music_on;
                         break;
                     }
-#if defined(DEBUG)
+#ifdef DEBUG
                     case 'D': // Увеличение уровня сложности
                     {
                         if (++game.difficulty >= 10) game.difficulty = 0;
@@ -2537,12 +2535,12 @@ void main()
         if (snd_effects) sound_effect();
         process_game_state();
 
-#if defined(MINIMAP)
+#ifdef MINIMAP
         draw_coin_minimap(); // Нарисовать мини-карту монеток (камешков)
         draw_bg_minimap();   // Нарисовать мини-карту ячеек фона
 #endif
 
-#if defined(DEBUG)
+#ifdef DEBUG
         // Распечатать оставшееся свободное время
         print_dec(*((volatile uint16_t *)REG_TVE_COUNT), 0, MAX_Y_POS + 2 * POS_Y_STEP);
 #endif
