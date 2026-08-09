@@ -388,6 +388,19 @@ static int check_collision_4_15(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
 }
 
 /**
+ * @brief Проверка соприкосновения снаряда (2x7) с 4x15-спрайтом по их левым-верхним углам.
+ *
+ * Габариты снаряда меньше, поэтому проверять его через check_collision_4_15 нельзя:
+ * зона попадания оказывалась бы раздута вправо на 2 байта и вниз на 8 строк, и
+ * летящий в эту сторону снаряд взрывался бы, не долетев до врага полклетки.
+ */
+static int check_collision_missile(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
+{
+    return ((uint16_t)((int)x2 - (int)x1 + 3) < 5u)   // x2 - x1 в пределах -3..1
+        && ((uint16_t)((int)y2 - (int)y1 + 14) < 21u); // y2 - y1 в пределах -14..6
+}
+
+/**
  * @brief Преобразование графической координаты X в логическую (номер клетки).
  */
 static uint8_t graph_to_x_log(uint16_t x_graph)
@@ -1965,7 +1978,7 @@ static void process_missile()
                 if ((bug->state != CREATURE_ALIVE) && (bug->state != CREATURE_STARTING)) continue;
 
                 // Проверить, что выстрел попал во врага
-                if (check_collision_4_15(mis.x_graph, mis.y_graph, bug->x_graph, bug->y_graph))
+                if (check_collision_missile(mis.x_graph, mis.y_graph, bug->x_graph, bug->y_graph))
                 {
                     explode = 1; // Взорвать выстрел
                     bug->count = 1; // Чтобы CREATURE_RIP стёр врага на следующем тике, а не ждал старого счётчика
