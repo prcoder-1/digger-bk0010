@@ -2363,6 +2363,20 @@ static void man_rip()
 
     reset_v_scroll(); // Чтобы анимация гибели не проигрывалась на "провалившемся" экране
 
+    // Убрать летящий снаряд (или его взрыв). Анимация гибели блокирующая, поэтому
+    // снаряд провисел бы на экране всё это время, после неё сделал бы последний шаг
+    // со сменой фазы, а дальше init_level_state сбросил бы mis.flying - и стирать
+    // спрайт стало бы уже некому.
+    if (mis.flying)
+    {
+        sp_clear_brick(mis.x_graph, mis.y_graph, sizeof(image_explode[0][0]),
+                       sizeof(image_explode[0]) / sizeof(image_explode[0][0]));
+        mis.flying = 0;
+        mis.explode = 0;
+    }
+
+    mis.fire = 0; // Не рождать новый снаряд у погибшего Диггера
+
     uint16_t prev_y_graph = 0;
     uint16_t period = 19000 / N;
     uint16_t i = 0;
