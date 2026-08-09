@@ -101,21 +101,24 @@ enum bonus_state : uint8_t
     BONUS_END      /**< Режим бонус закончился */
 };
 
-#pragma pack(push, 1)
 /**
  * @brief Состояние мешка с деньгами
  *
  * Размер дополнен до 8 байт: при индексации &bags_state[i] компилятор использует
  * сдвиг (<<3) вместо вызова __mulhi3 для умножения на 5.
+ *
+ * Координаты - слова, а не байты: они уходят в функции вывода спрайтов, которые
+ * принимают uint16_t, и байтовое поле каждый раз требовало бы расширения до слова
+ * парой clr/bisb. Порядок полей подобран так, чтобы слова легли на чётные смещения.
  */
 struct bag_info
 {
     enum bag_state state; ///< Флаг активности мешка
     enum direction dir;   ///< Направление движения мешка
-    uint8_t x_graph;      ///< Положение по оси X в графических координатах
-    uint8_t y_graph;      ///< Положение по оси Y в графических координатах
+    uint16_t x_graph;     ///< Положение по оси X в графических координатах
+    uint16_t y_graph;     ///< Положение по оси Y в графических координатах
     uint8_t count;        ///< Счётчик
-    uint8_t _pad[3];      ///< Выравнивание до 8 байт (см. комментарий выше)
+    uint8_t _pad[1];      ///< Выравнивание до 8 байт (см. комментарий выше)
 };
 
 /**
@@ -127,16 +130,19 @@ struct bug_info
 {
     enum creature_state state; ///< Состояние врага (жив, погиб, лежит дохлый - влияет на внешний вид)
     enum bug_types type;       ///< Тип врага (Ноббин или Хоббин)
+    uint16_t x_graph;          ///< Положение по оси X в графических координатах
+    uint16_t y_graph;          ///< Положение по оси Y в графических координатах
     enum direction dir;        ///< Направление движения врага
     uint8_t count;             ///< Счётчик
     uint8_t wait;              ///< Счётчик задержки врага (при толкании мешков, изменении направления)
     uint8_t image_phase;       ///< Фаза анимации при выводе спрайта
     int8_t image_phase_inc;    ///< Направление изменения фазы анимации при выводе спрайта (+1 или -1)
-    uint8_t x_graph;           ///< Положение по оси X в графических координатах
-    uint8_t y_graph;           ///< Положение по оси Y в графических координатах
-    uint8_t _pad[7];           ///< Выравнивание до 16 байт
+    uint8_t _pad[5];           ///< Выравнивание до 16 байт
 };
-#pragma pack(pop)
+
+// Размеры структур критичны: на них завязана индексация массивов сдвигом вместо __mulhi3
+static_assert(sizeof(struct bag_info) == 8);
+static_assert(sizeof(struct bug_info) == 16);
 
 /**
  * @brief Единичные шаги по направлениям (DIR_LEFT, DIR_RIGHT, DIR_UP, DIR_DOWN).
@@ -389,7 +395,7 @@ static void add_score_250()
 /**
  * @brief Проверка соприкосновения двух 4x15-спрайтов по их левым-верхним углам.
  */
-static int check_collision_4_15(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
+static int check_collision_4_15(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2)
 {
     return ((uint16_t)((int)x2 - (int)x1 + 3) < 7u)
         && ((uint16_t)((int)y2 - (int)y1 + 14) < 29u);
@@ -402,7 +408,7 @@ static int check_collision_4_15(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
  * зона попадания оказывалась бы раздута вправо на 2 байта и вниз на 8 строк, и
  * летящий в эту сторону снаряд взрывался бы, не долетев до врага полклетки.
  */
-static int check_collision_missile(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
+static int check_collision_missile(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2)
 {
     return ((uint16_t)((int)x2 - (int)x1 + 3) < 5u)   // x2 - x1 в пределах -3..1
         && ((uint16_t)((int)y2 - (int)y1 + 14) < 21u); // y2 - y1 в пределах -14..6
@@ -426,12 +432,12 @@ __attribute__((noinline)) static uint8_t graph_to_y_log(uint16_t y_graph)
 /**
  * @brief Положение внутри клетки (номер подпозиции): 0 - объект выровнен по клетке.
  */
-static inline uint8_t graph_to_x_rem(uint16_t x_graph)
+static inline uint16_t graph_to_x_rem(uint16_t x_graph)
 {
     return (x_graph - FIELD_X_OFFSET) % POS_X_STEP;
 }
 
-static inline uint8_t graph_to_y_rem(uint16_t y_graph)
+static inline uint16_t graph_to_y_rem(uint16_t y_graph)
 {
     return ((y_graph - FIELD_Y_OFFSET) % POS_Y_STEP) / MOVE_Y_STEP;
 }
@@ -479,7 +485,7 @@ static void next_image_phase(uint8_t *phase, int8_t *inc)
 /**
  * @brief Нарисовать мешок с золотом по заданным координатам
  */
-static void draw_bag(uint8_t x_graph, uint8_t y_graph)
+static void draw_bag(uint16_t x_graph, uint16_t y_graph)
 {
     sp_4_15_mask(x_graph, y_graph, image_bag[0], outline_bag[0]);
 }
@@ -487,7 +493,7 @@ static void draw_bag(uint8_t x_graph, uint8_t y_graph)
 /**
  * @brief Стереть мешок с золотом по заданным координатам
  */
-static void erase_bag(uint8_t x_graph, uint8_t y_graph)
+static void erase_bag(uint16_t x_graph, uint16_t y_graph)
 {
     sp_4_15_mask(x_graph, y_graph, nullptr, outline_bag[0]);
 }
@@ -732,7 +738,7 @@ static uint16_t full_bite(uint8_t byte)
  *
  * @return - 1 - движение в заданном направлении возможно, 0 - движение в заданном направлении невозможно
  */
-static uint8_t check_path(enum direction dir, uint8_t x_graph, uint8_t y_graph)
+static uint8_t check_path(enum direction dir, uint16_t x_graph, uint16_t y_graph)
 {
     uint8_t x_log = graph_to_x_log(x_graph);
     uint8_t y_log = graph_to_y_log(y_graph);
@@ -890,8 +896,8 @@ static uint8_t move_bag(struct bag_info *bag, enum direction dir)
 {
     uint8_t rv = 0;
 
-    uint8_t bag_x_graph = bag->x_graph;
-    uint8_t bag_y_graph = bag->y_graph;
+    uint16_t bag_x_graph = bag->x_graph;
+    uint16_t bag_y_graph = bag->y_graph;
 
     // Проверить пытается ли переместиться мешок за пределы экрана
     if (check_out_of_range(dir, bag_x_graph, bag_y_graph))
@@ -1024,8 +1030,8 @@ static void move_bug(struct bug_info *bug)
 {
     enum direction dir_1, dir_2, dir_3, dir_4;
 
-    const uint8_t bug_x_graph = bug->x_graph;
-    const uint8_t bug_y_graph = bug->y_graph;
+    const uint16_t bug_x_graph = bug->x_graph;
+    const uint16_t bug_y_graph = bug->y_graph;
     const uint8_t bug_x_rem = graph_to_x_rem(bug_x_graph);
     const uint8_t bug_y_rem = graph_to_y_rem(bug_y_graph);
 
@@ -1299,7 +1305,7 @@ static void stop_bag(struct bag_info *bag)
  * @param x_graph - координата X стёртого блока
  * @param y_graph - координата Y стёртого блока
  */
-static void redraw_bags(uint8_t x_graph, uint8_t y_graph)
+static void redraw_bags(uint16_t x_graph, uint16_t y_graph)
 {
     for (uint8_t i = 0; i < MAX_BAGS; ++i)
     {
@@ -1692,8 +1698,8 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
     {
         struct bag_info *bag = &bags_state[i]; // Структура с информацией о мешке
 
-        uint8_t bag_x_graph = bag->x_graph;
-        uint8_t bag_y_graph = bag->y_graph;
+        uint16_t bag_x_graph = bag->x_graph;
+        uint16_t bag_y_graph = bag->y_graph;
         uint8_t bag_x_log = graph_to_x_log(bag_x_graph);
         uint8_t bag_y_log = graph_to_y_log(bag_y_graph);
         uint8_t bag_x_rem = graph_to_x_rem(bag_x_graph);
@@ -1877,7 +1883,7 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                     // (CREATURE_STARTING) гибнет под мешком наравне с живым
                     if ((bug->state != CREATURE_ALIVE) && (bug->state != CREATURE_STARTING)) continue;
 
-                    uint8_t bug_x_graph = bug->x_graph;
+                    uint16_t bug_x_graph = bug->x_graph;
 
                     // Сделать чтобы враги пытались убежать от летящего мешка
                     // Если враг находится на одной вертикальной линии с мешком и
@@ -2276,8 +2282,8 @@ static void process_man()
                 }
             }
 
-            uint8_t prev_man_x_graph = man.x_graph;
-            uint8_t prev_man_y_graph = man.y_graph;
+            uint16_t prev_man_x_graph = man.x_graph;
+            uint16_t prev_man_y_graph = man.y_graph;
 
             if (man.dir != DIR_STOP)
             {
