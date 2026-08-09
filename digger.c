@@ -212,8 +212,9 @@ struct {
 
 // Переменные отвечающие за состояние игры
 struct {
-    uint16_t difficulty; /// Уровень сложности
-    uint16_t level_no;   /// Текущий номер уровня
+    uint16_t difficulty; /// Уровень сложности (равен номеру уровня, но не более десяти)
+    uint16_t level;      /// Текущий номер уровня (начиная с единицы)
+    uint16_t level_no;   /// Номер экрана (поля) текущего уровня (индекс в массиве level[])
     int16_t  lives;      /// Текущее количество жизней
     uint32_t score;      /// Количество очков
 } game;
@@ -528,18 +529,18 @@ static void init_level_state()
 
     // print_dec(game.difficulty, 0, MAX_Y_POS + 2 * POS_Y_STEP);
 
-    if (game.difficulty > 6) bugs.max = 5;      // На уровне сложности 7 и выше максимально 5 врагов одновременно
-    else if (game.difficulty > 0) bugs.max = 4; // На уровне сложности со 1 до 6 (включительно) до 4 врагов одновременно
+    if (game.difficulty > 7) bugs.max = 5;      // На уровне сложности 8 и выше максимально 5 врагов одновременно
+    else if (game.difficulty > 1) bugs.max = 4; // На уровне сложности со 2 до 7 (включительно) до 4 врагов одновременно
     else bugs.max = 3;                      // На первом уровне максимально три врага одновременно
 
     // Переменные относщиеся к созданию и управлению врагами
-    bugs.total = game.difficulty + 6;         // Общее количество врагов на уровне - шесть плюс уровень сложности
+    bugs.total = game.difficulty + 5;         // Общее количество врагов на уровне - пять плюс уровень сложности
     bugs.delay = 45 - (game.difficulty << 1); // Задержка появления врагов (с ростом сложности убывает)
     bugs.delay_counter = bugs.delay;     // Инициализация счётчика задержки врага исходным значением
     bugs.active = 0;                     // Количество активных врагов
     bugs.created = 0;                    // Общее количество созданных врагов
 
-    broke_max = 140 - game.difficulty * 10; // Время через которое исчезнет разбившийся мешок (с ростом сложности убывает)
+    broke_max = 150 - game.difficulty * 10; // Время через которое исчезнет разбившийся мешок (с ростом сложности убывает)
 
     // Инициализация переменных Диггера
     man.dir = DIR_RIGHT;
@@ -589,6 +590,26 @@ static void gnaw(enum direction dir, uint16_t x_graph, uint16_t y_graph)
     };
 
     sp_put(x_graph + gnaw_mtx[dir].x, y_graph + gnaw_mtx[dir].y, gnaw_mtx[dir].x_size, gnaw_mtx[dir].y_size, nullptr, gnaw_mtx[dir].sprite);
+}
+
+/**
+ * @brief Установка номера экрана и уровня сложности по текущему номеру уровня.
+ *
+ *        Как в оригинале (get_screen(), get_dificulty()): экраны 1-8 соответствуют
+ *        уровням 1-8, а начиная с девятого уровня циклически повторяются только
+ *        экраны 5-8 в порядке 6, 7, 8, 5 (уровень 9 - экран 6, уровень 12 - экран 5).
+ *        Уровень сложности равен номеру уровня и ограничен сверху десятью.
+ */
+static void set_level_params()
+{
+    // Номер экрана (1-8) для текущего номера уровня
+    uint16_t screen = game.level;
+    if (screen > LEVELS_NUM) screen = (game.level & 3) + 5; // (level % 4) + 5
+
+    game.level_no = screen - 1; // Индекс экрана в массиве уровней
+
+    game.difficulty = game.level;
+    if (game.difficulty > 10) game.difficulty = 10;
 }
 
 /**
@@ -1008,7 +1029,7 @@ static void move_bug(struct bug_info *bug)
     if (!bug_x_rem && !bug_y_rem)
     {
         // Если Хоббин застрял на время более заданного, то превратить его в Ноббина
-        if ((bug->type == BUG_HOBBIN) && (bug->count > (32 + game.difficulty * 2)))
+        if ((bug->type == BUG_HOBBIN) && (bug->count > (30 + game.difficulty * 2)))
         {
             bug->count = 0;         // Очистить время застревания
             bug->type = BUG_NOBBIN; // Превратить врага в Ноббина
@@ -1070,9 +1091,9 @@ static void move_bug(struct bug_info *bug)
         // Иначе движение назад и так последнее в списке (dir_4)
 
         // В уровнях сложности до шестого использовать элемент случайности в выборе направления
-        if ((game.difficulty < 5) && ((rand() & 0xF) > (game.difficulty + 10)))
+        if ((game.difficulty < 6) && ((rand() & 0xF) > (game.difficulty + 9)))
         {
-            // В одном из (5 + game.difficulty) случаев поменять наиболее
+            // С вероятностью (6 - game.difficulty)/16 поменять наиболее
             // приоритетное направление с менее приоритетным
             dir_1 ^= dir_3;
             dir_3 ^= dir_1;
@@ -1499,8 +1520,8 @@ static void sound_effect()
  */
 static void init_game()
 {
-    game.difficulty = 0; // Начальный уровень сложности
-    game.level_no = 0;   // Начальный уровень
+    game.level = 1;      // Начальный уровень
+    set_level_params();  // Начальный экран и уровень сложности
     game.lives = 3;      // Начальное количество жизней
     game.score = 0;      // Начальное количество очков
     bonus.life_score = BONUS_LIFE_SCORE;
@@ -1603,7 +1624,7 @@ static void process_bugs()
                     }
 
                     //  Если Ноббин застрял или соприкоснулся с другим на определённое (зависящее от уровня сложности) время
-                    if (bug->count > (20 - game.difficulty))
+                    if (bug->count > (21 - game.difficulty))
                     {
                         bug->count = 0;         // Сбросить счётчик застревания
                         bug->type = BUG_HOBBIN; // Переключить тип врага на Хоббина
@@ -1611,7 +1632,7 @@ static void process_bugs()
                 }
 
                 // Если выпало случайное число с вероятностью зависящей от уровня сложности
-                if ((rand() & 0xF) < game.difficulty) move_bug(bug); // Переместить врага ещё раз для увеличения скорости
+                if ((rand() & 0xF) < (game.difficulty - 1)) move_bug(bug); // Переместить врага ещё раз для увеличения скорости
 
                 // Здесь специально нету break для проваливания в следующую секцию
             }
@@ -2051,7 +2072,7 @@ static void process_missile()
                 if (mis.fire) // Если произведён выстрел
                 {
                     mis.fire = 0;
-                    mis.wait = 85 + game.difficulty * 4; // Начальное значение счётчика появления "башенки"
+                    mis.wait = 81 + game.difficulty * 4; // Начальное значение счётчика появления "башенки"
                     mis.image_phase = 0;
                     mis.flying = 1;
                     mis.dir = man.dir;
@@ -2190,7 +2211,7 @@ static void process_man()
 #ifdef DEBUG
                     case 'D': // Увеличение уровня сложности
                     {
-                        if (++game.difficulty >= 10) game.difficulty = 0;
+                        if (++game.difficulty > 10) game.difficulty = 1;
                         break;
                     }
 
@@ -2236,7 +2257,7 @@ static void process_man()
                 {
                     bonus.state = BONUS_ON; // Включить Бонус-режим
                     bonus.count = 1; // Начальное значение множителя очков в Бонус-режиме
-                    bonus.time = 230 - game.difficulty * 20; // Время действия Бонус-режима
+                    bonus.time = 250 - game.difficulty * 20; // Время действия Бонус-режима
                     bonus.flash = 19; // Время мигания индикатора включения Бонус-режима
 
                     add_score(1000); // 1000 очков за вишенку
@@ -2583,12 +2604,11 @@ static void process_game_state()
     {
         snd.done = 0;
 
-        // Циклическое увеличение номера уровня
-        game.level_no++;
-        game.level_no &= LEVELS_NUM - 1;
+        // Переход на следующий уровень (номер уровня клампится на 1000, как в оригинале)
+        if (game.level < 1000) game.level++;
 
-        // Увеличение сложности после прохождения очередного уровня (клампится на 10)
-        if (game.difficulty < 10) game.difficulty++;
+        // Экран и уровень сложности нового уровня
+        set_level_params();
 
         init_level(); // Инициализация нового уровня
     }
@@ -2678,7 +2698,7 @@ void main()
         // На высоких уровнях сложности дать Диггеру шанс на дополнительный шаг
         // в этом же кадре. Симметрично бусту врагов в process_bugs,
         // но вдвое реже - враги остаются чуть быстрее Диггера.
-        if ((rand() & 0x1F) < game.difficulty) process_man();
+        if ((rand() & 0x1F) < (game.difficulty - 1)) process_man();
 
         // Логические координаты Диггера ПОСЛЕ хода - для process_bags
         const uint8_t man_x_log = graph_to_x_log(man.x_graph);
