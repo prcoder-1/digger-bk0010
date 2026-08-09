@@ -2009,8 +2009,19 @@ static void process_missile()
                     // координат Диггера и его направления движения.
                     // Смещения нерегулярные (специфичные точки рождения снаряда
                     // относительно спрайта Диггера), общую таблицу dir_d* не используем.
-                    static const int8_t fire_dx[4] = { -MOVE_X_STEP, 4, 1, 1 };
-                    static const int8_t fire_dy[4] = { MOVE_Y_STEP, MOVE_Y_STEP, -MOVE_Y_STEP, 15 + MOVE_Y_STEP };
+                    //
+                    // Снаряд рождается вплотную к спрайту Диггера (4x15), выступая за его
+                    // край ровно на шаг перемещения: спрайт снаряда одним байтом (строкой)
+                    // перекрывает Диггера. Если родить снаряд дальше - на клетку впереди, -
+                    // то выстрел в упор во врага, бегущего в ту же сторону, промахивается:
+                    // скорость снаряда всего вдвое выше скорости врага, и снаряд летит
+                    // рядом с ним, ни разу не попав в зону проверки соприкосновения.
+                    static const int8_t fire_dx[4] = {
+                        -MOVE_X_STEP, 4 - missile_x_size + MOVE_X_STEP, 1, 1
+                    };
+                    static const int8_t fire_dy[4] = {
+                        MOVE_Y_STEP, MOVE_Y_STEP, -MOVE_Y_STEP, 15 - missile_y_size + MOVE_Y_STEP
+                    };
 
                     mis.x_graph = man.x_graph + fire_dx[mis.dir];
                     mis.y_graph = man.y_graph + fire_dy[mis.dir];
@@ -2087,7 +2098,20 @@ static void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
                 {
                     case 12:  // СБР - Пауза
                     {
-                        while (!((*(volatile uint8_t *)REG_KEY_STATE) & (1 << KEY_STATE_STATE)));
+                        constexpr uint16_t joy_buttons = (1 << PAR_INTERF_LEFT_BUTTON) | (1 << PAR_INTERF_RIGHT_BUTTON);
+                        volatile uint16_t *joy = (volatile uint16_t *)REG_PAR_INTERF;
+                        volatile uint8_t *key_state = (volatile uint8_t *)REG_KEY_STATE;
+
+                        // Дождаться отпускания кнопки джойстика, иначе удерживаемая
+                        // кнопка огня сняла бы паузу в тот же момент
+                        while (*joy & joy_buttons);
+
+                        // Пауза снимается любой клавишей или кнопкой джойстика
+                        while (!(*key_state & (1 << KEY_STATE_STATE)) && !(*joy & joy_buttons));
+
+                        // Дождаться отпускания кнопки, чтобы снятие паузы не обернулось выстрелом
+                        while (*joy & joy_buttons);
+
                         break;
                     }
 
