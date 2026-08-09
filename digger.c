@@ -1144,7 +1144,12 @@ static void move_bug(struct bug_info *bug)
 
             if (bag->state == BAG_INACTIVE) continue; // Пропустить неактивные мешки
 
-            if (check_collision_4_15(bag->x_graph, bag->y_graph, bug_x_graph, bug_y_graph))
+            // Соприкосновение проверяется по НОВОМУ положению врага (bug_x_graph/bug_y_graph -
+            // это положение на входе в кадр, оно нужно только для отката). По старому положению
+            // враг, подошедший к мешку вплотную, упирался в него навсегда: откат возвращал его
+            // в точку, которая сама лежит в зоне соприкосновения, поэтому следующий шаг в любую
+            // сторону снова "сталкивался" с мешком и опять откатывался.
+            if (check_collision_4_15(bag->x_graph, bag->y_graph, bug->x_graph, bug->y_graph))
             {
                 uint16_t remove_bag = 0;
                 if (bug->type == BUG_HOBBIN)
