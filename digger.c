@@ -416,7 +416,9 @@ static inline uint8_t graph_to_x_log(uint16_t x_graph)
     return (x_graph - FIELD_X_OFFSET) / POS_X_STEP;
 }
 
-static inline uint8_t graph_to_y_log(uint16_t y_graph)
+// Не инлайним: деление на POS_Y_STEP разворачивается в цикл сдвигов, который при девяти
+// местах вызова стоит дороже, чем jsr (см. graph_to_x_log - там сдвигов два, инлайн выгоднее).
+__attribute__((noinline)) static uint8_t graph_to_y_log(uint16_t y_graph)
 {
     return (y_graph - FIELD_Y_OFFSET) / POS_Y_STEP;
 }
@@ -575,21 +577,23 @@ static void init_level_state()
  */
 static void gnaw(enum direction dir, uint16_t x_graph, uint16_t y_graph)
 {
-    static const struct
-    {
-        int16_t x;
-        int16_t y;
-        uint16_t x_size;
-        uint16_t y_size;
-        uint8_t *sprite;
-    } gnaw_mtx[4] = {
-        { -2, -1, sizeof(outline_blank_left[0]),  sizeof(outline_blank_left)  / sizeof(outline_blank_left[0]),  (uint8_t*)outline_blank_left  },
-        {  4, -1, sizeof(outline_blank_right[0]), sizeof(outline_blank_right) / sizeof(outline_blank_right[0]), (uint8_t*)outline_blank_right },
-        { -1, -7, sizeof(outline_blank_up[0]),    sizeof(outline_blank_up)    / sizeof(outline_blank_up[0]),    (uint8_t*)outline_blank_up    },
-        { -1, 15, sizeof(outline_blank_down[0]),  sizeof(outline_blank_down)  / sizeof(outline_blank_down[0]),  (uint8_t*)outline_blank_down  }
+    // Параметры прогрызаемого участка держим в раздельных байтовых массивах, а не в массиве
+    // структур: индексация массива структур (10 байт на элемент) требует умножения, которое
+    // на 1801ВМ1 разворачивается в вызов __mulhi3.
+    static const int8_t   gnaw_x[4] = { -2, 4, -1, -1 };
+    static const int8_t   gnaw_y[4] = { -1, -1, -7, 15 };
+    static const uint8_t  gnaw_x_size[4] = {
+        sizeof(outline_blank_left[0]), sizeof(outline_blank_right[0]), sizeof(outline_blank_up[0]), sizeof(outline_blank_down[0])
+    };
+    static const uint8_t  gnaw_y_size[4] = {
+        sizeof(outline_blank_left)  / sizeof(outline_blank_left[0]),  sizeof(outline_blank_right) / sizeof(outline_blank_right[0]),
+        sizeof(outline_blank_up)    / sizeof(outline_blank_up[0]),    sizeof(outline_blank_down)  / sizeof(outline_blank_down[0])
+    };
+    static uint8_t *const gnaw_sprite[4] = {
+        (uint8_t*)outline_blank_left, (uint8_t*)outline_blank_right, (uint8_t*)outline_blank_up, (uint8_t*)outline_blank_down
     };
 
-    sp_put(x_graph + gnaw_mtx[dir].x, y_graph + gnaw_mtx[dir].y, gnaw_mtx[dir].x_size, gnaw_mtx[dir].y_size, nullptr, gnaw_mtx[dir].sprite);
+    sp_put(x_graph + gnaw_x[dir], y_graph + gnaw_y[dir], gnaw_x_size[dir], gnaw_y_size[dir], nullptr, gnaw_sprite[dir]);
 }
 
 /**
