@@ -65,16 +65,17 @@ credits-file-title: digger_credits.c
 crt0:
 	pdp11-aout-as ${AS_FLAGS} crt0.s -o crt0.o
 
-libs: memory.s dzx0.s sprites.c sprites_extra.c sound.c sound_pwm.c sound_vibrato.c tools.c
+libs: memory.s dzx0.s mirror.s sprites.c sprites_extra.c sound.c sound_pwm.c sound_vibrato.c tools.c
 	pdp11-aout-as ${AS_FLAGS} memory.s -o memory.o
 	pdp11-aout-as ${AS_FLAGS} dzx0.s -o dzx0.o
+	pdp11-aout-as ${AS_FLAGS} mirror.s -o mirror.o
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o sprites.o sprites.c
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o sprites_extra.o sprites_extra.c
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o sound.o sound.c
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o sound_pwm.o sound_pwm.c
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o sound_vibrato.o sound_vibrato.c
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o tools.o tools.c
-	pdp11-aout-ar rcs libs.a memory.o sprites.o sprites_extra.o sound.o sound_pwm.o sound_vibrato.o tools.o dzx0.o
+	pdp11-aout-ar rcs libs.a memory.o mirror.o sprites.o sprites_extra.o sound.o sound_pwm.o sound_vibrato.o tools.o dzx0.o
 
 digger-out-file: crt0 digger-main-file sprites-file short-font-file levels-file music-file-background libs
 	pdp11-aout-ld -T a.out.ld -Map digger.map -o ${OUT_FILE_1} crt0.o digger_sprites.o digger_short_font.o digger_levels.o digger_music_background.o digger.o libs.a $(LIBGCC)
