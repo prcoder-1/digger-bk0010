@@ -422,8 +422,8 @@ static inline uint8_t graph_to_x_log(uint16_t x_graph)
     return (x_graph - FIELD_X_OFFSET) / POS_X_STEP;
 }
 
-// Не инлайним: деление на POS_Y_STEP разворачивается в цикл сдвигов, который при девяти
-// местах вызова стоит дороже, чем jsr (см. graph_to_x_log - там сдвигов два, инлайн выгоднее).
+// Деление на POS_Y_STEP разворачивается в цикл сдвигов, который при девяти местах вызова
+// стоит дороже, чем jsr (см. graph_to_x_log - там сдвигов два, инлайн выгоднее).
 __attribute__((noinline)) static uint8_t graph_to_y_log(uint16_t y_graph)
 {
     return (y_graph - FIELD_Y_OFFSET) / POS_Y_STEP;
@@ -583,9 +583,6 @@ static void init_level_state()
  */
 static void gnaw(enum direction dir, uint16_t x_graph, uint16_t y_graph)
 {
-    // Параметры прогрызаемого участка держим в раздельных байтовых массивах, а не в массиве
-    // структур: индексация массива структур (10 байт на элемент) требует умножения, которое
-    // на 1801ВМ1 разворачивается в вызов __mulhi3.
     static const int8_t   gnaw_x[4] = { -2, 4, -1, -1 };
     static const int8_t   gnaw_y[4] = { -1, -1, -7, 15 };
     static const uint8_t  gnaw_x_size[4] = {

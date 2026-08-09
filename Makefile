@@ -8,9 +8,6 @@ BIN_FILE_1=${FILE_1}.BIN
 BIN_FILE_2=${FILE_2}.BIN
 OUT_FILE_1=${FILE_1}.out
 OUT_FILE_2=${FILE_2}.out
-# -fno-reorder-blocks / -fno-caller-saves / -fno-if-conversion дают около 300 байт экономии
-# на digger.o: раскладка блоков без дублирования хвостов, отказ от сохранения регистров
-# вокруг вызовов и от if-конверсии (последняя на этом порту ещё и источник кривого кода).
 OPT_FLAG=-Os -mlra -fno-reorder-blocks -fno-caller-saves -fno-if-conversion
 XGCC=/home/prcoder/xgcc
 LIBGCC=$(shell pdp11-aout-gcc -m10 -m1801vm1 -msoft-float $(OPT_FLAG) -print-libgcc-file-name)
