@@ -1802,7 +1802,10 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                 for (uint8_t i = 0; i < bugs.max; ++i)
                 {
                     struct bug_info *bug = &bugs_state[i]; // Структура с информацией о враге
-                    if (bug->state != CREATURE_ALIVE) continue; // Пропустить неживых врагов
+
+                    // Пропустить неживых врагов. Стоящий на месте рождения враг
+                    // (CREATURE_STARTING) гибнет под мешком наравне с живым
+                    if ((bug->state != CREATURE_ALIVE) && (bug->state != CREATURE_STARTING)) continue;
 
                     uint8_t bug_x_graph = bug->x_graph;
 
@@ -1956,7 +1959,10 @@ static void process_missile()
             for (uint8_t i = 0; i < bugs.max; ++i)
             {
                 struct bug_info *bug = &bugs_state[i]; // Структура с информацией о враге
-                if (bug->state != CREATURE_ALIVE) continue; //  Пропустить неживых врагов
+
+                // Пропустить неживых врагов. Враг, ещё стоящий на месте рождения
+                // (CREATURE_STARTING), уязвим наравне с живым - он и убивает наравне с ним
+                if ((bug->state != CREATURE_ALIVE) && (bug->state != CREATURE_STARTING)) continue;
 
                 // Проверить, что выстрел попал во врага
                 if (check_collision_4_15(mis.x_graph, mis.y_graph, bug->x_graph, bug->y_graph))
@@ -2297,7 +2303,10 @@ static void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
             {
                 struct bug_info *bug = &bugs_state[i]; // Структура с информацией о враге
 
-                if (bug->state != CREATURE_ALIVE) continue; // Пропустить дохлых врагов
+                // Пропустить неактивных и дохлых врагов. Враг, ещё стоящий на месте
+                // рождения (CREATURE_STARTING), опасен наравне с живым: в оригинале он
+                // сразу помечается живым, а счётчик задержки лишь не даёт ему двигаться.
+                if ((bug->state != CREATURE_ALIVE) && (bug->state != CREATURE_STARTING)) continue;
 
                 // Если Диггер не касается врага
                 if (!check_collision_4_15(bug->x_graph, bug->y_graph, man.x_graph, man.y_graph)) continue;
