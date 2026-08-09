@@ -26,13 +26,13 @@ void sp_4_15_hv_mirror_put(uint16_t x, uint16_t y, const uint8_t *image)
 
 ".l1_%=:\n\t"
         "mov (r3)+, r0\n\t"
-        "jsr pc, .l_mirror_%=\n\t"
+        "jsr pc, _mirror_word\n\t"
         "movb r0, -(r4)\n\t"
         "swab r0\n\t"
         "movb r0, -(r4)\n\t"
 
         "mov (r3)+, r0\n\t"
-        "jsr pc, .l_mirror_%=\n\t"
+        "jsr pc, _mirror_word\n\t"
         "movb r0, -(r4)\n\t"
         "swab r0\n\t"
         "movb r0, -(r4)\n\t"
@@ -43,12 +43,12 @@ void sp_4_15_hv_mirror_put(uint16_t x, uint16_t y, const uint8_t *image)
 
 ".l2_%=:\n\t"
         "mov (r3)+, r0\n\t"
-        "jsr pc, .l_mirror_%=\n\t"
+        "jsr pc, _mirror_word\n\t"
         "swab r0\n\t"
         "mov r0, -(r4)\n\t"
 
         "mov (r3)+, r0\n\t"
-        "jsr pc, .l_mirror_%=\n\t"
+        "jsr pc, _mirror_word\n\t"
         "swab r0\n\t"
         "mov r0, -(r4)\n\t"
 
@@ -56,38 +56,6 @@ void sp_4_15_hv_mirror_put(uint16_t x, uint16_t y, const uint8_t *image)
         "sob r2, .l2_%=\n\t"
         "br .lq_%=\n"
 
-".l_mirror_%=:\n\t"
-        // 16-bit word mirror
-        "mov r0, r1\n\t"      // r0 = r1 = ABCD EFGH
-        "bic $0x3333, r1\n\t" //      r1 = 0B0D 0F0H
-        "bic r1, r0\n\t"      //      r0 = A0C0 E0G0
-
-        "asl r0\n\t"
-        "asl r0\n\t"          //      r0 = 0A0C 0E0G
-
-        "clc\n\t"
-        "ror r1\n\t"
-        "ror r1\n\t"          //      r1 = B0D0 F0H0
-
-        "bis r1, r0\n\t"      //      r0 = BADC FEGH
-        "mov r0, r1\n\t"      //      r1 = BADC FEGH
-
-        "bic $0xF0F0, r1\n\t" //      r1 = 00DC 00GH
-        "bic r1, r0\n\t"      //      r0 = BA00 FE00
-
-        "asl r1\n\t"
-        "asl r1\n\t"
-        "asl r1\n\t"
-        "asl r1\n\t"          //      r0 = 00BA 00FE
-
-        "clc\n\t"
-        "ror r0\n\t"
-        "ror r0\n\t"
-        "ror r0\n\t"
-        "ror r0\n\t"          //      r1 = DC00 GH00
-
-        "bis r1, r0\n\t"      //      r0 = DCBA GHFE
-        "rts pc\n"
 
 ".lq_%=:\n\t"
         :

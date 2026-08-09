@@ -26,12 +26,19 @@ constexpr uint16_t MAX_Y_POS = FIELD_Y_OFFSET + POS_Y_STEP * (H_MAX - 1); // М�
 
 constexpr uint16_t COIN_Y_OFFSET = 3; // Смещение спрайта монетки в ячейке по оси Y
 
+// Правый верхний угол игрового поля: там появляется вишенка-бонус и рождаются враги
+constexpr uint8_t CORNER_X = FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP;
+constexpr uint8_t CORNER_Y = FIELD_Y_OFFSET;
+
 constexpr uint8_t MAX_BAGS = 7; // Максимальное количество мешков с деньгами на уровне
 constexpr uint8_t MAX_BUGS = 5; // Максимальное количество врагов на уровне
 constexpr uint8_t MAX_LIVES = 6; // Максимальное количество жизней
 
 constexpr uint8_t MAN_START_X = 7; // Начальное положение Диггера по оси X (в клетках)
 constexpr uint8_t MAN_START_Y = 9; // Начальное положение Диггера по оси Y (в клетках)
+
+// Кнопки джойстика: обе работают как огонь и как «любая кнопка»
+constexpr uint16_t JOY_BUTTONS = (1 << PAR_INTERF_LEFT_BUTTON) | (1 << PAR_INTERF_RIGHT_BUTTON);
 
 constexpr uint8_t LOOSE_WAIT = 15; // Время с момента начала покачивания до момента падения мешка
 
@@ -159,8 +166,8 @@ struct bug_info bugs_state[MAX_BUGS];
 
 // Переменные отвечающие за состояние Диггера
 struct {
-    uint16_t image_phase;      /// Фаза отображения спрайта Диггера
-    uint16_t image_phase_inc;  /// Инкремент(декремент) фазы отображения спрайта Диггера
+    uint8_t image_phase;       /// Фаза отображения спрайта Диггера
+    int8_t  image_phase_inc;   /// Инкремент(декремент) фазы отображения спрайта Диггера
     uint16_t wait;             /// Задержка перед следующим перемещением Диггера
     uint16_t x_graph;          /// Положение Диггера по оси X в графических координатах
     uint16_t y_graph;          /// Положение Диггера по оси Y в графических координатах
@@ -403,14 +410,27 @@ static int check_collision_missile(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y
 /**
  * @brief Преобразование графической координаты X в логическую (номер клетки).
  */
-static uint8_t graph_to_x_log(uint16_t x_graph)
+static inline uint8_t graph_to_x_log(uint16_t x_graph)
 {
     return (x_graph - FIELD_X_OFFSET) / POS_X_STEP;
 }
 
-static uint8_t graph_to_y_log(uint16_t y_graph)
+static inline uint8_t graph_to_y_log(uint16_t y_graph)
 {
     return (y_graph - FIELD_Y_OFFSET) / POS_Y_STEP;
+}
+
+/**
+ * @brief Положение внутри клетки (номер подпозиции): 0 - объект выровнен по клетке.
+ */
+static inline uint8_t graph_to_x_rem(uint16_t x_graph)
+{
+    return (x_graph - FIELD_X_OFFSET) % POS_X_STEP;
+}
+
+static inline uint8_t graph_to_y_rem(uint16_t y_graph)
+{
+    return ((y_graph - FIELD_Y_OFFSET) % POS_Y_STEP) / MOVE_Y_STEP;
 }
 
 /**
@@ -439,6 +459,37 @@ static void reset_v_scroll()
 }
 
 /**
+ * @brief Переключить фазу анимации спрайта по циклу 0-1-2-1-...
+ *
+ * Одинаково анимируются и Диггер, и враги, поэтому шаг фазы с разворотом
+ * на границах вынесен из draw_man и move_bug сюда.
+ *
+ * @param phase - текущая фаза
+ * @param inc - направление изменения фазы (+1 или -1)
+ */
+static void next_image_phase(uint8_t *phase, int8_t *inc)
+{
+    *phase += *inc;
+    if (!*phase || *phase >= 2) *inc = -*inc;
+}
+
+/**
+ * @brief Нарисовать мешок с золотом по заданным координатам
+ */
+static void draw_bag(uint8_t x_graph, uint8_t y_graph)
+{
+    sp_4_15_mask(x_graph, y_graph, image_bag[0], outline_bag[0]);
+}
+
+/**
+ * @brief Стереть мешок с золотом по заданным координатам
+ */
+static void erase_bag(uint8_t x_graph, uint8_t y_graph)
+{
+    sp_4_15_mask(x_graph, y_graph, nullptr, outline_bag[0]);
+}
+
+/**
  * @brief Инициализация переменных состояния перед старом уровня
  */
 static void init_level_state()
@@ -449,7 +500,7 @@ static void init_level_state()
     bonus.state = BONUS_OFF;
 
     // Стереть вишенку
-    erase_4_15(FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP, FIELD_Y_OFFSET);
+    erase_4_15(CORNER_X, CORNER_Y);
 
     // Отключение индикации бонус-режима
     bonus_indicator(0);
@@ -471,7 +522,7 @@ static void init_level_state()
         if (bag->state == BAG_INACTIVE) continue; // Пропустить неактивные мешки
         if ((bag->state == BAG_STATIONARY) && (bag->dir == DIR_STOP)) continue; // Пропустить стационарные мешки
 
-        sp_4_15_mask(bag->x_graph, bag->y_graph, nullptr, outline_bag[0]); // Стереть мешок
+        erase_bag(bag->x_graph, bag->y_graph); // Стереть мешок
         bag->state = BAG_INACTIVE;
     }
 
@@ -597,7 +648,7 @@ static void init_level()
                 bag->dir = DIR_STOP;         // Мешок стоит на месте
 
                 // Нарисовать мешок с золотом
-                sp_4_15_mask(bag->x_graph, bag->y_graph, image_bag[0], outline_bag[0]);
+                draw_bag(bag->x_graph, bag->y_graph);
             }
 
             if (ls == LEV_H || ls == LEV_S)
@@ -662,21 +713,21 @@ static uint8_t check_path(enum direction dir, uint8_t x_graph, uint8_t y_graph)
     uint8_t y_log = graph_to_y_log(y_graph);
     const uint8_t current_cell = background[y_log][x_log]; // Состояние текущей клетки
 
+    // Смещение до соседней клетки берётся из общих dir_dx/dir_dy, здесь только маски:
+    // mask - ближняя к текущей клетке сторона соседней, cur_mask - дальняя сторона текущей
     static const struct
     {
-        int8_t  x;
-        int8_t  y;
         uint8_t mask;
         uint8_t cur_mask;
     } dir_matrix[4] = {
-        { -1,  0, 0x08, 0x01 }, // Влево
-        {  1,  0, 0x01, 0x08 }, // Вправо
-        {  0, -1, 0x80, 0x10 }, // Вверх
-        {  0,  1, 0x10, 0x80 }  // Вниз
+        { 0x08, 0x01 }, // Влево
+        { 0x01, 0x08 }, // Вправо
+        { 0x80, 0x10 }, // Вверх
+        { 0x10, 0x80 }  // Вниз
     } ;
 
-    x_log += dir_matrix[dir].x;
-    y_log += dir_matrix[dir].y;
+    x_log += dir_dx[dir];
+    y_log += dir_dy[dir];
 
     if ((x_log >= W_MAX) || (y_log >= H_MAX)) return 0;
 
@@ -695,12 +746,10 @@ static uint8_t check_path(enum direction dir, uint8_t x_graph, uint8_t y_graph)
  */
 static void set_background_bits(uint16_t x_graph, uint16_t y_graph, enum direction dir)
 {
-    const uint16_t abs_x_pos = x_graph - FIELD_X_OFFSET;
-    const uint16_t abs_y_pos = y_graph - FIELD_Y_OFFSET;
-    uint16_t x_log = abs_x_pos / POS_X_STEP;
-    uint16_t y_log = abs_y_pos / POS_Y_STEP;
-    int16_t x_rem = abs_x_pos % POS_X_STEP;
-    int16_t y_rem = (abs_y_pos % POS_Y_STEP) >> 2;
+    uint16_t x_log = graph_to_x_log(x_graph);
+    uint16_t y_log = graph_to_y_log(y_graph);
+    int16_t x_rem = graph_to_x_rem(x_graph);
+    int16_t y_rem = graph_to_y_rem(y_graph);
 
     switch (dir)
     {
@@ -906,10 +955,10 @@ static uint8_t move_bag(struct bag_info *bag, enum direction dir)
     if (!rv)
     {
         // Стирание мешка по старым координатам
-        sp_4_15_mask(bag->x_graph, bag->y_graph, nullptr, outline_bag[0]);
+        erase_bag(bag->x_graph, bag->y_graph);
 
         // Отрисовка спрайта передвигаемого мешка
-        sp_4_15_mask(bag_x_graph, bag_y_graph, image_bag[0], outline_bag[0]);
+        draw_bag(bag_x_graph, bag_y_graph);
 
         set_background_bits(bag_x_graph, bag_y_graph, dir); // Сбросить биты матрицы фона
         // Удалить монеты уничтоженные мешком
@@ -952,10 +1001,8 @@ static void move_bug(struct bug_info *bug)
 
     const uint8_t bug_x_graph = bug->x_graph;
     const uint8_t bug_y_graph = bug->y_graph;
-    const uint8_t bug_abs_x_pos = bug_x_graph - FIELD_X_OFFSET;
-    const uint8_t bug_abs_y_pos = bug_y_graph - FIELD_Y_OFFSET;
-    const uint8_t bug_x_rem = bug_abs_x_pos % POS_X_STEP;
-    const uint8_t bug_y_rem = (bug_abs_y_pos % POS_Y_STEP) >> 2;
+    const uint8_t bug_x_rem = graph_to_x_rem(bug_x_graph);
+    const uint8_t bug_y_rem = graph_to_y_rem(bug_y_graph);
 
     // Проверка возможности изменения направления движения при нахождении на ровной границе клетки
     if (!bug_x_rem && !bug_y_rem)
@@ -1174,11 +1221,7 @@ static void move_bug(struct bug_info *bug)
         erase_trail(bug->dir, bug->x_graph, bug->y_graph);
     }
 
-    // Увеличить/уменьшить фазу на единицу
-    bug->image_phase += bug->image_phase_inc;
-
-    // Переключить направление изменения фазы, если фаза дошла до предельного значения
-    if (!bug->image_phase || bug->image_phase >= 2) bug->image_phase_inc = -bug->image_phase_inc;
+    next_image_phase(&bug->image_phase, &bug->image_phase_inc); // Переключить фазу изображения
 
     // Отрисовка спрайта врага
     if (bug->type == BUG_NOBBIN)
@@ -1247,7 +1290,7 @@ static void redraw_bags(uint8_t x_graph, uint8_t y_graph)
 
         if (bag->state == BAG_STATIONARY)
         {
-            sp_4_15_mask(bag->x_graph, bag->y_graph, image_bag[0], outline_bag[0]); // Мешок с золотом
+            draw_bag(bag->x_graph, bag->y_graph); // Мешок с золотом
         }
         else
         {
@@ -1264,10 +1307,7 @@ static void draw_man()
 {
     uint8_t cab = !mis.flying && !mis.wait; // Флаг наличия "башенки"
 
-    man.image_phase += man.image_phase_inc; // Переключить фазу изображения
-
-    // При необходимости, сменить направление изменения фазы спрайта
-    if (!man.image_phase || man.image_phase >= 2) man.image_phase_inc = -man.image_phase_inc;
+    next_image_phase(&man.image_phase, &man.image_phase_inc); // Переключить фазу изображения
 
     uint16_t image_phase = man.image_phase + ((cab) ? 0 : 3);
     const uint8_t *image = (man.dir < DIR_UP) ? (uint8_t *)image_digger_right[image_phase] : (uint8_t *)image_digger_up[image_phase];
@@ -1490,10 +1530,6 @@ static void process_bugs()
             {
                 if (bonus.state != BONUS_ON) // Если не включен бонус-режим, запустить нового врага
                 {
-                    // Координаты рожденияя врагов - в правом верхнем углу
-                    constexpr uint8_t bug_start_x = FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP;
-                    constexpr uint8_t bug_start_y = FIELD_Y_OFFSET + 0 * POS_Y_STEP;
-
                     for (uint16_t i = 0; i < bugs.max; ++i)
                     {
                         struct bug_info *bug = &bugs_state[i];
@@ -1506,8 +1542,8 @@ static void process_bugs()
                         bug->wait = 0;                  // Враг не задержан
                         bug->image_phase = 0;           // Начальная фаза отрисовки спрайта
                         bug->image_phase_inc = 1;       // Начальное направление изменения фазы
-                        bug->x_graph = bug_start_x;     // Начальная графическая координата по оси X
-                        bug->y_graph = bug_start_y;     // Начальная графическая координата по оси Y
+                        bug->x_graph = CORNER_X;        // Начальная графическая координата по оси X (правый верхний угол)
+                        bug->y_graph = CORNER_Y;        // Начальная графическая координата по оси Y
                         bug->type = BUG_NOBBIN;         // Враги рождаются в виде Ноббинов
                         bug->dir = DIR_STOP;            // Начальное направление движения
 
@@ -1636,12 +1672,10 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
 
         uint8_t bag_x_graph = bag->x_graph;
         uint8_t bag_y_graph = bag->y_graph;
-        uint8_t bag_abs_x_pos = bag_x_graph - FIELD_X_OFFSET;
-        uint8_t bag_abs_y_pos = bag_y_graph - FIELD_Y_OFFSET;
-        uint8_t bag_x_log = bag_abs_x_pos / POS_X_STEP;
-        uint8_t bag_y_log = bag_abs_y_pos / POS_Y_STEP;
-        uint8_t bag_x_rem = bag_abs_x_pos % POS_X_STEP;
-        uint8_t bag_y_rem = (bag_abs_y_pos % POS_Y_STEP) >> 2;
+        uint8_t bag_x_log = graph_to_x_log(bag_x_graph);
+        uint8_t bag_y_log = graph_to_y_log(bag_y_graph);
+        uint8_t bag_x_rem = graph_to_x_rem(bag_x_graph);
+        uint8_t bag_y_rem = graph_to_y_rem(bag_y_graph);
 
         switch (bag->state)
         {
@@ -1766,9 +1800,8 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
 
                 // Перемещаем мешок в новое положение по оси Y
                 bag_y_graph += 2 * MOVE_Y_STEP; // Скорость падения мешка вдвое выше скорости перемещения врагов
-                bag_abs_y_pos = bag_y_graph - FIELD_Y_OFFSET;
-                bag_y_log = bag_abs_y_pos / POS_Y_STEP;
-                bag_y_rem = (bag_abs_y_pos % POS_Y_STEP) >> 2;
+                bag_y_log = graph_to_y_log(bag_y_graph);
+                bag_y_rem = graph_to_y_rem(bag_y_graph);
 
                 if (bag_y_rem == 0) // Если мешок находится в центре клетки по-вертикали, значит он пролетел один этаж
                 {
@@ -1800,7 +1833,7 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                     // стирает остатки спрайта падающего мешка целиком.
                     // Для разбивающегося мешка (BAG_BREAKS) это кадр перед началом анимации,
                     // как и в оригинале (stop_bag там рисует стационарный мешок).
-                    sp_4_15_mask(bag_x_graph, bag_y_graph, image_bag[0], outline_bag[0]);
+                    draw_bag(bag_x_graph, bag_y_graph);
                 }
 
                 if (man.state == CREATURE_ALIVE) //  Если Диггер жив
@@ -2079,11 +2112,16 @@ static inline void eat_coin()
 /**
  * @brief Обработка Диггера
  */
-static void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
+static void process_man()
 {
     // Обработка перемещения Диггера
     if (man.state == CREATURE_ALIVE) // Если Диггер жив
     {
+        // Положение Диггера на момент входа: по остаткам видно, стоит ли он
+        // на границе клетки и можно ли менять направление движения
+        const uint8_t man_x_rem = graph_to_x_rem(man.x_graph);
+        const uint8_t man_y_rem = graph_to_y_rem(man.y_graph);
+
         if (man.wait) man.wait--; // Если Диггер в режиме задержки (при толкании мешков)
         else
         {
@@ -2111,7 +2149,7 @@ static void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
                 }
             }
 
-            if (!mis.wait && (port_state & ((1 << PAR_INTERF_LEFT_BUTTON) | (1 << PAR_INTERF_RIGHT_BUTTON)))) mis.fire = 1;
+            if (!mis.wait && (port_state & JOY_BUTTONS)) mis.fire = 1;
 
             if (new_code) // Если поступил новый скан-код
             {
@@ -2119,19 +2157,18 @@ static void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
                 {
                     case 12:  // СБР - Пауза
                     {
-                        constexpr uint16_t joy_buttons = (1 << PAR_INTERF_LEFT_BUTTON) | (1 << PAR_INTERF_RIGHT_BUTTON);
                         volatile uint16_t *joy = (volatile uint16_t *)REG_PAR_INTERF;
                         volatile uint8_t *key_state = (volatile uint8_t *)REG_KEY_STATE;
 
                         // Дождаться отпускания кнопки джойстика, иначе удерживаемая
                         // кнопка огня сняла бы паузу в тот же момент
-                        while (*joy & joy_buttons);
+                        while (*joy & JOY_BUTTONS);
 
                         // Пауза снимается любой клавишей или кнопкой джойстика
-                        while (!(*key_state & (1 << KEY_STATE_STATE)) && !(*joy & joy_buttons));
+                        while (!(*key_state & (1 << KEY_STATE_STATE)) && !(*joy & JOY_BUTTONS));
 
                         // Дождаться отпускания кнопки, чтобы снятие паузы не обернулось выстрелом
-                        while (*joy & joy_buttons);
+                        while (*joy & JOY_BUTTONS);
 
                         break;
                     }
@@ -2198,7 +2235,7 @@ static void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
             if (bonus.state == BONUS_READY)
             {
                 // Проверить что Диггер соприкоснулся с вишенкой
-                if (check_collision_4_15(man.x_graph, man.y_graph, FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP, FIELD_Y_OFFSET))
+                if (check_collision_4_15(man.x_graph, man.y_graph, CORNER_X, CORNER_Y))
                 {
                     bonus.state = BONUS_ON; // Включить Бонус-режим
                     bonus.count = 1; // Начальное значение множителя очков в Бонус-режиме
@@ -2208,12 +2245,12 @@ static void process_man(const uint8_t man_x_rem, const uint8_t man_y_rem)
                     add_score(1000); // 1000 очков за вишенку
 
                     // Стереть вишенку
-                    erase_4_15(FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP, FIELD_Y_OFFSET);
+                    erase_4_15(CORNER_X, CORNER_Y);
                 }
                 else
                 {
                     // Нарисовать вишенку в правом верхнем углу игрового поля
-                    sp_4_15_put(FIELD_X_OFFSET + (W_MAX - 1) * POS_X_STEP, FIELD_Y_OFFSET, (uint8_t *)image_cherry);
+                    sp_4_15_put(CORNER_X, CORNER_Y, (uint8_t *)image_cherry);
                 }
             }
 
@@ -2596,7 +2633,7 @@ static void process_game_state()
 
             // Ожидание нажатия клавиши или кнопки джойстика
             while(((union EXT_DEV *)REG_EXT_DEV)->bits.MAG_KEY &&
-                  !(*((uint16_t *)REG_PAR_INTERF) & ((1 << PAR_INTERF_LEFT_BUTTON) | (1 << PAR_INTERF_RIGHT_BUTTON))));
+                  !(*((uint16_t *)REG_PAR_INTERF) & JOY_BUTTONS));
             (void)*(volatile uint8_t *)REG_KEY_DATA; // Очистка буфера клавиатуры
 
             init_game(); // Установить игру в начальное состояние
@@ -2636,29 +2673,19 @@ void main()
         // и включить делитель на 4, а так же, сбросить флаг события таймера
         tve_csr->reg = (1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN) | (1 << TVE_CSR_D4);
 
-        // Положение Диггера на момент входа в кадр: остатки нужны process_man
-        // чтобы понять, на границе ли клетки и можно ли менять направление.
-        const uint8_t man_x_rem = (man.x_graph - FIELD_X_OFFSET) % POS_X_STEP;
-        const uint8_t man_y_rem = ((man.y_graph - FIELD_Y_OFFSET) % POS_Y_STEP) >> 2;
-
         // Диггер обрабатывается первым - чтение клавиатуры, движение, выстрел.
         // Это снимает кадр задержки между нажатием и реакцией: остальные системы
         // в этом же кадре видят новую позицию/направление/mis.fire.
-        process_man(man_x_rem, man_y_rem);
+        process_man();
 
         // На высоких уровнях сложности дать Диггеру шанс на дополнительный шаг
         // в этом же кадре. Симметрично бусту врагов в process_bugs,
         // но вдвое реже - враги остаются чуть быстрее Диггера.
-        if ((rand() & 0x1F) < game.difficulty)
-        {
-            const uint8_t mx_rem = (man.x_graph - FIELD_X_OFFSET) % POS_X_STEP;
-            const uint8_t my_rem = ((man.y_graph - FIELD_Y_OFFSET) % POS_Y_STEP) >> 2;
-            process_man(mx_rem, my_rem);
-        }
+        if ((rand() & 0x1F) < game.difficulty) process_man();
 
         // Логические координаты Диггера ПОСЛЕ хода - для process_bags
-        const uint8_t man_x_log = (man.x_graph - FIELD_X_OFFSET) / POS_X_STEP;
-        const uint8_t man_y_log = (man.y_graph - FIELD_Y_OFFSET) / POS_Y_STEP;
+        const uint8_t man_x_log = graph_to_x_log(man.x_graph);
+        const uint8_t man_y_log = graph_to_y_log(man.y_graph);
 
         process_bugs();
         process_bags(man_x_log, man_y_log);
