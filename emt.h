@@ -30,7 +30,7 @@ static inline char EMT_6()
     asm volatile (
         "emt 06\n"
         "mov r0, %0"
-        : "=r" (rv) : : "cc"
+        : "=r" (rv) : : "r0", "cc"
     );
 
     return rv;
@@ -51,7 +51,7 @@ static inline void EMT_10(char *ptr, uint16_t len_delim)
         "mov %0, r1\n\t"
         "mov %1, r2\n\t"
         "emt 010\n"
-        : : "r" (ptr), "r" (len_delim) : "cc"
+        : : "r" (ptr), "r" (len_delim) : "r1", "r2", "cc", "memory"
     );
 }
 
@@ -71,7 +71,7 @@ static inline void EMT_12(uint8_t key_num, char *ptr)
         "mov %0, r0\n\t"
         "mov %1, r1\n\t"
         "emt 012\n"
-        : : "r" (key_num), "r" (ptr) : "r0", "cc"
+        : : "r" (key_num), "r" (ptr) : "r0", "r1", "cc", "memory"
     );
 }
 
@@ -124,7 +124,7 @@ static inline void EMT_20(const char *ptr)
         "mov %0, r1\n\t"
         "clr r2\n\t"
         "emt 020\n"
-        : : "r" (ptr) : "r1", "r2", "cc"
+        : : "r" (ptr) : "r1", "r2", "cc", "memory"
     );
 }
 
@@ -146,7 +146,7 @@ static inline void EMT_20_l(const char *ptr, uint16_t len_delim)
         "mov %0, r1\n\t"
         "mov %1, r2\n\t"
         "emt 020\n"
-        : : "r" (ptr), "r" (len_delim) : "r1", "r2", "cc"
+        : : "r" (ptr), "r" (len_delim) : "r1", "r2", "cc", "memory"
     );
 }
 
@@ -170,7 +170,7 @@ static inline void EMT_22(char c, uint8_t pos)
         "mov %0, r0\n\t"
         "mov %1, r1\n\t"
         "emt 022\n"
-        : : "r" (c), "r" (pos) : "cc"
+        : : "r" (c), "r" (pos) : "r0", "r1", "cc", "memory"
     );
 }
 
@@ -211,8 +211,8 @@ static inline void EMT_26(uint8_t *x, uint8_t *y)
 {
     asm volatile (
         "emt 026\n"
-        "mov r1, @%0\n\t"
-        "mov r2, @%1\n\t"
+        "movb r1, (%0)\n\t"
+        "movb r2, (%1)\n\t"
         : : "r" (x), "r" (y) : "r1", "r2", "cc", "memory"
     );
 }
@@ -241,7 +241,7 @@ static inline void EMT_30(uint8_t w_e, uint8_t x, uint8_t y)
         "mov %1, r1\n\t"
         "mov %2, r2\n\t"
         "emt 030\n"
-        : : "r" (w_e), "r" (x), "r" (y) : "cc"
+        : : "r" (w_e), "r" (x), "r" (y) : "r0", "r1", "r2", "cc", "memory"
     );
 }
 
@@ -271,7 +271,7 @@ static inline void EMT_32(uint8_t w_e, uint8_t x, uint8_t y)
         "mov %1, r1\n\t"
         "mov %2, r2\n\t"
         "emt 032\n"
-        : : "r" (w_e), "r" (x), "r" (y) : "cc"
+        : : "r" (w_e), "r" (x), "r" (y) : "r0", "r1", "r2", "cc", "memory"
     );
 }
 
@@ -357,7 +357,7 @@ static inline void EMT_36(const char *ptr)
     asm volatile (
         "mov %0, r1\n\t"
         "emt 036\n"
-        : : "r" (ptr) : "cc"
+        : : "r" (ptr) : "r1", "cc", "memory"
     );
 }
 
@@ -430,7 +430,7 @@ static inline void EMT_40(enum EMT_40_speeds speed)
     asm volatile (
         "mov %0, r0\n\t"
         "emt 040\n"
-        : : "r" (speed) : "cc"
+        : : "r" (speed) : "r0", "cc"
     );
 }
 
@@ -483,7 +483,7 @@ static inline uint8_t EMT_44()
     asm volatile (
         "emt 044\n"
         "mov r0, %0"
-        : "=r" (rv) : : "cc"
+        : "=r" (rv) : : "r0", "cc"
     );
 
     return rv;
@@ -505,7 +505,7 @@ static inline void EMT_46(const uint8_t *ptr, uint16_t len)
         "mov %0, r1\n\t"
         "mov %1, r2\n\t"
         "emt 046\n"
-        : : "r" (ptr), "r" (len) : "r1", "r2", "cc"
+        : : "r" (ptr), "r" (len) : "r1", "r2", "cc", "memory"
     );
 }
 

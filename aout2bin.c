@@ -20,7 +20,7 @@ int main(int ac, char *av[])
 {
     if (ac != 3)
     {
-	printf("Usage: <a.out file name> <bin file name>%s\n", av[0]);
+	printf("Usage: %s <a.out file name> <bin file name>\n", av[0]);
 	return -1;
     }
     
@@ -60,7 +60,14 @@ int main(int ac, char *av[])
     printf("Rel. info suppressed = %04o\n", a_ptr->relocation_info_suppressed);
 
     uint8_t *text_ptr = (uint8_t *)(a_ptr + 1);
-    uint16_t bin_size = a_ptr->text_size + a_ptr->bss_size + a_ptr->data_size;
+    // .bss в BIN не пишется: в a.out его нет, загрузчик БК его не обнуляет
+    uint16_t bin_size = a_ptr->text_size + a_ptr->data_size;
+
+    if (file_len < (long)sizeof(*a_ptr) + bin_size)
+    {
+	printf("File '%s' is too short for its header.\n", av[1]);
+	return -1;
+    }
     
     printf("\nBinary file length   = %04o (%d bytes)\n", bin_size, bin_size);
 
