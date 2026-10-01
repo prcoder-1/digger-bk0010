@@ -312,18 +312,18 @@ static void print_dec(uint32_t number, uint16_t x_graph, uint16_t y_graph)
     for (uint8_t i = 0; i < SCORE_DIGITS; ++i)
     {
         const uint32_t p = *pw++;
-        uint8_t digit = 0;
+        // Строка таблицы цифры выбирается сдвигом указателя, а не индексом: digit * 12 стоило бы __mulhi3
+        const uint8_t *idx_row = digit_indices[0];
         while (number >= p)
         {
             number -= p;
-            ++digit;
+            idx_row += row_n;
         }
 
-        const uint8_t *idx_row = digit_indices[digit];
         uint8_t *dst = digit_buf;
         for (uint8_t r = 0; r < row_n; ++r)
         {
-            const uint8_t *src = digit_rows[idx_row[r]];
+            const uint8_t *src = &digit_rows[0][0] + idx_row[r]; // В таблице уже смещения в байтах
             *dst++ = *src++;
             *dst++ = *src++;
             *dst++ = *src;
