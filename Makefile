@@ -1,4 +1,4 @@
-VERSION=1.1
+VERSION=1.2
 BUILD_DATE=$(shell date +%d.%m.%Y)
 # DEBUG=-DDEBUG
 # MINIMAP=-DMINIMAP
@@ -8,6 +8,12 @@ BIN_FILE_1=${FILE_1}.BIN
 BIN_FILE_2=${FILE_2}.BIN
 OUT_FILE_1=${FILE_1}.out
 OUT_FILE_2=${FILE_2}.out
+MAP_FILE_1=digger.map
+MAP_FILE_2=title.map
+# Флаг профильной сборки: не инлайнить функции с единственным вызовом, иначе
+# process_bugs/bags/missile/bonus/game_state, sound_effect и draw_man
+# растворяются в main и профилировщик не может их разделить.
+PROF_FLAG=-fno-inline-functions-called-once -fno-inline-small-functions
 OPT_FLAG=-Os -mlra -fno-reorder-blocks -fno-caller-saves -fno-if-conversion
 XGCC=/home/prcoder/xgcc
 LIBGCC=$(shell pdp11-aout-gcc -m10 -m1801vm1 -msoft-float $(OPT_FLAG) -print-libgcc-file-name)
@@ -20,7 +26,7 @@ GMPI_UPLOAD_DIR=/BK_Uploads
 .PHONY: all asm-files bin-files digger-main-file title-main-file levels-file \
         short-font-file full-font-file sprites-file sprites-file-title \
         music-file-title cover-file-title credits-file-title crt0 libs digger-out-file \
-        title-out-file g-mpi docs clean
+        title-out-file profile-bin g-mpi docs clean
 
 all: asm-files bin-files
 
@@ -78,10 +84,10 @@ libs: memory.s dzx0.s mirror.s sprites.c sprites_extra.c sound.c sound_pwm.c sou
 	pdp11-aout-ar rcs libs.a memory.o mirror.o sprites.o sprites_extra.o sound.o sound_pwm.o sound_vibrato.o tools.o dzx0.o
 
 digger-out-file: crt0 digger-main-file sprites-file short-font-file levels-file music-file-background libs
-	pdp11-aout-ld -T a.out.ld -Map digger.map -o ${OUT_FILE_1} crt0.o digger_sprites.o digger_short_font.o digger_levels.o digger_music_background.o digger.o libs.a $(LIBGCC)
+	pdp11-aout-ld -T a.out.ld -Map ${MAP_FILE_1} -o ${OUT_FILE_1} crt0.o digger_sprites.o digger_short_font.o digger_levels.o digger_music_background.o digger.o libs.a $(LIBGCC)
 
 title-out-file: crt0 title-main-file sprites-file-title full-font-file music-file-title cover-file-title credits-file-title libs
-	pdp11-aout-ld -T a.out.ld -Map title.map -o ${OUT_FILE_2} crt0.o digger_sprites_title.o digger_full_font.o digger_music_title.o digger_title.o digger_credits.o title.o libs.a $(LIBGCC)
+	pdp11-aout-ld -T a.out.ld -Map ${MAP_FILE_2} -o ${OUT_FILE_2} crt0.o digger_sprites_title.o digger_full_font.o digger_music_title.o digger_title.o digger_credits.o title.o libs.a $(LIBGCC)
 
 aout2bin: aout2bin.c
 	gcc aout2bin.c -o aout2bin
@@ -89,6 +95,14 @@ aout2bin: aout2bin.c
 bin-files: aout2bin digger-out-file title-out-file
 	./aout2bin ${OUT_FILE_1} ${BIN_FILE_1}
 	./aout2bin ${OUT_FILE_2} ${BIN_FILE_2}
+
+# Сборка для профилирования: тот же код, но функции верхнего уровня остаются
+# настоящими подпрограммами - иначе профилировщик эмулятора не отделит их от main.
+# Кладёт DIGGER_PROF.BIN и карту digger_prof.map.
+profile-bin: aout2bin
+	${MAKE} OPT_FLAG="${OPT_FLAG} ${PROF_FLAG}" \
+	        OUT_FILE_1=DIGGER_PROF.out MAP_FILE_1=digger_prof.map digger-out-file
+	./aout2bin DIGGER_PROF.out DIGGER_PROF.BIN
 
 g-mpi: bin-files
 	curl -i -o /dev/null -X POST -H "Content-Type: multipart/form-data" -F "storeas=${GMPI_UPLOAD_DIR}/${BIN_FILE_1}" -F "size=$(shell stat -c%s ${BIN_FILE_1})" -F "file=@${BIN_FILE_1}" "${GMPI_API_URL}/upload"
