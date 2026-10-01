@@ -2451,9 +2451,9 @@ static void process_man()
             // Нарисовать перевёрнутого Диггера
             sp_4_15_mask(man.x_graph, man.y_graph, image_digger_turned_over[0], outline_digger_turned_over[0]);
 
-            // Мешок могли убрать, не дав ему остановиться (съел Хоббин, раздавил другой мешок) -
-            // тогда dir так и остался бы DIR_DOWN, и игра зависла бы с мёртвым Диггером
-            if (man.dead_bag->dir == DIR_STOP || man.dead_bag->state != BAG_FALLING)
+            // Мешок остановился, либо его убрали в полёте (съел Хоббин, раздавил другой мешок) -
+            // проверка по dir == DIR_STOP во втором случае подвесила бы игру с мёртвым Диггером
+            if (man.dead_bag->state != BAG_FALLING)
             {
                 man_rip();
             }
@@ -2678,16 +2678,21 @@ static void process_game_state()
 
             sp_put(go_x, go_y, go_width, go_height, (uint8_t *)game_over, 0); // Вывод написи Game Over
 
-            volatile union EXT_DEV *ext_dev = (volatile union EXT_DEV *)REG_EXT_DEV;
+            // Маска вместо битового поля MAG_KEY: поле gcc извлекает шестью сдвигами
+            volatile uint16_t *ext_dev = (volatile uint16_t *)REG_EXT_DEV;
             volatile uint16_t *joy = (volatile uint16_t *)REG_PAR_INTERF;
+            constexpr uint16_t key_up = 1 << EXT_DEV_MAG_KEY; // 1 - клавиша отпущена
 
             // Сначала дождаться отпускания: в момент гибели игрок обычно держит
             // стрелку, и Game Over иначе снимался бы сразу же
-            while (!ext_dev->bits.MAG_KEY || (*joy & JOY_BUTTONS));
+            while (!(*ext_dev & key_up) || (*joy & JOY_BUTTONS));
 
             // Ожидание нажатия клавиши или кнопки джойстика
-            while (ext_dev->bits.MAG_KEY && !(*joy & JOY_BUTTONS));
+            while ((*ext_dev & key_up) && !(*joy & JOY_BUTTONS));
             (void)*(volatile uint8_t *)REG_KEY_DATA; // Очистка буфера клавиатуры
+
+            // Дождаться отпускания кнопки, иначе удерживаемый "огонь" сразу выстрелит в новой игре
+            while (*joy & JOY_BUTTONS);
 
             init_game(); // Установить игру в начальное состояние
         }
