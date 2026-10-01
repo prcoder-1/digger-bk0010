@@ -1904,7 +1904,7 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
 
             case BAG_BREAKS: // Мешок разбивается
             {
-                uint16_t *v_scroll = (uint16_t *)REG_V_SCROLL;
+                volatile uint16_t *v_scroll = (volatile uint16_t *)REG_V_SCROLL;
 
                 // Анимация разбивающегося мешка (три фазы, пропуская один такт счётчика)
                 if (bag->count++ < 6)
@@ -2153,11 +2153,12 @@ static void process_man()
             man.new_dir = DIR_STOP;
 
             // Обработка управления с клавиатуры и джойстика
-            volatile uint16_t port_state = *((uint16_t *)REG_PAR_INTERF); // Состояние регистра параллельного порта
+            const uint16_t port_state = *((volatile uint16_t *)REG_PAR_INTERF); // Состояние регистра параллельного порта
             // print_dec(port_state, 0, MAX_Y_POS + 2 * POS_Y_STEP);
-            volatile uint8_t key_pressed = !(((union EXT_DEV *)REG_EXT_DEV)->bits.MAG_KEY);
-            volatile uint8_t new_code = (*(uint8_t *)REG_KEY_STATE) & (1 << KEY_STATE_STATE);
-            volatile uint8_t code = *((uint8_t *)REG_KEY_DATA); // Скан-код нажатой клавиши
+            const uint8_t key_pressed = !(((union EXT_DEV *)REG_EXT_DEV)->bits.MAG_KEY);
+            // Состояние читается до данных: чтение регистра данных сбрасывает флаг готовности
+            const uint8_t new_code = (*(volatile uint8_t *)REG_KEY_STATE) & (1 << KEY_STATE_STATE);
+            const uint8_t code = *((volatile uint8_t *)REG_KEY_DATA); // Скан-код нажатой клавиши
             if (key_pressed || port_state) // Если удерживают клавишу на клавиатуре или направление на джойстике
             {
                 static const enum direction joy_dirs[] = { DIR_UP, DIR_RIGHT, DIR_DOWN, DIR_LEFT };
@@ -2191,6 +2192,10 @@ static void process_man()
 
                         // Пауза снимается любой клавишей или кнопкой джойстика
                         while (!(*key_state & (1 << KEY_STATE_STATE)) && !(*joy & JOY_BUTTONS));
+
+                        // Забрать код клавиши, снявшей паузу, иначе на следующем кадре
+                        // он будет обработан как команда (СБР снова поставит паузу)
+                        (void)*(volatile uint8_t *)REG_KEY_DATA;
 
                         // Дождаться отпускания кнопки, чтобы снятие паузы не обернулось выстрелом
                         while (*joy & JOY_BUTTONS);
@@ -2430,7 +2435,9 @@ static void process_man()
             // Нарисовать перевёрнутого Диггера
             sp_4_15_mask(man.x_graph, man.y_graph, image_digger_turned_over[0], outline_digger_turned_over[0]);
 
-            if (man.dead_bag->dir == DIR_STOP)
+            // Мешок могли убрать, не дав ему остановиться (съел Хоббин, раздавил другой мешок) -
+            // тогда dir так и остался бы DIR_DOWN, и игра зависла бы с мёртвым Диггером
+            if (man.dead_bag->dir == DIR_STOP || man.dead_bag->state != BAG_FALLING)
             {
                 man_rip();
             }
@@ -2655,9 +2662,15 @@ static void process_game_state()
 
             sp_put(go_x, go_y, go_width, go_height, (uint8_t *)game_over, 0); // Вывод написи Game Over
 
+            volatile union EXT_DEV *ext_dev = (volatile union EXT_DEV *)REG_EXT_DEV;
+            volatile uint16_t *joy = (volatile uint16_t *)REG_PAR_INTERF;
+
+            // Сначала дождаться отпускания: в момент гибели игрок обычно держит
+            // стрелку, и Game Over иначе снимался бы сразу же
+            while (!ext_dev->bits.MAG_KEY || (*joy & JOY_BUTTONS));
+
             // Ожидание нажатия клавиши или кнопки джойстика
-            while(((union EXT_DEV *)REG_EXT_DEV)->bits.MAG_KEY &&
-                  !(*((uint16_t *)REG_PAR_INTERF) & JOY_BUTTONS));
+            while (ext_dev->bits.MAG_KEY && !(*joy & JOY_BUTTONS));
             (void)*(volatile uint8_t *)REG_KEY_DATA; // Очистка буфера клавиатуры
 
             init_game(); // Установить игру в начальное состояние
