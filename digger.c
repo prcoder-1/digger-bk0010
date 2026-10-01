@@ -544,7 +544,7 @@ static void init_level_state()
     // Переменные относщиеся к созданию и управлению врагами
     bugs.total = game.difficulty + 5;         // Общее количество врагов на уровне - пять плюс уровень сложности
     bugs.delay = 45 - (game.difficulty << 1); // Задержка появления врагов (с ростом сложности убывает)
-    bugs.delay_counter = bugs.delay;     // Инициализация счётчика задержки врага исходным значением
+    bugs.delay_counter = 10;             // Первый враг - через 10 тактов после старта (как в оригинале)
     bugs.active = 0;                     // Количество активных врагов
     bugs.created = 0;                    // Общее количество созданных врагов
 
@@ -1545,47 +1545,45 @@ static void process_bugs()
 {
     // Обработка появления врагов
     if (bugs.delay_counter > 0) --bugs.delay_counter; // Отсчёт времени до появления нового врага
-    else
+    else if (man.state == CREATURE_ALIVE) // Если Диггер жив
     {
-        bugs.delay_counter = bugs.delay; // Перезарядить счётчик времени до появления врага
-
-        if (man.state == CREATURE_ALIVE) // Если Диггер жив
+        // Счётчик перезаряжается только при рождении врага: пока его некуда выпустить,
+        // он остаётся нулевым, и враг появляется сразу, как освободится место (как в оригинале)
+        if ((bugs.created < bugs.total) && (bugs.active < bugs.max)) // Если врагов на экране одновременно меньше максимального количества
         {
-            if ((bugs.created < bugs.total) && (bugs.active < bugs.max)) // Если врагов на экране одновременно меньше максимального количества
+            if (bonus.state != BONUS_ON) // Если не включен бонус-режим, запустить нового врага
             {
-                if (bonus.state != BONUS_ON) // Если не включен бонус-режим, запустить нового врага
+                for (uint16_t i = 0; i < bugs.max; ++i)
                 {
-                    for (uint16_t i = 0; i < bugs.max; ++i)
-                    {
-                        struct bug_info *bug = &bugs_state[i];
+                    struct bug_info *bug = &bugs_state[i];
 
-                        if (bug->state != CREATURE_INACTIVE) continue; // Пропустить активных врагов
+                    if (bug->state != CREATURE_INACTIVE) continue; // Пропустить активных врагов
 
-                        // Начальное состояние врага
-                        bug->state = CREATURE_STARTING; // Враг стартует
-                        bug->count = 6;                 // Время до запуска врага
-                        bug->wait = 0;                  // Враг не задержан
-                        bug->image_phase = 0;           // Начальная фаза отрисовки спрайта
-                        bug->image_phase_inc = 1;       // Начальное направление изменения фазы
-                        bug->x_graph = CORNER_X;        // Начальная графическая координата по оси X (правый верхний угол)
-                        bug->y_graph = CORNER_Y;        // Начальная графическая координата по оси Y
-                        bug->type = BUG_NOBBIN;         // Враги рождаются в виде Ноббинов
-                        bug->dir = DIR_STOP;            // Начальное направление движения
+                    // Начальное состояние врага
+                    bug->state = CREATURE_STARTING; // Враг стартует
+                    bug->count = 6;                 // Время до запуска врага
+                    bug->wait = 0;                  // Враг не задержан
+                    bug->image_phase = 0;           // Начальная фаза отрисовки спрайта
+                    bug->image_phase_inc = 1;       // Начальное направление изменения фазы
+                    bug->x_graph = CORNER_X;        // Начальная графическая координата по оси X (правый верхний угол)
+                    bug->y_graph = CORNER_Y;        // Начальная графическая координата по оси Y
+                    bug->type = BUG_NOBBIN;         // Враги рождаются в виде Ноббинов
+                    bug->dir = DIR_STOP;            // Начальное направление движения
 
-                        bugs.active++;  // Увеличить счётчик активных врагов
-                        bugs.created++; // Увеличить общее количество созданных врагов
+                    bugs.active++;  // Увеличить счётчик активных врагов
+                    bugs.created++; // Увеличить общее количество созданных врагов
+                    bugs.delay_counter = bugs.delay; // Задержка до появления следующего врага
 
-                        break;
-                    }
+                    break;
                 }
             }
-            else
+        }
+        else
+        {
+            // Если Бонус (вишенка) ещё не появлялся и создано максимальное количество врагов
+            if ((bonus.state == BONUS_OFF) && (bugs.created == bugs.total))
             {
-                // Если Бонус (вишенка) ещё не появлялся и создано максимальное количество врагов
-                if ((bonus.state == BONUS_OFF) && (bugs.created == bugs.total))
-                {
-                    bonus.state = BONUS_READY; // Включить готовность к активации бонус-режима
-                }
+                bonus.state = BONUS_READY; // Включить готовность к активации бонус-режима
             }
         }
     }
@@ -1608,28 +1606,37 @@ static void process_bugs()
                     break;
                 }
 
-                if (bug->type == BUG_NOBBIN) // Если это Ноббин
+                // Столкновения с другими врагами (как dir_change/BUG_STUCK в оригинале): любое
+                // столкновение задерживает врага, попутчика разворачивает, Ноббину копит застревание
+                uint8_t collided = 0;
+                for (uint16_t t = 0; t < bugs.max; ++t)
                 {
-                    for (uint16_t t = 0; t < bugs.max; ++t)
+                    if (t == i) continue; // Пропустить самого себя
+
+                    struct bug_info *another_bug = &bugs_state[t];
+                    if (another_bug->state == CREATURE_INACTIVE) continue; // Пропустить неактивных врагов
+
+                    // Если враг соприкоснулся с другим врагом
+                    if (check_collision_4_15(bug->x_graph, bug->y_graph, another_bug->x_graph, another_bug->y_graph))
                     {
-                        if (t == i) continue; // Пропустить самого себя
+                        collided = 1;
 
-                        struct bug_info *another_bug = &bugs_state[t];
-                        if (another_bug->state != CREATURE_ALIVE) continue; // Пропустить неживых врагов
-
-                        // Если враг соприкоснулся с другим врагом
-                        if (check_collision_4_15(bug->x_graph, bug->y_graph, another_bug->x_graph, another_bug->y_graph))
+                        // Если оба уже движутся в одном направлении - развернуть другого
+                        if ((another_bug->state == CREATURE_ALIVE) && (bug->dir == another_bug->dir))
                         {
-                            bug->count++;  // Увеличить счётчик застревания
-
-                            if (bug->dir == another_bug->dir) // Если враги движутся в одном направлении
-                            {
-                                bug->wait++;   // Увеличить счётчик ожидания
-                                bug->dir ^= 1; // Инвертировать направление движения
-                            }
+                            another_bug->dir ^= 1; // Инвертировать направление движения
                         }
                     }
+                }
 
+                if (collided)
+                {
+                    bug->wait++; // Увеличить счётчик ожидания
+                    if ((bug->type == BUG_NOBBIN) && (man.state == CREATURE_ALIVE)) bug->count++; // Увеличить счётчик застревания
+                }
+
+                if (bug->type == BUG_NOBBIN) // Если это Ноббин
+                {
                     //  Если Ноббин застрял или соприкоснулся с другим на определённое (зависящее от уровня сложности) время
                     if (bug->count > (21 - game.difficulty))
                     {
@@ -1720,8 +1727,11 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                         {
                             case DIR_STOP: // Если мешок неподвижен
                             {
-                                // Если Диггер двигался вверх и он находится под мешком, то пока не начинать раскачивать мешок
-                                if (!((man_x_log == bag_x_log) && (man_y_log == bag_y_log + 1) && (man.new_dir == DIR_UP)))
+                                // Не раскачивать мешок, пока под ним (или в его клетке) Диггер, повёрнутый
+                                // вверх или вниз - даже стоящий на месте (get_man_block в оригинале)
+                                if (!((man_x_log == bag_x_log) &&
+                                      ((man_y_log == bag_y_log + 1) || (man_y_log == bag_y_log)) &&
+                                      ((man.dir == DIR_UP) || (man.dir == DIR_DOWN))))
                                 {
                                     // Начать раскачивать мешок
                                     bag->state = BAG_LOOSE;  // Мешок раскачивается
@@ -1945,6 +1955,12 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
 
                     // Стереть разбившийся мешок
                     erase_4_15(bag->x_graph, bag->y_graph);
+                }
+                else if ((bag_y_log < H_MAX - 1) && (bag->count < broke_max - 10) &&
+                         full_bite(background[bag_y_log + 1][bag_x_log]))
+                {
+                    // Под золотом прокопан проход - оно исчезает быстрее (как в оригинале)
+                    bag->count = broke_max - 10;
                 }
 
                 break;
