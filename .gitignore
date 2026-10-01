@@ -1,0 +1,20 @@
+# Артефакты сборки
+*.o
+*.a
+*.out
+*.map
+/*.BIN
+/aout2bin
+/bmp2sprite
+/sprite2bmp
+docs/
+
+# Ассемблерные листинги цели asm-files (исходные .s в корне - в репозитории)
+/digger.s
+/sprites.s
+/title.s
+/tools.s
+
+# IDE
+.kdev4/
+*.kdev4
