@@ -1183,6 +1183,8 @@ static void move_bug(struct bug_info *bug)
 
     if (bug->state == CREATURE_ALIVE)
     {
+        uint8_t bag_hit = 0; // Враг коснулся мешка или золота
+
         // Проверить соприкосновение врага с мешками
         for (uint8_t i = 0; i < MAX_BAGS; ++i)
         {
@@ -1193,6 +1195,7 @@ static void move_bug(struct bug_info *bug)
             // Соприкосновение проверяется по новому положению врага
             if (check_collision_4_15(bag->x_graph, bag->y_graph, bug->x_graph, bug->y_graph))
             {
+                bag_hit = 1;
                 uint16_t remove_bag = 0;
                 if (bug->type == BUG_HOBBIN)
                 {
@@ -1216,7 +1219,6 @@ static void move_bug(struct bug_info *bug)
                                 bug->x_graph = bug_x_graph;
                                 bug->y_graph = bug_y_graph;
                                 bug->count++; // Увеличить счётчик застревания
-                                bug->wait++; // Задержать врага перед мешком
 
                                 if ((dir == DIR_UP) || (dir == DIR_DOWN))
                                 {
@@ -1232,7 +1234,6 @@ static void move_bug(struct bug_info *bug)
                         case BAG_BROKEN:  // Если мешок разбит
                         {
                             remove_bag = 1; // Удалить съеденное Ноббином золото
-                            bug->wait++; // Задержать врага съедающего золото
                             break;
                         }
                     }
@@ -1244,10 +1245,16 @@ static void move_bug(struct bug_info *bug)
 
                     // Стереть съеденный мешок или золото
                     sp_4_15_mask(bag->x_graph, bag->y_graph, nullptr, outline_bag_fall[0]);
-
-                    bug->wait++; // Задержать врага перед мешком
                 }
             }
+        }
+
+        // Как в оригинале: касание мешков задерживает врага на такт (один раз, сколько бы
+        // мешков он ни задел), а толкание вбок - ещё на такт, даже если мешок сдвинулся
+        if (bag_hit)
+        {
+            bug->wait++;
+            if (bug->dir < DIR_UP) bug->wait++;
         }
 
         // Для Хоббинов увеличивать счётчик застревания для превращения в Ноббина по времени
