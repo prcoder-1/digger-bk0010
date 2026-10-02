@@ -1656,7 +1656,7 @@ static void process_bugs()
                 if (bug->type == BUG_NOBBIN) // Если это Ноббин
                 {
                     //  Если Ноббин застрял или соприкоснулся с другим на определённое (зависящее от уровня сложности) время
-                    if (bug->count > (21 - game.difficulty))
+                    if (bug->count > (10 - game.difficulty))
                     {
                         bug->count = 0;         // Сбросить счётчик застревания
                         bug->type = BUG_HOBBIN; // Переключить тип врага на Хоббина
