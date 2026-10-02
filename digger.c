@@ -2093,6 +2093,19 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
 }
 
 /**
+ * @brief Соприкасается ли снаряд с объектом 4x15
+ *
+ * Отдельной функцией с одним аргументом: встроенная в process_missile проверка с четырьмя
+ * аргументами повторялась бы для врагов, мешков и вишенки.
+ *
+ * @param xy - координаты объекта (x_graph, y_graph подряд, как в bag_info и bug_info)
+ */
+__attribute__((noinline)) static uint8_t missile_touches(const uint16_t *xy)
+{
+    return check_collision_missile(mis.x_graph, mis.y_graph, xy[0], xy[1]);
+}
+
+/**
  * @brief Обработка выстрела
  */
 static void process_missile()
@@ -2119,6 +2132,7 @@ static void process_missile()
         {
             // Стереть изображение взрыва
             sp_clear_brick(mis.x_graph, mis.y_graph, explode_x_size, explode_y_size);
+            redraw_bags(mis.x_graph, mis.y_graph); // Вернуть мешок, задетый взрывом
             mis.flying = 0;  // Выстрел больше не летит
             mis.explode = 0; // И не взрывается
         }
@@ -2153,7 +2167,7 @@ static void process_missile()
                 if ((bug->state != CREATURE_ALIVE) && (bug->state != CREATURE_STARTING)) continue;
 
                 // Проверить, что выстрел попал во врага
-                if (check_collision_missile(mis.x_graph, mis.y_graph, bug->x_graph, bug->y_graph))
+                if (missile_touches(&bug->x_graph))
                 {
                     explode = 1; // Взорвать выстрел
                     bug->count = 1; // Чтобы CREATURE_RIP стёр врага на следующем тике, а не ждал старого счётчика
@@ -2164,6 +2178,16 @@ static void process_missile()
                     if (bonus.state == BONUS_ON) bugs.total++;
                 }
             }
+
+            // Как в оригинале (colision & 0x40fe): снаряд взрывается о мешок, золото и вишенку
+            for (uint8_t i = 0; i < MAX_BAGS; ++i)
+            {
+                struct bag_info *bag = &bags_state[i];
+                if ((bag->state != BAG_INACTIVE) && missile_touches(&bag->x_graph)) explode = 1;
+            }
+
+            static const uint16_t cherry_xy[2] = { CORNER_X, CORNER_Y };
+            if ((bonus.state == BONUS_READY) && missile_touches(cherry_xy)) explode = 1;
 
             if (!check_path(mis.dir, mis.x_graph, mis.y_graph))
             {
