@@ -2335,15 +2335,20 @@ static void process_man()
             uint16_t prev_man_x_graph = man.x_graph;
             uint16_t prev_man_y_graph = man.y_graph;
 
+            // Бит 0 - Диггер упёрся в мешок, бит 1 - Диггер стоит на месте
+            uint16_t collision_flag = 0;
+
             if (man.dir != DIR_STOP)
             {
                 // Переместить Диггера на один шаг в заданном направлении
                 man.x_graph += dir_dx[man.dir] * MOVE_X_STEP;
                 man.y_graph += dir_dy[man.dir] * MOVE_Y_STEP;
             }
-            else man.dir = man.prev_dir;
-
-            uint16_t collision_flag = 0;
+            else
+            {
+                man.dir = man.prev_dir;
+                collision_flag = 2;
+            }
 
             // Обработка толкания мешков и съедения золота
             for (uint8_t i = 0; i < MAX_BAGS; ++i)
@@ -2364,7 +2369,7 @@ static void process_man()
                         // Если направление движения Диггера вверх или вниз, или мешок не удалось переместить
                         if (man.dir == DIR_UP || man.dir == DIR_DOWN || move_bag(bag, man.dir))
                         {
-                            collision_flag = 1;
+                            collision_flag |= 1;
                         }
 
                         break;
@@ -2372,7 +2377,7 @@ static void process_man()
 
                     case BAG_FALLING:
                     {
-                        collision_flag = 1;
+                        collision_flag |= 1;
                         break;
                     }
 
@@ -2392,7 +2397,7 @@ static void process_man()
                 }
             }
 
-            if (collision_flag)
+            if (collision_flag & 1)
             {
                 // Вернуть Диггера в прежнее положение
                 man.x_graph = prev_man_x_graph;
@@ -2465,6 +2470,10 @@ static void process_man()
                 }
             }
 
+            // Как в оригинале: Диггер, упёршийся в мешок на ходу, разворачивается. Иначе, пока
+            // он не дошёл до середины клетки и держат поперечное направление, он бы так
+            // и бился в мешок. Разворот после отрисовки: нарисован он лицом к мешку
+            if (collision_flag == 1) man.dir ^= 1;
             man.prev_dir = man.dir;
         }
     }
