@@ -135,8 +135,8 @@ struct bug_info
     enum direction dir;        ///< Направление движения врага
     uint8_t count;             ///< Счётчик
     uint8_t wait;              ///< Счётчик задержки врага (при толкании мешков, изменении направления)
-    uint8_t image_phase;       ///< Фаза анимации при выводе спрайта
-    int8_t image_phase_inc;    ///< Направление изменения фазы анимации при выводе спрайта (+1 или -1)
+    uint8_t image_phase;       ///< Фаза анимации - смещение кадра в байтах (см. next_image_phase)
+    int8_t image_phase_inc;    ///< Шаг фазы анимации (плюс или минус размер кадра)
     uint8_t _pad[5];           ///< Выравнивание до 16 байт
 };
 
@@ -172,8 +172,8 @@ struct bug_info bugs_state[MAX_BUGS];
 
 // Переменные отвечающие за состояние Диггера
 struct {
-    uint8_t image_phase;       /// Фаза отображения спрайта Диггера
-    int8_t  image_phase_inc;   /// Инкремент(декремент) фазы отображения спрайта Диггера
+    uint8_t image_phase;       /// Фаза анимации Диггера - смещение кадра в байтах (см. next_image_phase)
+    int8_t  image_phase_inc;   /// Шаг фазы анимации Диггера (плюс или минус размер кадра)
     uint16_t wait;             /// Задержка перед следующим перемещением Диггера
     uint16_t x_graph;          /// Положение Диггера по оси X в графических координатах
     uint16_t y_graph;          /// Положение Диггера по оси Y в графических координатах
@@ -202,7 +202,7 @@ struct {
     enum bonus_state state; /// Состояние режима бонус
     uint16_t time;          /// Время активности бонус-режима
     uint8_t  flash;         /// Время мерцания при включении/выключении Бонус-режима
-    uint8_t  count;         /// Множитель очков в Бонус-режиме (умножается на два за каждого пойманного врага)
+    uint16_t count;         /// Очки за следующего пойманного в Бонус-режиме врага (200, 400, 800...)
     uint32_t life_score;    /// Количество очков для дополнительной жизни
 } bonus;
 
@@ -210,7 +210,7 @@ struct {
 struct {
     uint16_t x_graph;     /// Положение выстрела по оси X в графических координатах
     uint16_t y_graph;     /// Положение выстрела по оси Y в графических координатах
-    uint8_t  image_phase; /// Фаза анимации при выводе спрайта снаряда
+    uint8_t  image_phase; /// Фаза анимации снаряда или взрыва - смещение кадра в байтах (без умножения на размер)
     uint8_t  fire;        /// Флаг выстрела
     uint8_t  flying;      /// Флаг означающий, что снаряд летит
     uint8_t  wait;        /// Задержка готовности выстрела
@@ -353,6 +353,8 @@ static void print_lives()
 
     for (uint16_t l = 1; width > 0; man_x_offset += one_pos_width, width -= one_pos_width)
     {
+        asm ("" : "+r"(man_x_offset), "+r"(width)); // Иначе gcc выводит их из l вызовом __mulhi3
+
         if (++l > game.lives)
         {
             sp_clear_brick(man_x_offset, man_y_offset, width, height);
@@ -394,7 +396,7 @@ static void add_score(uint16_t score_add)
 /**
  * @brief Добавление очков за убитого врага
  */
-static void add_score_250()
+__attribute__((noinline)) static void add_score_250() // Вызов без аргументов короче встроенной передачи 250
 {
     add_score(250); // 250 очков за убитого врага
 }
@@ -426,7 +428,10 @@ static int check_collision_missile(uint16_t x1, uint16_t y1, uint16_t x2, uint16
  */
 static inline uint8_t graph_to_x_log(uint16_t x_graph)
 {
-    return (x_graph - FIELD_X_OFFSET) / POS_X_STEP;
+    // Знаковый сдвиг - это asr, беззнаковый - пара clc/ror на каждый разряд. Отрицательной
+    // разность бывает только у снаряда за левым краем: клетка и так выходит за W_MAX
+    static_assert(POS_X_STEP == 4);
+    return (int16_t)(x_graph - FIELD_X_OFFSET) >> 2;
 }
 
 // Деление на POS_Y_STEP разворачивается в цикл сдвигов, который при девяти местах вызова
@@ -446,18 +451,44 @@ static inline uint16_t graph_to_x_rem(uint16_t x_graph)
 
 static inline uint16_t graph_to_y_rem(uint16_t y_graph)
 {
-    return ((y_graph - FIELD_Y_OFFSET) % POS_Y_STEP) / MOVE_Y_STEP;
+    // Знаковый сдвиг (asr) короче беззнакового, а после маски значение неотрицательно
+    static_assert(POS_Y_STEP == 16 && MOVE_Y_STEP == 4);
+    return (int16_t)((y_graph - FIELD_Y_OFFSET) & (POS_Y_STEP - 1)) >> 2;
 }
 
 /**
- * @brief Получение ячейки уровня по заданным координатам.
+ * @brief Умножение на 3 и на 5 сдвигом и сложением
+ *
+ * Без барьера gcc сворачивает сдвиг со сложением обратно в вызов __mulhi3. Пока ни
+ * одного вызова нет, __mulhi3 не попадает в сборку вовсе, а каждый вызов с передачей
+ * аргументов через стек длиннее сдвигов.
  */
-static inline enum level_symbols getLevelSymbol(uint8_t y_log, uint8_t x_log)
+static inline uint16_t mul3(uint16_t x)
+{
+    uint16_t x2 = x << 1;
+    asm ("" : "+r"(x2));
+    return x + x2;
+}
+
+static inline uint16_t mul5(uint16_t x)
+{
+    uint16_t x4 = x << 2;
+    asm ("" : "+r"(x4));
+    return x + x4;
+}
+
+/**
+ * @brief Получение ячейки уровня в заданной строке.
+ *
+ * @param row - строка уровня (level[номер экрана][y_log])
+ * @param x_log - логическая координата по оси X
+ */
+static inline enum level_symbols getLevelSymbol(const uint16_t *row, uint8_t x_log)
 {
     static const uint8_t word_no_tbl[W_MAX] = { 0,0,0,0,0, 1,1,1,1,1, 2,2,2,2,2 };
     static const uint8_t shift_tbl[W_MAX]   = { 0,3,6,9,12, 0,3,6,9,12, 0,3,6,9,12 };
 
-    return (level[game.level_no][y_log][word_no_tbl[x_log]] >> shift_tbl[x_log]) & 7;
+    return (row[word_no_tbl[x_log]] >> shift_tbl[x_log]) & 7;
 }
 
 static void bonus_indicator(uint16_t color);
@@ -474,25 +505,30 @@ static void reset_v_scroll()
     *((volatile uint16_t *)REG_V_SCROLL) = 0330 | (1 << V_SCROLL_EXT_MEMORY);
 }
 
+// Размер кадра спрайта 4x15 в байтах
+constexpr uint8_t FRAME_4_15 = sizeof(image_nobbin[0]);
+
 /**
  * @brief Переключить фазу анимации спрайта по циклу 0-1-2-1-...
  *
  * Одинаково анимируются и Диггер, и враги, поэтому шаг фазы с разворотом
- * на границах вынесен из draw_man и move_bug сюда.
+ * на границах вынесен из draw_man и move_bug сюда. Фаза хранится как смещение
+ * кадра в байтах (0, FRAME_4_15, 2 * FRAME_4_15): индекс пришлось бы умножать
+ * на размер кадра вызовом __mulhi3.
  *
  * @param phase - текущая фаза
- * @param inc - направление изменения фазы (+1 или -1)
+ * @param inc - шаг фазы (+FRAME_4_15 или -FRAME_4_15)
  */
 static void next_image_phase(uint8_t *phase, int8_t *inc)
 {
     *phase += *inc;
-    if (!*phase || *phase >= 2) *inc = -*inc;
+    if (!*phase || *phase >= 2 * FRAME_4_15) *inc = -*inc;
 }
 
 /**
  * @brief Нарисовать мешок с золотом по заданным координатам
  */
-static void draw_bag(uint16_t x_graph, uint16_t y_graph)
+__attribute__((noinline)) static void draw_bag(uint16_t x_graph, uint16_t y_graph) // Два аргумента вместо четырёх
 {
     sp_4_15_mask(x_graph, y_graph, image_bag[0], outline_bag[0]);
 }
@@ -563,7 +599,7 @@ static void init_level_state()
     static const uint8_t bug_swap[10] = { 37, 32, 28, 26, 23, 0, 0, 0, 0, 0 };
     bugs.swap = bug_swap[game.difficulty - 1];
 
-    broke_max = 150 - game.difficulty * 10; // Время через которое исчезнет разбившийся мешок (с ростом сложности убывает)
+    broke_max = 150 - mul5(game.difficulty << 1); // Время через которое исчезнет разбившийся мешок (с ростом сложности убывает)
 
     // Инициализация переменных Диггера
     man.dir = DIR_RIGHT;
@@ -571,7 +607,7 @@ static void init_level_state()
     man.x_graph = FIELD_X_OFFSET + MAN_START_X * POS_X_STEP; // Исходная координата Диггера на экране по оси X
     man.y_graph = FIELD_Y_OFFSET + MAN_START_Y * POS_Y_STEP; // Исходная координата Диггера на экране по оси Y
     man.image_phase = 0;        // Фаза анимации Диггера
-    man.image_phase_inc = 1;    // Направление ихменения фазы анимации Диггера
+    man.image_phase_inc = FRAME_4_15; // Направление изменения фазы анимации Диггера
     man.wait = 0;               // Задержка перед следующим перемещением Диггера
     man.state = CREATURE_ALIVE; // Исходное состояние - Диггер жив
 
@@ -648,7 +684,8 @@ static void init_level()
     constexpr uint16_t x_size = 13; // Ширина поля фона в блоках
     constexpr uint16_t y_size = POS_Y_STEP * H_MAX / bg_block_height + MOVE_Y_STEP + 2; // Высота поля фона в блоках
 
-    const uint8_t *back_image = (uint8_t *)image_background[game.level_no]; // Указатель на образец фона для текущего уровня
+    static_assert(sizeof(image_background[0]) == 20);
+    const uint8_t *back_image = (uint8_t *)image_background + mul5(game.level_no << 2); // Образец фона текущего уровня: image_background[game.level_no]
 
     // Отрисовка фона
     for (uint16_t y_graph = 0; y_graph < y_size * bg_block_height; y_graph += bg_block_height)
@@ -663,7 +700,9 @@ static void init_level()
     uint16_t bag_num = 0;
     uint16_t x_graph = FIELD_X_OFFSET;
     uint16_t y_graph = FIELD_Y_OFFSET;
-    for (uint16_t y_log = 0; y_log < H_MAX; ++y_log)
+    static_assert(sizeof(level[0]) / sizeof(level[0][0][0]) == 30);
+    const uint16_t *level_row = &level[0][0][0] + mul5(mul3(game.level_no << 1)); // level[game.level_no][0]
+    for (uint16_t y_log = 0; y_log < H_MAX; ++y_log, level_row += W_MAX / CELLS_PER_WORD)
     {
         coins[y_log] = 0; // Сброситть все биты монеток для данной строки
 
@@ -672,7 +711,7 @@ static void init_level()
             uint8_t *bg = &background[y_log][x_log]; // Структура с информацией о клетке фона
             *bg = 0; // Сбросить все биты состояния фона (вся клетка фона цела)
 
-            enum level_symbols ls = getLevelSymbol(y_log, x_log);
+            enum level_symbols ls = getLevelSymbol(level_row, x_log);
 
             if (ls == LEV_C)
             {
@@ -707,9 +746,13 @@ static void init_level()
             if (ls == LEV_V || ls == LEV_S)
             {
                 *bg |= 0xF0;  // устанавливаем все биты состояния фона для вертикальных проходов
-                for (uint16_t i = 15; i > 0; i -= 3)
+                // Пять прогрызов сверху вниз с шагом 3. Число итераций такого цикла gcc вычисляет
+                // делением на 3 через __mulhi3 - барьер оставляет ему простой счётчик
+                uint16_t gnaw_y = y_graph - 15;
+                for (uint8_t n = 5; n; --n, gnaw_y += 3)
                 {
-                    gnaw(DIR_DOWN,x_graph, y_graph - i);
+                    asm ("" : "+r"(gnaw_y));
+                    gnaw(DIR_DOWN, x_graph, gnaw_y);
                 }
                 gnaw(DIR_UP, x_graph, y_graph + 3);
             }
@@ -850,19 +893,22 @@ static void set_background_bits(uint16_t x_graph, uint16_t y_graph, enum directi
 
     uint8_t *cell = &background[y_log][x_log]; // Указатель на текущую ячейку состояния фона
 
+    // Маски таблицей: сдвиг на переменное число разрядов на PDP-11 - это цикл
+    static const uint8_t bit_mask[8] = { 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80 };
+
     switch (dir)
     {
         case DIR_LEFT:
         case DIR_RIGHT:
         {
-            *cell |= 1 << x_rem; // Установить соответсвующий бит матрицы фона
+            *cell |= bit_mask[x_rem]; // Установить соответсвующий бит матрицы фона
             break;
         }
 
         case DIR_UP:
         case DIR_DOWN:
         {
-            *cell |= 1 << (y_rem + 4); // Установить соответсвующий бит матрицы фона
+            *cell |= bit_mask[y_rem + 4]; // Установить соответсвующий бит матрицы фона
             break;
         }
     }
@@ -1288,15 +1334,15 @@ static void move_bug(struct bug_info *bug)
     // Отрисовка спрайта врага
     if (bug->type == BUG_NOBBIN)
     {
-        sp_4_15_put(bug->x_graph, bug->y_graph, (uint8_t *)image_nobbin[bug->image_phase]);
+        sp_4_15_put(bug->x_graph, bug->y_graph, (uint8_t *)image_nobbin + bug->image_phase);
     }
     else if (bug->dir == DIR_RIGHT)
     {
-        sp_4_15_put(bug->x_graph, bug->y_graph, (uint8_t *)image_hobbin_right[bug->image_phase]);
+        sp_4_15_put(bug->x_graph, bug->y_graph, (uint8_t *)image_hobbin_right + bug->image_phase);
     }
     else
     {
-        sp_4_15_h_mirror_put(bug->x_graph, bug->y_graph, (uint8_t *)image_hobbin_right[bug->image_phase]);
+        sp_4_15_h_mirror_put(bug->x_graph, bug->y_graph, (uint8_t *)image_hobbin_right + bug->image_phase);
     }
 }
 
@@ -1372,8 +1418,8 @@ static void draw_man()
 
     next_image_phase(&man.image_phase, &man.image_phase_inc); // Переключить фазу изображения
 
-    uint16_t image_phase = man.image_phase + ((cab) ? 0 : 3);
-    const uint8_t *image = (man.dir < DIR_UP) ? (uint8_t *)image_digger_right[image_phase] : (uint8_t *)image_digger_up[image_phase];
+    uint16_t image_phase = man.image_phase + ((cab) ? 0 : 3 * FRAME_4_15);
+    const uint8_t *image = ((man.dir < DIR_UP) ? (uint8_t *)image_digger_right : (uint8_t *)image_digger_up) + image_phase;
 
     if (man.dir == DIR_LEFT)
     {
@@ -1603,7 +1649,7 @@ static void process_bugs()
                     bug->count = 5;                 // Время до запуска врага (BUG_BEGIN в оригинале)
                     bug->wait = 0;                  // Враг не задержан
                     bug->image_phase = 0;           // Начальная фаза отрисовки спрайта
-                    bug->image_phase_inc = 1;       // Начальное направление изменения фазы
+                    bug->image_phase_inc = FRAME_4_15; // Начальное направление изменения фазы
                     bug->x_graph = CORNER_X;        // Начальная графическая координата по оси X (правый верхний угол)
                     bug->y_graph = CORNER_Y;        // Начальная графическая координата по оси Y
                     bug->type = BUG_NOBBIN;         // Враги рождаются в виде Ноббинов
@@ -1979,8 +2025,11 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
 
                     if (bag->count & 1)
                     {
+                        // Смещения кадров таблицей: индекс пришлось бы умножать вызовом __mulhi3
+                        static const uint8_t broke_frames[3] = { 0, FRAME_4_15, 2 * FRAME_4_15 };
+
                         // Нарисовать анимацию рассыпающегося золота
-                        sp_4_15_put(bag->x_graph, bag->y_graph, (uint8_t *)image_bag_broke[(bag->count - 1) >> 1]);
+                        sp_4_15_put(bag->x_graph, bag->y_graph, (uint8_t *)image_bag_broke + broke_frames[(bag->count - 1) >> 1]);
                         plot_count++;
                     }
                 }
@@ -2049,20 +2098,19 @@ static void process_missile()
     // Размеры и количество фаз анимации выстрела
     constexpr uint16_t missile_x_size = sizeof(image_missile[0][0]);
     constexpr uint16_t missile_y_size = sizeof(image_missile[0]) / missile_x_size;
-    constexpr uint16_t missile_phases_no = sizeof(image_missile) / sizeof(image_missile[0]);
 
     // Размеры и количество фаз анимации взрыва
     constexpr uint16_t explode_x_size = sizeof(image_explode[0][0]);
     constexpr uint16_t explode_y_size = sizeof(image_explode[0]) / explode_x_size;
-    constexpr uint16_t explode_phases_no = sizeof(image_explode) / sizeof(image_explode[0]);
 
     if (mis.explode)
     {
         // Обработка взрывающегося выстрела
-        if (mis.image_phase < explode_phases_no)
+        if (mis.image_phase < sizeof(image_explode))
         {
             // Вывести изображение взрыва
-            sp_put(mis.x_graph, mis.y_graph, explode_x_size, explode_y_size, (uint8_t *)image_explode[mis.image_phase++], nullptr);
+            sp_put(mis.x_graph, mis.y_graph, explode_x_size, explode_y_size, (uint8_t *)image_explode + mis.image_phase, nullptr);
+            mis.image_phase += sizeof(image_explode[0]);
             plot_count++;
         }
         else
@@ -2123,10 +2171,11 @@ static void process_missile()
             {
                 plot_count++;
                 // Циклически менять фазу анимации выстрела
-                if (++mis.image_phase >= missile_phases_no) mis.image_phase = 0;
+                mis.image_phase += sizeof(image_missile[0]);
+                if (mis.image_phase >= sizeof(image_missile)) mis.image_phase = 0;
 
                 // Вывести новое изображение выстрела
-                sp_put(mis.x_graph, mis.y_graph, missile_x_size, missile_y_size, (uint8_t *)image_missile[mis.image_phase], nullptr);
+                sp_put(mis.x_graph, mis.y_graph, missile_x_size, missile_y_size, (uint8_t *)image_missile + mis.image_phase, nullptr);
             }
 
             if (explode)
@@ -2145,7 +2194,7 @@ static void process_missile()
                 if (mis.fire) // Если произведён выстрел
                 {
                     mis.fire = 0;
-                    mis.wait = 60 + game.difficulty * 3; // Начальное значение счётчика появления "башенки" (как в оригинале)
+                    mis.wait = 60 + mul3(game.difficulty); // Начальное значение счётчика появления "башенки" (как в оригинале)
                     mis.image_phase = 0;
                     mis.flying = 1;
                     mis.dir = man.dir;
@@ -2172,7 +2221,7 @@ static void process_missile()
                     mis.y_graph = man.y_graph + fire_dy[mis.dir];
 
                     // Вывести начальное положение спрайта выстрела
-                    sp_put(mis.x_graph, mis.y_graph, missile_x_size, missile_y_size, (uint8_t *)image_missile[mis.image_phase], nullptr);
+                    sp_put(mis.x_graph, mis.y_graph, missile_x_size, missile_y_size, (uint8_t *)image_missile + mis.image_phase, nullptr);
 
                     // Включить звук выстрела
                     snd.fire_period = 10;
@@ -2336,8 +2385,8 @@ static void process_man()
                 if (check_collision_4_15(man.x_graph, man.y_graph, CORNER_X, CORNER_Y))
                 {
                     bonus.state = BONUS_ON; // Включить Бонус-режим
-                    bonus.count = 1; // Начальное значение множителя очков в Бонус-режиме
-                    bonus.time = 250 - game.difficulty * 20; // Время действия Бонус-режима
+                    bonus.count = 200; // Очки за первого пойманного в Бонус-режиме врага
+                    bonus.time = 250 - mul5(game.difficulty << 2); // Время действия Бонус-режима
                     bonus.flash = 19; // Время мигания индикатора включения Бонус-режима
 
                     add_score(1000); // 1000 очков за вишенку
@@ -2480,8 +2529,8 @@ static void process_man()
                     snd.bug_c1 = 0;
                     snd.bug_c2 = 4;
                     snd.bug_period = 0;
-                    add_score(bonus.count * 200); // 200 * bonus.count очков за каждого съеденного врага
-                    bonus.count <<= 1; // Удвоить bonus.count
+                    add_score(bonus.count); // 200, 400, 800... очков за каждого съеденного врага
+                    bonus.count <<= 1; // Удвоить очки за следующего
 
                     // Стереть съеденного врага
                     erase_4_15(bug->x_graph, bug->y_graph);
@@ -2642,7 +2691,7 @@ static void man_rip()
     man.state = CREATURE_RIP;
 }
 
-static void bonus_indicator(uint16_t color)
+__attribute__((noinline)) static void bonus_indicator(uint16_t color)
 {
     volatile uint16_t *ptr_up = (uint16_t *)MEM_VIDEO;
     volatile uint16_t *ptr_down = (uint16_t *)MEM_VIDEO + SCREEN_WORD_WIDTH * SCREEN_PIX_HEIGHT - 1;
