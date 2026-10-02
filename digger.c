@@ -2377,7 +2377,9 @@ static void process_man()
 
                     case BAG_FALLING:
                     {
-                        collision_flag |= 1;
+                        // Как в оригинале: сверху или снизу в падающий мешок не пройти, а вбок он
+                        // Диггера не останавливает. Убьёт его мешок в process_bags этого же кадра
+                        if (man.dir >= DIR_UP) collision_flag |= 1;
                         break;
                     }
 
