@@ -1183,7 +1183,8 @@ static void move_bug(struct bug_info *bug)
 
     if (bug->state == CREATURE_ALIVE)
     {
-        uint8_t bag_hit = 0; // Враг коснулся мешка или золота
+        uint8_t bag_hit = 0;  // Враг коснулся мешка или золота
+        uint8_t ate_gold = 0; // Враг съел золото
 
         // Проверить соприкосновение врага с мешками
         for (uint8_t i = 0; i < MAX_BAGS; ++i)
@@ -1196,14 +1197,16 @@ static void move_bug(struct bug_info *bug)
             if (check_collision_4_15(bag->x_graph, bag->y_graph, bug->x_graph, bug->y_graph))
             {
                 bag_hit = 1;
-                uint16_t remove_bag = 0;
-                if (bug->type == BUG_HOBBIN)
+                uint16_t remove_bag = 1; // Хоббин уничтожает мешок, а золото съедает любой враг
+
+                if (bag->state == BAG_BROKEN)
                 {
-                    // Если Хоббин коснулся мешка
-                    remove_bag = 1; // Удалить съеденный Хоббином мешок
+                    ate_gold = 1; // Враг съел золото из разбитого мешка
                 }
-                else
+                else if (bug->type == BUG_NOBBIN)
                 {
+                    remove_bag = 0;
+
                     // Если Ноббин коснулся мешка
                     switch (bag->state)
                     {
@@ -1230,12 +1233,6 @@ static void move_bug(struct bug_info *bug)
 
                             break;
                         }
-
-                        case BAG_BROKEN:  // Если мешок разбит
-                        {
-                            remove_bag = 1; // Удалить съеденное Ноббином золото
-                            break;
-                        }
                     }
                 }
 
@@ -1250,8 +1247,13 @@ static void move_bug(struct bug_info *bug)
         }
 
         // Как в оригинале: касание мешков задерживает врага на такт (один раз, сколько бы
-        // мешков он ни задел), а толкание вбок - ещё на такт, даже если мешок сдвинулся
-        if (bag_hit)
+        // мешков он ни задел), а толкание вбок - ещё на такт, даже если мешок сдвинулся.
+        // Съевший золото враг не задерживается вовсе (rst_bwait в оригинале)
+        if (ate_gold)
+        {
+            bug->wait = 0;
+        }
+        else if (bag_hit)
         {
             bug->wait++;
             if (bug->dir < DIR_UP) bug->wait++;
