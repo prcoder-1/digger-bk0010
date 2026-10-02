@@ -1966,8 +1966,10 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
 
                 if (man.state == CREATURE_ALIVE) //  Если Диггер жив
                 {
-                    // Проверить, что Диггер попал под падающий под мешок
-                    if (check_collision_4_15(man.x_graph, man.y_graph, bag_x_graph, bag_y_graph))
+                    // Проверить, что Диггер попал под падающий мешок. Как в оригинале, гибнет только
+                    // Диггер не выше мешка: оказавшегося над ним мешок не задевает
+                    if ((man.y_graph >= bag_y_graph) &&
+                        check_collision_4_15(man.x_graph, man.y_graph, bag_x_graph, bag_y_graph))
                     {
                         man.state = CREATURE_DEAD_MONEY_BAG; // Диггер погиб от падающего мешка
                         man.dead_bag = bag; // Указатель на мешок от которого погиб Диггер
