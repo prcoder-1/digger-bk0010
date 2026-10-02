@@ -2127,7 +2127,7 @@ static void process_missile()
                 if (mis.fire) // Если произведён выстрел
                 {
                     mis.fire = 0;
-                    mis.wait = 81 + game.difficulty * 4; // Начальное значение счётчика появления "башенки"
+                    mis.wait = 60 + game.difficulty * 3; // Начальное значение счётчика появления "башенки" (как в оригинале)
                     mis.image_phase = 0;
                     mis.flying = 1;
                     mis.dir = man.dir;
