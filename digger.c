@@ -229,6 +229,10 @@ struct {
 
 uint8_t broke_max; // Время через которое исчезнет разбившийся мешок
 
+// Счётчик "отрисовок" за кадр, ведётся как inc_plot() в оригинале: в перегруженном
+// кадре враги притормаживаются (delay_bugs)
+uint16_t plot_count;
+
 // Переменные отвечающие за вывод звуков.
 uint16_t snd_effects = 1;    /// Флаг, показывающий, что звуковые эффекты включены
 uint16_t music_on = 1;       /// Флаг, показывающий, что фоновая музыка включена
@@ -364,6 +368,7 @@ static void print_lives()
  */
 static void add_score(uint16_t score_add)
 {
+    plot_count += 3;
     game.score += score_add;
     // Счёт шестизначный: при переполнении обнуляется (как в оригинале). bonus.life_score при этом
     // намеренно не сбрасывается - в оригинале bonus растёт сквозь обнуление счёта,
@@ -992,6 +997,8 @@ static uint8_t move_bag(struct bag_info *bag, enum direction dir)
 
     if (!rv)
     {
+        plot_count++;
+
         // Стирание мешка по старым координатам
         erase_bag(bag->x_graph, bag->y_graph);
 
@@ -1157,6 +1164,7 @@ static void move_bug(struct bug_info *bug)
 
         // Очистить биты фона прогрызенные Хоббином
         set_background_bits(bug_x_graph, bug_y_graph, bug->dir);
+        plot_count++;
 
         // Стерерь кусочек фона на экране в соответствии с направлением движения и текущим положением
         gnaw(bug->dir, bug_x_graph, bug_y_graph);
@@ -1222,6 +1230,7 @@ static void move_bug(struct bug_info *bug)
                                 bug->x_graph = bug_x_graph;
                                 bug->y_graph = bug_y_graph;
                                 bug->count++; // Увеличить счётчик застревания
+                                plot_count++;
 
                                 if ((dir == DIR_UP) || (dir == DIR_DOWN))
                                 {
@@ -1273,6 +1282,7 @@ static void move_bug(struct bug_info *bug)
         erase_trail(bug->dir, bug->x_graph, bug->y_graph);
     }
 
+    plot_count++;
     next_image_phase(&bug->image_phase, &bug->image_phase_inc); // Переключить фазу изображения
 
     // Отрисовка спрайта врага
@@ -1297,6 +1307,7 @@ static void move_bug(struct bug_info *bug)
  */
 static void stop_bag(struct bag_info *bag)
 {
+    plot_count++;
     // Если мешок пролетел больше одного этажа, то он будет разбит
     bag->state = (bag->count > 1) ? BAG_BREAKS : BAG_STATIONARY;
     bag->dir = DIR_STOP; // Остановить мешок
@@ -1397,6 +1408,7 @@ static int remove_coin(uint8_t x_log, uint8_t y_log)
     if (coins[y_log] & coin_mask)
     {
         coins[y_log] &= ~coin_mask; // Сбросить бит соответствующий съеденной монете
+        plot_count++;
 
         // Стереть съеденную монету (драгоценный камешек)
         sp_put(FIELD_X_OFFSET + x_log * POS_X_STEP, FIELD_Y_OFFSET + y_log * POS_Y_STEP + COIN_Y_OFFSET,
@@ -1657,6 +1669,7 @@ static void process_bugs()
                     if (check_collision_4_15(bug->x_graph, bug->y_graph, another_bug->x_graph, another_bug->y_graph))
                     {
                         collided = 1;
+                        plot_count++;
 
                         // Если оба уже движутся в одном направлении - развернуть другого
                         if ((another_bug->state == CREATURE_ALIVE) && (bug->dir == another_bug->dir))
@@ -1829,6 +1842,7 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
 
                         // Нарисовать спрайт раскачивающегося мешка (используя маску)
                         sp_4_15_mask(bag_x_graph, bag_y_graph, bag_image, bag_outline);
+                        plot_count++;
                     }
                 }
                 else
@@ -1847,6 +1861,7 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
             case BAG_FALLING: // Мешок падает
             {
                 bags_fall = 1; // Найден падающий мешок
+                plot_count += 2;
 
                 // Прогрызть фон и сбросить биты матрицы фона
                 gnaw(DIR_UP, bag_x_graph, bag_y_graph + 9);
@@ -1966,6 +1981,7 @@ static void process_bags(const uint8_t man_x_log, const uint8_t man_y_log)
                     {
                         // Нарисовать анимацию рассыпающегося золота
                         sp_4_15_put(bag->x_graph, bag->y_graph, (uint8_t *)image_bag_broke[(bag->count - 1) >> 1]);
+                        plot_count++;
                     }
                 }
                 else
@@ -2047,6 +2063,7 @@ static void process_missile()
         {
             // Вывести изображение взрыва
             sp_put(mis.x_graph, mis.y_graph, explode_x_size, explode_y_size, (uint8_t *)image_explode[mis.image_phase++], nullptr);
+            plot_count++;
         }
         else
         {
@@ -2104,6 +2121,7 @@ static void process_missile()
             }
             else if (!explode)
             {
+                plot_count++;
                 // Циклически менять фазу анимации выстрела
                 if (++mis.image_phase >= missile_phases_no) mis.image_phase = 0;
 
@@ -2194,6 +2212,8 @@ static void process_man()
         // на границе клетки и можно ли менять направление движения
         const uint8_t man_x_rem = graph_to_x_rem(man.x_graph);
         const uint8_t man_y_rem = graph_to_y_rem(man.y_graph);
+
+        plot_count++; // Диггер перерисовывается и в такт задержки
 
         if (man.wait) man.wait--; // Если Диггер в режиме задержки (при толкании мешков)
         else
@@ -2340,6 +2360,8 @@ static void process_man()
 
             if (man.dir != DIR_STOP)
             {
+                plot_count++;
+
                 // Переместить Диггера на один шаг в заданном направлении
                 man.x_graph += dir_dx[man.dir] * MOVE_X_STEP;
                 man.y_graph += dir_dy[man.dir] * MOVE_Y_STEP;
@@ -2390,6 +2412,7 @@ static void process_man()
                         snd.money_period_1 = 500 / N; // Начальный период чётных звуков
                         snd.money_period_2 = 4000 / N; // Начальный период нечётных звуков
                         snd.money = 30; // Количество звуков в последовательности
+                        plot_count++;
                         bag->state = BAG_INACTIVE; // Сделать мешок неактивным
                         add_score(500); // 500 очков за съеденное золото
                         // Стереть золото из разбитого мешка
@@ -2401,6 +2424,8 @@ static void process_man()
 
             if (collision_flag & 1)
             {
+                plot_count++;
+
                 // Вернуть Диггера в прежнее положение
                 man.x_graph = prev_man_x_graph;
                 man.y_graph = prev_man_y_graph;
@@ -2774,6 +2799,8 @@ void main()
         // и включить делитель на 4, а так же, сбросить флаг события таймера
         tve_csr->reg = (1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN) | (1 << TVE_CSR_D4);
 
+        plot_count = 0;
+
         // Диггер обрабатывается первым - чтение клавиатуры, движение, выстрел.
         // Это снимает кадр задержки между нажатием и реакцией: остальные системы
         // в этом же кадре видят новую позицию/направление/mis.fire.
@@ -2792,6 +2819,16 @@ void main()
         process_bags(man_x_log, man_y_log);
         process_missile();
         process_bonus();
+
+        // Перегруженный кадр задерживает врагов, кроме первого (delay_bugs в оригинале)
+        if (plot_count > 9)
+        {
+            uint16_t n = plot_count - 9; // Сколько врагов задержать, начиная со второго
+            if (n > MAX_BUGS - 1) n = MAX_BUGS - 1;
+            struct bug_info *bug = &bugs_state[1];
+            do (bug++)->wait++; while (--n);
+        }
+
         if (snd_effects) sound_effect();
         process_game_state();
 
