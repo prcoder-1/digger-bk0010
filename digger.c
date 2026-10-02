@@ -1056,8 +1056,17 @@ static void move_bug(struct bug_info *bug)
         dir_1 = (man.x_graph < bug_x_graph) ? DIR_LEFT : DIR_RIGHT;
         dir_2 = (man.y_graph < bug_y_graph) ? DIR_UP   : DIR_DOWN;
 
-        // Если расстояние по вертикали превышает горизонтальное — отдать приоритет оси Y
-        if (abs16(man.y_graph - bug_y_graph) > abs16(man.x_graph - bug_x_graph))
+        // Если расстояние по вертикали превышает горизонтальное — отдать приоритет оси Y.
+        // Расстояния сравниваются в пикселях оригинала (клетка 20x18): здесь клетка - 4 байта
+        // по X и 16 строк по Y, поэтому 18*dy/16 > 20*dx/4, т.е. 9*dy > 40*dx
+        const uint16_t dist_x = abs16(man.x_graph - bug_x_graph);
+        const uint16_t dist_y = abs16(man.y_graph - bug_y_graph);
+        uint16_t dist_y9 = dist_y << 3;
+        uint16_t dist_x40 = dist_x << 2;
+        asm ("" : "+r"(dist_y9), "+r"(dist_x40)); // Иначе gcc свернёт сдвиги в вызовы __mulhi3
+        dist_y9 += dist_y;
+        dist_x40 = (dist_x40 + dist_x) << 3;
+        if (dist_y9 > dist_x40)
         {
             // Обмен dir_1 <-> dir_2 (XOR-swap): первичной становится ось Y
             dir_1 ^= dir_2;
