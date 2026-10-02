@@ -1166,11 +1166,11 @@ static void move_bug(struct bug_info *bug)
 
     if (man.state == CREATURE_ALIVE) // Если Диггер жив
     {
-        // Выждать время задержки перед запуском нового врага
+        // Выждать время задержки перед запуском нового врага: стоит на месте ровно count
+        // вызовов, на следующем уже двигается (BUG_BEGIN в оригинале)
         if (bug->state == CREATURE_STARTING)
         {
-            if (bug->count > 0) bug->count--;
-            else bug->state = CREATURE_ALIVE; // Если счётчик закончился, что оживить врага
+            if (!--bug->count) bug->state = CREATURE_ALIVE; // Если счётчик закончился, то оживить врага
         }
         else
         {
@@ -1588,7 +1588,7 @@ static void process_bugs()
 
                     // Начальное состояние врага
                     bug->state = CREATURE_STARTING; // Враг стартует
-                    bug->count = 6;                 // Время до запуска врага
+                    bug->count = 5;                 // Время до запуска врага (BUG_BEGIN в оригинале)
                     bug->wait = 0;                  // Враг не задержан
                     bug->image_phase = 0;           // Начальная фаза отрисовки спрайта
                     bug->image_phase_inc = 1;       // Начальное направление изменения фазы
@@ -1626,12 +1626,20 @@ static void process_bugs()
 
         switch (bug->state)
         {
-            case CREATURE_ALIVE: // Перемещение живого врага
+            case CREATURE_ALIVE:    // Перемещение живого врага
+            case CREATURE_STARTING: // Враг ждёт старта
             {
-                // Если враг в режиме ожидания
+                // Если враг в режиме ожидания. Как в оригинале, ожидание (например, после выбора
+                // направления на месте рождения) откладывает и отсчёт задержки старта
                 if (bug->wait)
                 {
                     bug->wait--; // Уменьшить счётчик в режиме ожидания
+                    break;
+                }
+
+                if (bug->state == CREATURE_STARTING)
+                {
+                    move_bug(bug); // Отсчитать задержку старта
                     break;
                 }
 
@@ -1677,11 +1685,6 @@ static void process_bugs()
                 // Лишний ход для увеличения скорости - только Ноббину, как в оригинале
                 if ((bug->type == BUG_NOBBIN) && ((uint8_t)rand() < bugs.boost)) move_bug(bug);
 
-                // Здесь специально нету break для проваливания в следующую секцию
-            }
-
-            case CREATURE_STARTING: // Враг ждёт старта
-            {
                 move_bug(bug); // Переместить врага
                 break;
             }
