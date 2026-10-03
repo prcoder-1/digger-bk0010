@@ -2569,6 +2569,7 @@ static void process_man()
                 {
                     erase_4_15(man.x_graph, man.y_graph); // Стереть Диггера
                     man_rip();
+                    break; // Иначе второй коснувшийся враг проиграл бы гибель ещё раз
                 }
             }
 
