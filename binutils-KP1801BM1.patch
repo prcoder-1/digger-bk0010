@@ -1,0 +1,29 @@
+--- a/gas/config/tc-pdp11.c
++++ b/gas/config/tc-pdp11.c
+@@ -284,6 +284,26 @@
+   if (fixP->fx_addsy != NULL)
+     val += symbol_get_bfdsym (fixP->fx_addsy)->section->vma;
+     /* *value += fixP->fx_addsy->bsym->section->vma; */
++  else
++    {
++      /* The displacement is masked into the opcode below; without these
++	 checks a far branch silently wraps to the wrong target.  */
++      offsetT disp = (offsetT) val;
++
++      if (fixP->fx_r_type == BFD_RELOC_PDP11_DISP_8_PCREL
++	  && (disp < -256 || disp > 254))
++	as_bad_where (fixP->fx_file, fixP->fx_line,
++		      _("branch target out of range"));
++      else if (fixP->fx_r_type == BFD_RELOC_PDP11_DISP_6_PCREL
++	       && (disp < 0 || disp > 126))
++	as_bad_where (fixP->fx_file, fixP->fx_line,
++		      _("sob target out of range"));
++      else if ((fixP->fx_r_type == BFD_RELOC_PDP11_DISP_8_PCREL
++		|| fixP->fx_r_type == BFD_RELOC_PDP11_DISP_6_PCREL)
++	       && (disp & 1))
++	as_bad_where (fixP->fx_file, fixP->fx_line,
++		      _("odd branch displacement"));
++    }
+ 
+   code &= ~mask;
+   code |= (val >> shift) & mask;
