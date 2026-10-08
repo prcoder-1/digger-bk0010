@@ -45,7 +45,7 @@
     call this platform "no hardware divide".  */
 --- a/gcc/config/pdp11/pdp11-protos.h
 +++ b/gcc/config/pdp11/pdp11-protos.h
-@@ -38,6 +38,7 @@
+@@ -38,9 +38,11 @@
  extern machine_mode pdp11_cc_mode (enum rtx_code, rtx, rtx);
  extern bool pdp11_expand_shift (rtx *, rtx (*) (rtx, rtx, rtx),
  				rtx (*) (rtx, rtx, rtx));
@@ -53,9 +53,34 @@
  extern const char * pdp11_assemble_shift (rtx *, machine_mode, int);
  extern int pdp11_shift_length (rtx *, machine_mode, int, bool);
  extern int pdp11_cmp_length (rtx *, int);
++extern void pdp11_expand_dw_cbranch (rtx *, machine_mode);
+ extern bool pushpop_regeq (rtx, int);
+ extern bool pdp11_small_shift (int);
+ 
 --- a/gcc/config/pdp11/pdp11.cc
 +++ b/gcc/config/pdp11/pdp11.cc
-@@ -635,8 +635,8 @@
+@@ -46,6 +46,7 @@
+ #include "builtins.h"
+ #include "explow.h"
+ #include "expmed.h"
++#include "dojump.h"
+ 
+ /* This file should be included last.  */
+ #include "target-def.h"
+@@ -313,7 +314,11 @@
+ static inline bool
+ pdp11_saved_regno (unsigned regno)
+ {
+-  return !call_used_or_fixed_reg_p (regno) && df_regs_ever_live_p (regno);
++  /* LRA may set frame_pointer_needed late (e.g. an asm clobbers sp)
++     without marking the hard frame pointer as ever live.  */
++  return !call_used_or_fixed_reg_p (regno)
++	 && (df_regs_ever_live_p (regno)
++	     || (regno == HARD_FRAME_POINTER_REGNUM && frame_pointer_needed));
+ }
+ 
+ /* Expand the function prologue.  */
+@@ -635,8 +640,8 @@
    rtx adjops[2];
    
    pdp11_action action[2];
@@ -66,7 +91,7 @@
    words = GET_MODE_BITSIZE (GET_MODE (operands[0])) / 16;
    adjops[1] = gen_rtx_CONST_INT (HImode, words * 2);
  
-@@ -657,9 +657,42 @@
+@@ -657,9 +662,42 @@
        output_asm_insn ("sub\t%1,%0", adjops);
      }
  
@@ -111,7 +136,7 @@
  
    /* Check for increment after.  */
    if (action[0] == inc_after)
-@@ -1927,6 +1960,99 @@
+@@ -1927,6 +1965,99 @@
    return (unsigned) n < 4;
  }
  
@@ -211,7 +236,7 @@
  /* Expand a shift insn.  Returns true if the expansion was done,
     false if it needs to be handled by the caller.  */
  bool
-@@ -2063,8 +2189,18 @@
+@@ -2063,8 +2194,18 @@
    if (!small)
      {
        /* Loop case, emit the count-down and branch if not done.  */
@@ -232,7 +257,7 @@
      }
    return "";
  }
-@@ -2084,12 +2220,12 @@
+@@ -2084,12 +2225,12 @@
      shift_size *= 2;
  
    /* If shifting by a small constant, the loop is unrolled by the
@@ -248,7 +273,59 @@
  
    /* Logical right shift takes one more instruction (CLC).  */
    if (code == LSHIFTRT)
-@@ -2306,6 +2442,18 @@
+@@ -2130,6 +2271,51 @@
+   return len - 2;
+ }
+ 
++/* Expand a signed LT/LE/GT/GE branch on an SImode or DImode value
++   word by word: only the high word compares signed, the lower words
++   unsigned.  The cmpsi/cmpdi chain can't do that, since it leaves the
++   N and V bits of a low-word compare to a signed branch.  */
++void
++pdp11_expand_dw_cbranch (rtx *operands, machine_mode mode)
++{
++  enum rtx_code code = GET_CODE (operands[0]);
++  enum rtx_code strict = (code == LT || code == LE) ? LT : GT;
++  rtx op0 = operands[1], op1 = operands[2];
++  rtx_code_label *label = as_a <rtx_code_label *> (operands[3]);
++  rtx_code_label *skip = gen_label_rtx ();
++  int nwords = GET_MODE_SIZE (mode) / UNITS_PER_WORD;
++  int i;
++
++  /* The sign alone decides x < 0 and x >= 0.  */
++  if (op1 == const0_rtx && (code == LT || code == GE))
++    nwords = 1;
++
++  for (i = 0; i < nwords; i++)
++    {
++      rtx w0 = operand_subword_force (op0, i, mode);
++      rtx w1 = operand_subword_force (op1, i, mode);
++
++      if (i == nwords - 1)
++	{
++	  do_compare_rtx_and_jump (w0, w1,
++				   i == 0 ? code : unsigned_condition (code),
++				   i != 0, NULL_TREE, HImode, NULL_RTX,
++				   NULL, label,
++				   profile_probability::uninitialized ());
++	  break;
++	}
++      do_compare_rtx_and_jump (w0, w1,
++			       i == 0 ? strict : unsigned_condition (strict),
++			       i != 0, NULL_TREE, HImode, NULL_RTX,
++			       NULL, label,
++			       profile_probability::uninitialized ());
++      do_compare_rtx_and_jump (w0, w1, NE, i != 0, NULL_TREE, HImode,
++			       NULL_RTX, NULL, skip,
++			       profile_probability::uninitialized ());
++    }
++  emit_label (skip);
++}
++
+ /* Prepend to CLOBBERS hard registers that are automatically clobbered
+    for an asm We do this for CC_REGNUM and FCC_REGNUM (on FPU target)
+    to maintain source compatibility with the original cc0-based
+@@ -2306,6 +2492,18 @@
        targetm.asm_out.open_paren  = "<";
        targetm.asm_out.close_paren = ">";
      }
@@ -269,7 +346,15 @@
  static void
 --- a/gcc/config/pdp11/pdp11.md
 +++ b/gcc/config/pdp11/pdp11.md
-@@ -246,6 +246,24 @@
+@@ -79,6 +79,7 @@
+ (define_mode_iterator HSint [HI SI])
+ (define_mode_iterator QHSint [QI HI SI])
+ (define_mode_iterator QHSDint [QI HI SI DI])
++(define_mode_iterator DWint [SI DI])
+ 
+ (define_code_iterator SHF [ashift ashiftrt lshiftrt])
+ 
+@@ -246,6 +247,24 @@
     cmp<PDPint:isfx>\t%0,%1"
    [(set_attr "length" "2,2,4,4,4,6")])
  
@@ -294,7 +379,16 @@
  ;; Two word compare
  (define_insn "cmpsi"
    [(set (reg:CC CC_REGNUM)
-@@ -333,7 +351,7 @@
+@@ -315,7 +334,7 @@
+   return "";
+ }
+   [(set (attr "length")
+-	(symbol_ref "pdp11_cmp_length (operands, 2)"))
++	(symbol_ref "pdp11_cmp_length (operands, 4)"))
+    (set_attr "base_cost" "0")])
+ 
+ ;; sob instruction
+@@ -333,7 +352,7 @@
  	      (set (match_dup 0)
  		   (plus:HI (match_dup 0)
  			 (const_int -1)))])]
@@ -303,7 +397,7 @@
    "{
      if (GET_MODE (operands[0]) != HImode)
        FAIL;
-@@ -351,7 +369,7 @@
+@@ -351,7 +370,7 @@
     (set (match_dup 0)
  	(plus:HI (match_dup 0)
  		 (const_int -1)))]
@@ -312,7 +406,7 @@
    "#"
    "&& reload_completed"
    [(parallel [(set (pc)
-@@ -380,7 +398,7 @@
+@@ -380,7 +399,7 @@
  	(plus:HI (match_dup 0)
  	      (const_int -1)))
     (clobber (reg:CC CC_REGNUM))]
@@ -321,7 +415,7 @@
    "*
  {
   rtx lb[1];
-@@ -434,6 +452,33 @@
+@@ -434,11 +453,76 @@
  		      (pc)))]
    "")
  
@@ -355,7 +449,52 @@
  (define_insn_and_split "cbranch<mode>4"
    [(set (pc)
  	(if_then_else (match_operator 0 "ordered_comparison_operator"
-@@ -746,7 +791,7 @@
+-		       [(match_operand:QHSDint 1 "general_operand" "g")
+-			(match_operand:QHSDint 2 "general_operand" "g")])
++		       [(match_operand:PDPint 1 "general_operand" "g")
++			(match_operand:PDPint 2 "general_operand" "g")])
++		      (label_ref (match_operand 3 "" ""))
++		      (pc)))]
++  ""
++  "#"
++  "reload_completed"
++  [(set (reg:CC CC_REGNUM)
++	(compare:CC (match_dup 1) (match_dup 2)))
++   (set (pc)
++	(if_then_else (match_op_dup 0
++                      [(reg:CC CC_REGNUM) (const_int 0)])
++		      (label_ref (match_dup 3))
++		      (pc)))]
++  "")
++
++;; Multi-word branches.  cmpsi/cmpdi compare the low words with the same
++;; CMP as the high word, which is right for EQ/NE and the unsigned codes
++;; only; signed ones are expanded word by word.
++(define_expand "cbranch<mode>4"
++  [(set (pc)
++	(if_then_else (match_operator 0 "ordered_comparison_operator"
++		       [(match_operand:DWint 1 "general_operand")
++			(match_operand:DWint 2 "general_operand")])
++		      (label_ref (match_operand 3 "" ""))
++		      (pc)))]
++  ""
++{
++  if (!dw_comparison_operator (operands[0], VOIDmode))
++    {
++      pdp11_expand_dw_cbranch (operands, <MODE>mode);
++      DONE;
++    }
++})
++
++(define_insn_and_split "*cbranch<mode>4_dw"
++  [(set (pc)
++	(if_then_else (match_operator 0 "dw_comparison_operator"
++		       [(match_operand:DWint 1 "general_operand" "g")
++			(match_operand:DWint 2 "general_operand" "g")])
+ 		      (label_ref (match_operand 3 "" ""))
+ 		      (pc)))]
+   ""
+@@ -746,7 +830,7 @@
      output_asm_insn (\"mov\t(%1)+,(%0)+\", operands);
    else
      output_asm_insn (\"movb\t(%1)+,(%0)+\", operands);
@@ -364,7 +503,7 @@
      output_asm_insn (\"sob\t%0,%l1\", lb);
    else
      {
-@@ -756,7 +801,7 @@
+@@ -756,7 +840,7 @@
    return \"\";
  }"
    [(set (attr "length")
@@ -373,7 +512,7 @@
  		      (const_int 4)
  		      (const_int 6)))])
  
-@@ -1541,7 +1586,7 @@
+@@ -1541,7 +1625,7 @@
    [(set (match_operand:HI 0 "nonimmediate_operand" "=rR,Q")
  	(xor:HI (match_operand:HI 1 "general_operand" "%0,0")
  		(match_operand:HI 2 "register_operand" "r,r")))]
@@ -382,7 +521,7 @@
    "#"
    "&& reload_completed"
    [(parallel [(set (match_dup 0)
-@@ -1555,7 +1600,7 @@
+@@ -1555,7 +1639,7 @@
  	(xor:HI (match_operand:HI 1 "general_operand" "%0,0")
  	     (match_operand:HI 2 "register_operand" "r,r")))
     (clobber (reg:CC CC_REGNUM))]
@@ -391,7 +530,7 @@
    "xor\t%2,%0"
    [(set_attr "length" "2,4")])
  
-@@ -1581,6 +1626,166 @@
+@@ -1581,6 +1665,166 @@
    "com<PDPint:isfx>\t%0"
    [(set_attr "length" "2,4")])
  
@@ -558,7 +697,7 @@
  ;;- arithmetic shift instructions
  ;;
  ;; There is a fair amount of complexity here because with -m10
-@@ -1712,6 +1917,140 @@
+@@ -1712,6 +1956,140 @@
    [(set_attr "length" "2,4")
     (set_attr "base_cost" "8")])
  
@@ -699,7 +838,7 @@
  ;; Now the expanders that produce the insns defined above. 
  (define_expand "ashl<mode>3"
    [(match_operand:QHSint 0 "nonimmediate_operand" "")
-@@ -1722,6 +2061,10 @@
+@@ -1722,6 +2100,10 @@
  {
    rtx r;
  
@@ -710,7 +849,7 @@
    if (!pdp11_expand_shift (operands, gen_ashift<mode>_sc, gen_ashift<mode>_base))
      {
        if (<QHSint:e_mname> == E_QImode)
-@@ -1747,6 +2090,10 @@
+@@ -1747,6 +2129,10 @@
  {
    rtx r;
  
@@ -721,7 +860,7 @@
    if (!pdp11_expand_shift (operands, gen_ashiftrt<mode>_sc, gen_ashiftrt<mode>_base))
      {
        operands[2] = negate_rtx (HImode, operands[2]);
-@@ -1773,6 +2120,10 @@
+@@ -1773,6 +2159,10 @@
  {
    rtx r, n;
  
@@ -732,6 +871,17 @@
    if (!pdp11_expand_shift (operands, gen_lshiftrt<mode>_sc, gen_lshiftrt<mode>_base))
      {
        if (<QHSint:e_mname> == E_QImode)
+--- a/gcc/config/pdp11/predicates.md
++++ b/gcc/config/pdp11/predicates.md
+@@ -59,3 +59,8 @@
+ ;; Accept any comparison valid for CCNZmode
+ (define_predicate "ccnz_operator"
+   (match_code "eq,ne,ge,lt"))
++
++;; Comparisons that a multi-word CMP/BNE chain can feed directly: the
++;; low words are compared unsigned, so signed LT/LE/GT/GE are excluded.
++(define_predicate "dw_comparison_operator"
++  (match_code "eq,ne,ltu,leu,gtu,geu"))
 --- a/gcc/common/config/pdp11/pdp11-common.cc
 +++ b/gcc/common/config/pdp11/pdp11-common.cc
 @@ -39,7 +39,8 @@
