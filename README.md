@@ -77,6 +77,13 @@ wget https://github.com/prcoder-1/digger-bk0010/raw/refs/heads/main/gcc-KP1801BM
 patch -p1 < gcc-KP1801BM1.patch
 ```
 
+Затем заходим в папку *binutils-2.43* и так же применяем [патч ассемблера](https://github.com/prcoder-1/digger-bk0010/raw/refs/heads/main/binutils-KP1801BM1.patch): без него слишком дальний переход **br**/**bxx**/**sob** собирается без ошибки, но уходит не туда:
+```
+cd ../binutils-2.43
+wget https://github.com/prcoder-1/digger-bk0010/raw/refs/heads/main/binutils-KP1801BM1.patch
+patch -p1 < binutils-KP1801BM1.patch
+```
+
 Выходим снова в папку *gcc-KP1801BM1* и создаём там папку *build*, входим в неё и создаём папки для сборки компилятора и *binutils*:
 ```
 cd ../..
@@ -190,6 +197,7 @@ make
 - **png2title.py** - упаковка PNG-обложки (4 цвета палитры БК) в **digger_title.c**; требует внешний компрессор [ZX0](https://github.com/einar-saukas/ZX0)
 - **bmp2sprite.cpp** / **sprite2bmp.cpp** - конвертация спрайтов между форматом БК и BMP (скрипты-обёртки **bmp2spr.sh** и **spr2bmp.sh**)
 - **gcc-KP1801BM1.patch** - патч компилятора для поддержки команд **sob** и **xor** процессора КР1801ВМ1
+- **binutils-KP1801BM1.patch** - патч ассемблера: ошибка вместо молча обрезанного смещения слишком дальнего перехода
 
 ## Сборка документации
 
