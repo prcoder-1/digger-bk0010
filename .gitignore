@@ -4,6 +4,7 @@
 *.out
 *.map
 /*.BIN
+/DIGGER_*.IMG
 /aout2bin
 /bmp2sprite
 /sprite2bmp
