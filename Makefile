@@ -1,9 +1,10 @@
-VERSION=1.2
+VERSION=1.3
 BUILD_DATE=$(shell date +%d.%m.%Y)
 # DEBUG=-DDEBUG
 # MINIMAP=-DMINIMAP
-FILE_1=DIGGER_V${VERSION}
-FILE_2=DIGTIT_V${VERSION}
+FILE_1=DIGGER_${VERSION}
+FILE_2=DIGTIT_${VERSION}
+IMG=DIGGER_V${VERSION}.IMG
 BIN_FILE_1=${FILE_1}.BIN
 BIN_FILE_2=${FILE_2}.BIN
 OUT_FILE_1=${FILE_1}.out
@@ -26,9 +27,9 @@ GMPI_UPLOAD_DIR=/BK_Uploads
 .PHONY: all asm-files bin-files digger-main-file title-main-file levels-file \
         short-font-file full-font-file sprites-file sprites-file-title \
         music-file-title cover-file-title credits-file-title crt0 libs digger-out-file \
-        title-out-file profile-bin g-mpi docs clean
+        title-out-file profile-bin andos g-mpi docs clean
 
-all: asm-files bin-files
+all: asm-files bin-files ${IMG}
 
 asm-files: digger.c sprites.c tools.c
 	pdp11-aout-gcc ${GCC_FLAGS} ${GCC_ASM_FLAGS} digger.c
@@ -39,7 +40,7 @@ digger-main-file: digger.c
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o digger.o digger.c
 
 title-main-file: title.c
-	pdp11-aout-gcc ${GCC_FLAGS} -DBIN_FILE_1="${BIN_FILE_1}" -c -o title.o title.c
+	pdp11-aout-gcc ${GCC_FLAGS} -DBIN_FILE_1="${FILE_1}" -c -o title.o title.c
 
 levels-file: digger_levels.c
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o digger_levels.o digger_levels.c
@@ -96,6 +97,12 @@ bin-files: aout2bin digger-out-file title-out-file
 	./aout2bin ${OUT_FILE_1} ${BIN_FILE_1}
 	./aout2bin ${OUT_FILE_2} ${BIN_FILE_2}
 
+# Дискета ANDOS: заставка с автостартом, игру она грузит через EMT 36
+${IMG}: ANDOS.IMG mkandos.py bin-files
+	python3 mkandos.py ANDOS.IMG $@ +${BIN_FILE_2} ${BIN_FILE_1}
+
+andos: ${IMG}
+
 # Сборка для профилирования: тот же код, но функции верхнего уровня остаются
 # настоящими подпрограммами - иначе профилировщик эмулятора не отделит их от main.
 # Кладёт DIGGER_PROF.BIN и карту digger_prof.map.
@@ -113,5 +120,5 @@ docs:
 	doxygen Doxyfile
 
 clean:
-	rm -f *.o *.a *.out *.map aout2bin
+	rm -f *.o *.a *.out *.map aout2bin ${IMG}
 	rm -rf docs/*
