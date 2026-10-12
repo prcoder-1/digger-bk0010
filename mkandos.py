@@ -5,8 +5,9 @@
 
 ANDOS — FAT12 (800 Кбайт: 80 дорожек x 2 стороны x 10 секторов x 512). Файл БК
 кладётся без заголовка .BIN (адрес, длина): адрес загрузки ANDOS хранит в поле
-времени записи каталога (смещение 22), дата 1980-01-01 (0x0021). Имя — имя
-файла без .BIN. Образ побайтно совпадает с тем, что даёт `bkdecmd a` (BKDE).
+времени записи каталога (смещение 22); дата (смещение 24) — дата изменения файла
+на ПК (у `bkdecmd a` из BKDE — всегда 1980-01-01, 0x0021). Имя — имя
+файла без .BIN.
 
 ANDOS файл только загружает. «+» перед именем — автостарт, как у игр на дисках
 ANDOS: файл грузится с 0760, а 8 слов 0760..0776 равны адресу старта и затирают
@@ -15,6 +16,14 @@ ANDOS: файл грузится с 0760, а 8 слов 0760..0776 равны а
 import os
 import struct
 import sys
+import time
+
+
+def fat_date(path):
+    """дата FAT (год с 1980 << 9 | месяц << 5 | день) по дате изменения файла"""
+    t = time.localtime(os.stat(path).st_mtime)
+    year = min(max(t.tm_year, 1980), 2107)
+    return (year - 1980) << 9 | t.tm_mon << 5 | t.tm_mday
 
 
 def main():
@@ -75,7 +84,7 @@ def main():
             img[off:off + csize] = part + bytes(csize - len(part))
         e = free_entry()
         img[e:e + 32] = (base.ljust(8).encode() + ext.ljust(3).encode() + b'\0' * 11 +
-                         struct.pack('<HHHI', addr, 0x0021, chain[0], len(body)))
+                         struct.pack('<HHHI', addr, fat_date(path), chain[0], len(body)))
         used += need
     for k in range(nfat):
         img[fat_off + k * spf * bps:fat_off + (k + 1) * spf * bps] = fat
