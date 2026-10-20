@@ -21,12 +21,12 @@ constexpr uint16_t music_chunk_counts = 60u;    // Ниже music_chunk_counts �
 // БК 0010 (полупериод 20/3 * p + 25.3 мкс - замер в эмуляторе)
 #define AYP(p) ((uint16_t)(AY_CLOCK * (40.0 * (p) / 3.0 + 50.6) / 16e6 + 0.5))
 
-enum : uint8_t { AY_TONE_A_LO = 0, AY_TONE_A_HI = 1, AY_VOL_A = 8, AY_ENV_HI = 12, AY_REGS = 14 };
+enum : uint8_t { AY_TONE_B_LO = 2, AY_TONE_B_HI = 3, AY_VOL_B = 9, AY_ENV_HI = 12, AY_REGS = 14 };
 
-// Регистры AY, пишутся целиком в начале ноты. Тон только в канале A, громкость от
-// огибающей «спад до нуля» (13 = 011, запись формы её перезапускает). Период огибающей -
-// слоты ноты * 256: спад длится ~1.7 длительности ноты.
-static uint8_t ay_regs[AY_REGS] = { [7] = 076, [AY_VOL_A] = 020, [13] = 011 };
+// Регистры AY, пишутся целиком в начале ноты. Тон только в канале B - при стерео ABC он
+// посередине, в обоих каналах. Громкость от огибающей «спад до нуля» (13 = 011, запись
+// формы её перезапускает). Период огибающей - слоты ноты * 256: спад ~1.7 длительности ноты.
+static uint8_t ay_regs[AY_REGS] = { [7] = 075, [AY_VOL_B] = 020, [13] = 011 };
 
 static enum bg_music_mode mode = BG_MUSIC_BEEPER;
 
@@ -167,8 +167,8 @@ static uint16_t bg_music_advance(void)
             mus.period = note_period[n];
             mus.chunk = note_chunk[n];
             const uint16_t ay_period = note_ay_period[n];
-            ay_regs[AY_TONE_A_LO] = (uint8_t)ay_period;
-            ay_regs[AY_TONE_A_HI] = (uint8_t)(ay_period >> 8);
+            ay_regs[AY_TONE_B_LO] = (uint8_t)ay_period;
+            ay_regs[AY_TONE_B_HI] = (uint8_t)(ay_period >> 8);
             ay_regs[AY_ENV_HI] = (uint8_t)slots;
             started = 1;
 
@@ -193,7 +193,7 @@ static void ay_write(uint8_t reg, uint8_t value)
 
 void bg_music_mute()
 {
-    if (mode == BG_MUSIC_AY) ay_write(AY_VOL_A, 0);
+    if (mode == BG_MUSIC_AY) ay_write(AY_VOL_B, 0);
 }
 
 void bg_music_next_mode()
@@ -213,7 +213,7 @@ void bg_music_frame()
     for (uint16_t i = music_chunks_per_frame; i; --i) started |= bg_music_advance();
 
     if (started) for (uint16_t r = 0; r < AY_REGS; ++r) ay_write(r, ay_regs[r]);
-    else ay_write(AY_VOL_A, 020); // Снять bg_music_mute
+    else ay_write(AY_VOL_B, 020); // Снять bg_music_mute
 }
 
 // Воспроизвести фоновую музыку в свободном времени кадра
