@@ -5,7 +5,7 @@
 enum sound_mode : uint16_t
 {
     SOUND_BEEPER = 0u, // Пищалка
-    SOUND_AY,          // AY-3-8910 на порту 0177714 (только БК 0011М)
+    SOUND_AY,          // AY-3-8910 на порту 0177714
     SOUND_OFF          // Выключено
 };
 

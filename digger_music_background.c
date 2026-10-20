@@ -202,12 +202,7 @@ void bg_music_mute()
 
 uint16_t sound_mode_next(uint16_t m)
 {
-    // Следующий режим: на БК 0010 (первые три) - без AY, на БК 0011М - с ним
-    static const uint8_t next[] = {
-        SOUND_OFF, SOUND_OFF, SOUND_BEEPER,
-        SOUND_AY,  SOUND_OFF, SOUND_BEEPER
-    };
-    return next[bk_11m ? m + 3 : m];
+    return ++m > SOUND_OFF ? SOUND_BEEPER : m;
 }
 
 // Пауза перед нотой не нужна: ноты разделяет перезапуск огибающей. Ноты начинаются
