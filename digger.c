@@ -151,9 +151,9 @@ static const int8_t dir_dx[4] = { -1,  1,  0,  0 };
 static const int8_t dir_dy[4] = {  0,  0, -1,  1 };
 
 /**
- * @brief Поле состояний ячеек фона.
+ * @brief Поле состояний ячеек фона (в .bss, см. digger_bss.s)
  */
-uint8_t background[H_MAX][16];
+extern uint8_t background[H_MAX][16];
 
 /**
  * @brief Поле состояний монеток. Установленный бит означает наличие монетки
@@ -235,7 +235,6 @@ uint16_t plot_count;
 
 // Переменные отвечающие за вывод звуков.
 uint16_t snd_effects = 1;    /// Флаг, показывающий, что звуковые эффекты включены
-uint16_t music_on = 1;       /// Флаг, показывающий, что фоновая музыка включена
 
 struct {
     uint8_t  loose;               /// Флаг, означающий, что звук качающегося мешка включен
@@ -1562,6 +1561,8 @@ static void sound_effect()
 
     if (snd.done) // Звук завершения уровня
     {
+        bg_music_mute();
+
         static const uint8_t done_periods[] = { C5, E5, G5, D5, F5, A5, E5, G5, B5, C6 };
 
         for (uint16_t i = 0; i < sizeof(done_periods) / sizeof(done_periods[0]); ++i)
@@ -2338,6 +2339,8 @@ static void process_man()
                         volatile uint16_t *joy = (volatile uint16_t *)REG_PAR_INTERF;
                         volatile uint8_t *key_state = (volatile uint8_t *)REG_KEY_STATE;
 
+                        bg_music_mute();
+
                         // Дождаться отпускания кнопки джойстика, иначе удерживаемая
                         // кнопка огня сняла бы паузу в тот же момент
                         while (*joy & JOY_BUTTONS);
@@ -2367,9 +2370,9 @@ static void process_man()
                         break;
                     }
 
-                    case 'M':  // Переключить фоновую музыку
+                    case 'M':  // Режим фоновой музыки: пищалка, AY (БК 0011М), выключена
                     {
-                        music_on = !music_on;
+                        bg_music_next_mode();
                         break;
                     }
 #ifdef DEBUG
@@ -2623,6 +2626,8 @@ static void man_rip()
     // Последовательность высоты на которую подпрыгивает перевёрнутый Диггер
     static uint8_t bounce[8] = { 3, 5, 6, 6, 5, 4, 3, 0 };
 
+    bg_music_mute();
+
     reset_v_scroll(); // Чтобы анимация гибели не проигрывалась на "провалившемся" экране
 
     // Убрать летящий снаряд (или его взрыв). Анимация гибели блокирующая, поэтому
@@ -2817,6 +2822,7 @@ static void process_game_state()
             constexpr uint16_t f_y = go_y - (MOVE_Y_STEP + 2);
             constexpr uint16_t f_w = go_width + 4 * MOVE_X_STEP;
             constexpr uint16_t f_h = go_height + 2 * (MOVE_Y_STEP + 2);
+            bg_music_mute();
             sp_clear_brick(f_x, f_y, f_w, f_h); // Очистка фона для надписи Game Over
             volatile uint8_t *p = (volatile uint8_t *)MEM_VIDEO + f_y * SCREEN_BYTE_WIDTH + f_x;
             volatile uint8_t *q = p + (f_h - 1) * SCREEN_BYTE_WIDTH;
@@ -2867,6 +2873,8 @@ void main()
 
     (void)*(volatile uint8_t *)REG_KEY_DATA; // Очистка буфера клавиатуры
 
+    clr_words(background, sizeof(background) / 2); // .bss загрузчик не обнуляет
+
     volatile uint16_t *ptr = (uint16_t *)MEM_VIDEO;
     for (uint16_t i = 0; i < SCREEN_WORD_WIDTH * SCREEN_PIX_HEIGHT; ++i) *(ptr + i) = 0;
 
@@ -2883,6 +2891,8 @@ void main()
         // Настроить таймер на использование мониторинга события, включить счётчик
         // и включить делитель на 4, а так же, сбросить флаг события таймера
         tve_csr->reg = (1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN) | (1 << TVE_CSR_D4);
+
+        bg_music_frame(); // AY - в начале кадра, чтобы ноты не зависели от загрузки кадра
 
         plot_count = 0;
 
@@ -2926,7 +2936,7 @@ void main()
         // Распечатать оставшееся свободное время
         print_dec(*((volatile uint16_t *)REG_TVE_COUNT), 0, MAX_Y_POS + 2 * POS_Y_STEP);
 #endif
-        if (music_on) bg_music_play(); // Воспроизвести фоновую музыку в свободном времени кадра
+        bg_music_play(); // Фоновая музыка пищалкой в свободном времени кадра
 
         // Добрать оставшееся время до конца кадра.
         while ((tve_csr->reg & (1 << TVE_CSR_FL)) == 0);

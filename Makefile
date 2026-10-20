@@ -26,7 +26,7 @@ GMPI_UPLOAD_DIR=/BK_Uploads
 
 .PHONY: all asm-files bin-files digger-main-file title-main-file levels-file \
         short-font-file full-font-file sprites-file sprites-file-title \
-        music-file-title cover-file-title credits-file-title crt0 libs digger-out-file \
+        music-file-title cover-file-title credits-file-title crt0 bss-file libs digger-out-file \
         title-out-file profile-bin andos g-mpi docs clean
 
 all: asm-files bin-files ${IMG}
@@ -72,6 +72,9 @@ credits-file-title: digger_credits.c
 crt0:
 	pdp11-aout-as ${AS_FLAGS} crt0.s -o crt0.o
 
+bss-file: digger_bss.s
+	pdp11-aout-as ${AS_FLAGS} digger_bss.s -o digger_bss.o
+
 libs: memory.s dzx0.s mirror.s sprites.c sprites_extra.c sound.c sound_pwm.c sound_vibrato.c tools.c
 	pdp11-aout-as ${AS_FLAGS} memory.s -o memory.o
 	pdp11-aout-as ${AS_FLAGS} dzx0.s -o dzx0.o
@@ -84,8 +87,8 @@ libs: memory.s dzx0.s mirror.s sprites.c sprites_extra.c sound.c sound_pwm.c sou
 	pdp11-aout-gcc ${GCC_FLAGS} -c -o tools.o tools.c
 	pdp11-aout-ar rcs libs.a memory.o mirror.o sprites.o sprites_extra.o sound.o sound_pwm.o sound_vibrato.o tools.o dzx0.o
 
-digger-out-file: crt0 digger-main-file sprites-file short-font-file levels-file music-file-background libs
-	pdp11-aout-ld -T a.out.ld -Map ${MAP_FILE_1} -o ${OUT_FILE_1} crt0.o digger_sprites.o digger_short_font.o digger_levels.o digger_music_background.o digger.o libs.a $(LIBGCC)
+digger-out-file: crt0 bss-file digger-main-file sprites-file short-font-file levels-file music-file-background libs
+	pdp11-aout-ld -T a.out.ld -Map ${MAP_FILE_1} -o ${OUT_FILE_1} crt0.o digger_bss.o digger_sprites.o digger_short_font.o digger_levels.o digger_music_background.o digger.o libs.a $(LIBGCC)
 
 title-out-file: crt0 title-main-file sprites-file-title full-font-file music-file-title cover-file-title credits-file-title libs
 	pdp11-aout-ld -T a.out.ld -Map ${MAP_FILE_2} -o ${OUT_FILE_2} crt0.o digger_sprites_title.o digger_full_font.o digger_music_title.o digger_title.o digger_credits.o title.o libs.a $(LIBGCC)
