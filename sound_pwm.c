@@ -17,6 +17,9 @@
 // не тянула в сборку sound()/sound_vibrato — экономия ~112 байт в DIGTIT.
 void sound_pwm(uint16_t period, uint16_t durance, uint16_t pw)
 {
+    // bk_loops монотонна, поэтому при pw <= period ограничение на pw сохраняется
+    period = bk_loops(period, 4);
+    pw = bk_loops(pw, 4);
     asm volatile (
         "mov %[period], r1\n\t"
         "mov %[durance], r2\n\t"

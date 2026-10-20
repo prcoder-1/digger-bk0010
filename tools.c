@@ -1,15 +1,16 @@
 #include "tools.h"
+#include "memory.h"
 
 void delay_ms(uint16_t time) // TODO: калибровка задержки
 {
     asm volatile (
         "mov %[time], r1\n"
 ".l1_%=:\n\t"
-        "mov $128, r0\n\r"
+        "mov %[inner], r0\n\r"
 ".l2_%=:\n\t"
         "sob r0, .l2_%=\n\r"
         "sob r1, .l1_%=\n\t"
-        : : [time]"r" (time) : "r0", "r1", "cc"
+        : : [time]"r" (time), [inner]"g" (bk_loops(128, 0)) : "r0", "r1", "cc"
     );
 }
 

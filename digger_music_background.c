@@ -177,7 +177,9 @@ void bg_music_play()
         volatile union TVE_CSR *tve_csr = (volatile union TVE_CSR *)REG_TVE_CSR;
 
         uint16_t music_budget = music_chunks_per_frame;
-        while (music_budget && *t_count > music_chunk_counts && (tve_csr->reg & (1 << TVE_CSR_FL)) == 0)
+        // Порог в реальном времени: на БК 0011М таймер считает быстрее
+        const uint16_t chunk_counts = bk_11m ? music_chunk_counts * TVE_FREQ_11M / TVE_FREQ_0010 : music_chunk_counts;
+        while (music_budget && *t_count > chunk_counts && (tve_csr->reg & (1 << TVE_CSR_FL)) == 0)
         {
             bg_music_tick();
             --music_budget;
