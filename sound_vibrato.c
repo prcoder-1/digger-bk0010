@@ -5,6 +5,12 @@
 // не втягивает этот код в DIGTIT. Геймплей (digger.c) линкует его как прежде.
 void sound_vibrato(uint16_t period, uint16_t durance)
 {
+    // На AY - ровный тон: sound() с периодом на 3 больше звучит столько же
+    if (fx_mode == SOUND_AY)
+    {
+        sound(period + 3, durance);
+        return;
+    }
     period = bk_loops(period, 11); // durance в полупериодах - длительность следует за периодом
     asm volatile (
         "mov %[period], r1\n\t"
