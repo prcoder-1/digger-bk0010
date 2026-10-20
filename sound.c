@@ -3,7 +3,7 @@
 
 void sound(uint16_t period, uint16_t durance)
 {
-    period = bk_loops(period, 7); // durance в полупериодах - длительность следует за периодом
+    period = bk_loops(period, 8); // durance в полупериодах - длительность следует за периодом
     asm volatile (
         "mov %[period], r1\n\t"
         "bne .Lp_%=\n\t"          // period 0 -> 1: иначе sob r4 крутит 65536 итераций
