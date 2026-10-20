@@ -27,10 +27,9 @@ enum PSW_BITS
  */
 static inline uint16_t get_PSW()
 {
-    uint16_t rv; // всё слово ССП: char усёк бы старший байт (приоритет/T/PA)
+    uint16_t rv; // MFPS даёт только младший байт ССП (расширенный знаком)
     asm volatile (
-        "mfps\n"
-        "mov r0, %0"
+        "mfps %0"
         : "=r" (rv) : : "cc"
     );
 
@@ -43,9 +42,8 @@ static inline uint16_t get_PSW()
 static inline void set_PSW(uint16_t psw)
 {
     asm volatile (
-        "mov %0, r0\n\t"
-        "mtps\n"
-        : : "r" (psw)
+        "mtps %0"
+        : : "g" (psw) : "cc"
     );
 }
 
