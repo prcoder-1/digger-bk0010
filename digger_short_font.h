@@ -8,4 +8,4 @@
 extern const uint8_t digit_rows[24][3];
 extern const uint8_t digit_indices[10][12];
 
-extern const uint8_t game_over[12][27];
+extern const uint8_t game_over[162]; // GAME OVER 27x12 байт, упакован по полубайтам

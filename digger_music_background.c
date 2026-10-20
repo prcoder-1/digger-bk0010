@@ -15,20 +15,16 @@ constexpr uint16_t music_chunks_per_frame = 4u; // Слотов музыки з�
 constexpr uint16_t music_chunk_ref = 1400u;     // Размер кусочка = music_chunk_ref/period полупериодов
 constexpr uint16_t music_chunk_counts = 60u;    // Ниже music_chunk_counts отсчётов кадра новый кусочек не начинаем.
 
-#define AY_CLOCK 1714286.0 // Такт AY, Гц (12 МГц / 7, «Мультизвук»)
+enum : uint8_t { AY_TONE_B_LO = 2, AY_TONE_B_HI = 3, AY_VOL_B = 9, AY_ENV_HI = 12, AY_ENV_SHAPE = 13 };
 
-// Период тона AY для ноты с периодом p пищалки: та же частота, что у sound_pwm на
-// БК 0010 (полупериод 20/3 * p + 25.3 мкс - замер в эмуляторе)
-#define AYP(p) ((uint16_t)(AY_CLOCK * (40.0 * (p) / 3.0 + 50.6) / 16e6 + 0.5))
+// Регистры AY 0..12, пишутся целиком (ay_out). Тон только в канале B - при стерео ABC
+// он посередине, в обоих каналах; его делят музыка и эффекты. Громкость музыки - от
+// огибающей «спад до нуля» (13 = 011, запись формы её перезапускает). Период огибающей -
+// слоты ноты * 256: спад ~1.7 длительности ноты.
+static uint8_t ay_regs[AY_ENV_SHAPE] = { [7] = 075 };
 
-enum : uint8_t { AY_TONE_B_LO = 2, AY_TONE_B_HI = 3, AY_VOL_B = 9, AY_ENV_HI = 12, AY_REGS = 14 };
-
-// Регистры AY, пишутся целиком в начале ноты. Тон только в канале B - при стерео ABC он
-// посередине, в обоих каналах. Громкость от огибающей «спад до нуля» (13 = 011, запись
-// формы её перезапускает). Период огибающей - слоты ноты * 256: спад ~1.7 длительности ноты.
-static uint8_t ay_regs[AY_REGS] = { [7] = 075, [AY_VOL_B] = 020, [13] = 011 };
-
-static enum bg_music_mode mode = BG_MUSIC_BEEPER;
+uint16_t music_mode = SOUND_BEEPER;
+static uint8_t music_vol; // Громкость музыки в канале B: 020 (огибающая) или 0 (заглушена)
 
 // Состояние проигрывателя фоновой музыки
 struct {
@@ -40,6 +36,7 @@ struct {
     uint16_t slots_ne;    /// Слотов в 1/8 ноте текущей мелодии (задаёт темп)
     uint16_t slots_n10;   /// Слотов в ноте длиной 5 восьмых (готовое значение - чтобы не звать __mulhi3)
     uint16_t period;      /// Период текущей ноты
+    uint16_t ay_period;   /// Период тона AY текущей ноты
     uint16_t chunk;       /// Полупериодов в одном кусочке текущей ноты (постоянное реальное время)
     uint16_t left;        /// Слотов осталось в текущей фазе (тон / пауза)
     uint16_t eighth;      /// 1/8 длительности ноты в слотах - пауза после тона (0 = паузы не будет)
@@ -48,12 +45,6 @@ struct {
 
 // Периоды нот, общие для обеих мелодий. Индексы 0..12 - Popcorn, 13 (AS4) - только бонус.
 static const uint16_t note_period[] = { D4, C4, A3, F3, D3, E4, F4, A4, G4, B4, C5, AS3, D5, AS4 };
-
-// Периоды тона AY для тех же нот
-static const uint16_t note_ay_period[] = {
-    AYP(D4), AYP(C4), AYP(A3), AYP(F3), AYP(D3), AYP(E4), AYP(F4),
-    AYP(A4), AYP(G4), AYP(B4), AYP(C5), AYP(AS3), AYP(D5), AYP(AS4)
-};
 
 // Размер кусочка (в полупериодах) для каждой ноты: music_chunk_ref/period, но не меньше одного полного цикла.
 #define PCHUNK(p) ((uint8_t)((music_chunk_ref / (p)) < 2 ? 2 : (music_chunk_ref / (p))))
@@ -94,31 +85,30 @@ static const uint8_t popcorn_parts[][2] = {
 
 static const uint8_t bonus_parts[][2] = { { B_A, 42 }, { B_A, 42 }, { B_B, 38 }, { B_B, 38 } };
 
+// Мелодии (индекс - enum bg_music): куски, конец списка, слотов в 1/8 и в 5/8 ноты
+static const struct {
+    const uint8_t (*parts)[2], (*end)[2];
+    uint16_t slots_ne, slots_n10;
+} tracks[] = {
+    { popcorn_parts, popcorn_parts + sizeof(popcorn_parts) / 2, popcorn_slots_ne, 5u * popcorn_slots_ne },
+    { bonus_parts, bonus_parts + sizeof(bonus_parts) / 2, bonus_slots_ne, 5u * bonus_slots_ne }
+};
+
+// Период тона AY с частотой пищалки на БК 0010 для периода p: 10/7 * p + 5 (такт AY
+// 1714286 Гц - «Мультизвук»; +5 - накладные команды цикла: у sound() полупериод
+// 20/3 * p + 29.3 мкс, у sound_pwm 20/3 * p + 25.3 мкс - в обоих случаях ошибка ~0 центов)
+__attribute__((noinline)) static uint16_t ay_tp(uint16_t p)
+{
+    return p + (p >> 1) - (p >> 4) - (p >> 7) + 5;
+}
+
 // Выбрать мелодию фоновой музыки и начать её с начала
 void bg_music_track(enum bg_music music)
 {
-    switch (music)
-    {
-        case BG_MUSIC_POPCORN:
-        {
-            mus.parts = popcorn_parts;
-            mus.parts_end = popcorn_parts + sizeof(popcorn_parts) / 2;
-            mus.slots_ne = popcorn_slots_ne;
-            mus.slots_n10 = 5u * popcorn_slots_ne;
-            break;
-        }
-
-        case BG_MUSIC_BONUS:
-        {
-            mus.parts = bonus_parts;
-            mus.parts_end = bonus_parts + sizeof(bonus_parts) / 2;
-            mus.slots_ne = bonus_slots_ne;
-            mus.slots_n10 = 5u * bonus_slots_ne;
-            break;
-        }
-    }
-
-    mus.part = mus.parts;
+    mus.parts = mus.part = tracks[music].parts;
+    mus.parts_end = tracks[music].end;
+    mus.slots_ne = tracks[music].slots_ne;
+    mus.slots_n10 = tracks[music].slots_n10;
     mus.part_left = 0;
     mus.left = 0;
     mus.eighth = 0;
@@ -166,9 +156,7 @@ static uint16_t bg_music_advance(void)
             }
             mus.period = note_period[n];
             mus.chunk = note_chunk[n];
-            const uint16_t ay_period = note_ay_period[n];
-            ay_regs[AY_TONE_B_LO] = (uint8_t)ay_period;
-            ay_regs[AY_TONE_B_HI] = (uint8_t)(ay_period >> 8);
+            mus.ay_period = ay_tp(note_period[n]);
             ay_regs[AY_ENV_HI] = (uint8_t)slots;
             started = 1;
 
@@ -191,35 +179,54 @@ static void ay_write(uint8_t reg, uint8_t value)
     *(volatile uint8_t *)port = (uint8_t)~value;
 }
 
-void bg_music_mute()
+// Записать регистры AY 0..12 с тоном и громкостью канала B
+static void ay_out(uint16_t tp, uint8_t vol)
 {
-    if (mode == BG_MUSIC_AY) ay_write(AY_VOL_B, 0);
+    ay_regs[AY_TONE_B_LO] = (uint8_t)tp;
+    ay_regs[AY_TONE_B_HI] = (uint8_t)(tp >> 8);
+    ay_regs[AY_VOL_B] = vol;
+    for (uint16_t r = 0; r < AY_ENV_SHAPE; ++r) ay_write(r, ay_regs[r]);
 }
 
-void bg_music_next_mode()
+void ay_fx(uint16_t period)
 {
-    bg_music_mute();
-    if (++mode == BG_MUSIC_AY && !bk_11m) ++mode;
-    if (mode > BG_MUSIC_OFF) mode = BG_MUSIC_BEEPER;
+    if (period) ay_out(ay_tp(period), 017);
+    else ay_out(mus.ay_period, music_vol); // Вернуть канал музыке
+}
+
+void bg_music_mute()
+{
+    music_vol = 0;
+    if (music_mode == SOUND_AY) ay_write(AY_VOL_B, 0);
+}
+
+uint16_t sound_mode_next(uint16_t m)
+{
+    // Следующий режим: на БК 0010 (первые три) - без AY, на БК 0011М - с ним
+    static const uint8_t next[] = {
+        SOUND_OFF, SOUND_OFF, SOUND_BEEPER,
+        SOUND_AY,  SOUND_OFF, SOUND_BEEPER
+    };
+    return next[bk_11m ? m + 3 : m];
 }
 
 // Пауза перед нотой не нужна: ноты разделяет перезапуск огибающей. Ноты начинаются
 // на границе кадра (длительности кратны четырём слотам), поэтому шаг - целый кадр.
 void bg_music_frame()
 {
-    if (mode != BG_MUSIC_AY) return;
+    if (music_mode != SOUND_AY) return;
 
     uint16_t started = 0;
     for (uint16_t i = music_chunks_per_frame; i; --i) started |= bg_music_advance();
 
-    if (started) for (uint16_t r = 0; r < AY_REGS; ++r) ay_write(r, ay_regs[r]);
-    else ay_write(AY_VOL_B, 020); // Снять bg_music_mute
+    ay_out(mus.ay_period, music_vol = 020); // Каждый кадр: заодно снимает bg_music_mute
+    if (started) ay_write(AY_ENV_SHAPE, 011);
 }
 
 // Воспроизвести фоновую музыку в свободном времени кадра
 void bg_music_play()
 {
-        if (mode != BG_MUSIC_BEEPER) return;
+        if (music_mode != SOUND_BEEPER) return;
 
         volatile uint16_t *t_count = (volatile uint16_t *)REG_TVE_COUNT;
         volatile union TVE_CSR *tve_csr = (volatile union TVE_CSR *)REG_TVE_CSR;

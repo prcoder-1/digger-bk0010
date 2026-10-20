@@ -166,12 +166,13 @@ uint16_t coins[H_MAX];
 struct bag_info bags_state[MAX_BAGS];
 
 /**
- * @brief Состояние врагов (Хоббинов/Ноббинов)
+ * @brief Состояние врагов (Хоббинов/Ноббинов), в системной области (digger_bss.s)
  */
-struct bug_info bugs_state[MAX_BUGS];
+extern struct bug_info bugs_state[MAX_BUGS];
+static_assert(sizeof(bugs_state) == 0120);
 
 // Переменные отвечающие за состояние Диггера
-struct {
+struct man_state {
     uint8_t image_phase;       /// Фаза анимации Диггера - смещение кадра в байтах (см. next_image_phase)
     int8_t  image_phase_inc;   /// Шаг фазы анимации Диггера (плюс или минус размер кадра)
     uint16_t wait;             /// Задержка перед следующим перемещением Диггера
@@ -182,7 +183,9 @@ struct {
     enum direction new_dir;    /// Желаемое новое направление движения Диггера
     enum creature_state state; /// Состояние Диггера (жив, убит, лежит дохлый)
     struct bag_info *dead_bag; /// Указатель на мешок от котрого погиб Диггер
-} man;
+};
+extern struct man_state man; // В системной области (digger_bss.s)
+static_assert(sizeof(man) == 016);
 
 // Переменные отвечающие за создание врагов
 struct
@@ -233,10 +236,8 @@ uint8_t broke_max; // Время через которое исчезнет ра
 // кадре враги притормаживаются (delay_bugs)
 uint16_t plot_count;
 
-// Переменные отвечающие за вывод звуков.
-uint16_t snd_effects = 1;    /// Флаг, показывающий, что звуковые эффекты включены
-
-struct {
+// Переменные отвечающие за вывод звуков (режим эффектов - fx_mode в sound.c)
+struct snd_state {
     uint8_t  loose;               /// Флаг, означающий, что звук качающегося мешка включен
     uint16_t loose_snd_phase;     /// Фаза звука качающегося мешка
 
@@ -267,7 +268,9 @@ struct {
 
     uint8_t  life;                /// Счётчик 0..24 - звук получения дополнительной жизни
     uint8_t  done;                /// Флаг, означающий, что звук завершения уровня включен
-} snd;
+};
+extern struct snd_state snd; // В системной области (digger_bss.s)
+static_assert(sizeof(snd) == 040);
 
 #ifdef MINIMAP
 /**
@@ -2364,15 +2367,16 @@ static void process_man()
                         break;
                     }
 
-                    case 'S':  // Переключить состояние звуковых эффектов
+                    case 'S':  // Звуковые эффекты: пищалка, AY (БК 0011М), выключены
                     {
-                        snd_effects = !snd_effects;
+                        fx_mode = sound_mode_next(fx_mode);
                         break;
                     }
 
                     case 'M':  // Режим фоновой музыки: пищалка, AY (БК 0011М), выключена
                     {
-                        bg_music_next_mode();
+                        bg_music_mute();
+                        music_mode = sound_mode_next(music_mode);
                         break;
                     }
 #ifdef DEBUG
@@ -2649,7 +2653,7 @@ static void man_rip()
     uint16_t i = 0;
     while (period < 36000 / N) // Звук убиения Диггера
     {
-        if (snd_effects) sound(period, 2);
+        if (fx_mode != SOUND_OFF) sound(period, 2);
 
         if (man.state != CREATURE_DEAD_MONEY_BAG)
         {
@@ -2713,7 +2717,7 @@ static void man_rip()
     {
         uint8_t period = music_dead_periods[i];
         uint16_t duration = music_dead_durations[i];
-        if (snd_effects) sound_vibrato(period, duration);
+        if (fx_mode != SOUND_OFF) sound_vibrato(period, duration);
 
         if (i < sizeof(rip_frames) / sizeof(rip_frames[0]))
         {
@@ -2814,8 +2818,8 @@ static void process_game_state()
         }
         else
         {
-            constexpr uint16_t go_width = sizeof(game_over[0]);
-            constexpr uint16_t go_height = sizeof(game_over) / go_width;
+            constexpr uint16_t go_width = 27;
+            constexpr uint16_t go_height = sizeof(game_over) * 2 / go_width;
             constexpr uint16_t go_x = (SCREEN_BYTE_WIDTH - go_width) / 2;
             constexpr uint16_t go_y = (SCREEN_PIX_HEIGHT - go_height) / 2;
             constexpr uint16_t f_x = go_x - 2 * MOVE_X_STEP;
@@ -2835,7 +2839,22 @@ static void process_game_state()
                 p += SCREEN_BYTE_WIDTH;
             }
 
-            sp_put(go_x, go_y, go_width, go_height, (uint8_t *)game_over, 0); // Вывод написи Game Over
+            // Вывод надписи Game Over: полубайт - 4 пикселя по 2 бита (бит 1 -> пиксель 11)
+            p = (volatile uint8_t *)MEM_VIDEO + go_y * SCREEN_BYTE_WIDTH + go_x;
+            const uint8_t *src = game_over;
+            uint16_t bits = 0, col = go_width;
+            for (uint16_t i = 0; i < sizeof(game_over) * 2; ++i)
+            {
+                if (!(i & 1)) bits = *src++;
+                uint8_t b = 0;
+                for (uint16_t k = 4; k; --k, bits >>= 1) { b >>= 2; if (bits & 1) b |= 0300; }
+                *p++ = b;
+                if (!--col)
+                {
+                    col = go_width;
+                    p += SCREEN_BYTE_WIDTH - go_width;
+                }
+            }
 
             // Маска вместо битового поля MAG_KEY: поле gcc извлекает шестью сдвигами
             volatile uint16_t *ext_dev = (volatile uint16_t *)REG_EXT_DEV;
@@ -2873,7 +2892,7 @@ void main()
 
     (void)*(volatile uint8_t *)REG_KEY_DATA; // Очистка буфера клавиатуры
 
-    clr_words(background, sizeof(background) / 2); // .bss загрузчик не обнуляет
+    clr_words(background, (0476 - 040) / 2); // Переменные в системной области (digger_bss.s)
 
     volatile uint16_t *ptr = (uint16_t *)MEM_VIDEO;
     for (uint16_t i = 0; i < SCREEN_WORD_WIDTH * SCREEN_PIX_HEIGHT; ++i) *(ptr + i) = 0;
@@ -2924,7 +2943,7 @@ void main()
             do (bug++)->wait++; while (--n);
         }
 
-        if (snd_effects) sound_effect();
+        if (fx_mode != SOUND_OFF) sound_effect();
         process_game_state();
 
 #ifdef MINIMAP

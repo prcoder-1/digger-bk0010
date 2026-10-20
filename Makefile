@@ -15,7 +15,7 @@ MAP_FILE_2=title.map
 # process_bugs/bags/missile/bonus/game_state, sound_effect и draw_man
 # растворяются в main и профилировщик не может их разделить.
 PROF_FLAG=-fno-inline-functions-called-once -fno-inline-small-functions
-OPT_FLAG=-Os -mlra -fno-reorder-blocks -fno-caller-saves -fno-if-conversion
+OPT_FLAG=-Os -mlra -fno-reorder-blocks -fno-caller-saves -fno-if-conversion -fno-tree-tail-merge
 XGCC=/home/prcoder/xgcc
 LIBGCC=$(shell pdp11-aout-gcc -m10 -m1801vm1 -msoft-float $(OPT_FLAG) -print-libgcc-file-name)
 GCC_FLAGS=-std=gnu23 -fomit-frame-pointer -msoft-float -fcprop-registers -nostartfiles -nodefaultlibs -nostdlib -m10 -m1801vm1 $(OPT_FLAG) -I$(XGCC)/include -DVERSION=${VERSION}  -DBUILD_DATE=${BUILD_DATE} ${DEBUG} ${MINIMAP}

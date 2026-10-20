@@ -1,8 +1,23 @@
 #pragma once
 #include <stdint.h>
 
+// Режим звука (музыки и эффектов)
+enum sound_mode : uint16_t
+{
+    SOUND_BEEPER = 0u, // Пищалка
+    SOUND_AY,          // AY-3-8910 на порту 0177714 (только БК 0011М)
+    SOUND_OFF          // Выключено
+};
+
+extern uint16_t fx_mode; // Режим sound()/sound_vibrato() - звуковых эффектов игры
+
+// Эффект на AY: тон с частотой пищалки для периода period; 0 - вернуть канал музыке.
+// Реализует игра (digger_music_background.c).
+void ay_fx(uint16_t period);
+
 /**
- * @brief Вывод звука (прямоугольными импульсами)
+ * @brief Вывод звука (прямоугольными импульсами). В режиме fx_mode == SOUND_AY звучит
+ *        тон AY, а время выдерживает тот же цикл с выключенной пищалкой
  *
  * @param period - период звука (1 / частота)
  * @param durance - длительность звука
