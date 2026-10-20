@@ -1,4 +1,4 @@
-VERSION=1.3
+VERSION=1.4
 BUILD_DATE=$(shell date +%d.%m.%Y)
 # DEBUG=-DDEBUG
 # MINIMAP=-DMINIMAP

@@ -14,8 +14,8 @@
 
 #define COIN_Y_OFFSET 3 // Смещение спрайта монетки в ячейке по оси Y
 
-// Длительность одного «кадра» демо в тактах таймера (23438 Гц).
-// 300 тактов ≈ 12.8 мс/кадр
+// Длительность одного «кадра» демо в тактах таймера БК 0010 (23438 Гц).
+// 300 тактов ≈ 12.8 мс/кадр, на БК 0011М пересчитывается под 31250 Гц
 constexpr uint16_t FRAME_TICKS = 300;
 
 #define FRAME_TIMER_MODE ((1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN))
@@ -165,7 +165,7 @@ static void init_demo()
     // непрерывный (CAP=0, OS=0), счётчик автоматически перезагружается.
     volatile uint16_t      *lim = (volatile uint16_t *)REG_TVE_LIMIT;
     volatile union TVE_CSR *csr = (volatile union TVE_CSR *)REG_TVE_CSR;
-    *lim = FRAME_TICKS;
+    *lim = bk_11m ? FRAME_TICKS * TVE_FREQ_11M / TVE_FREQ_0010 : FRAME_TICKS;
     csr->reg = FRAME_TIMER_MODE;
 }
 

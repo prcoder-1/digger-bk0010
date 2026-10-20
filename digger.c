@@ -2874,7 +2874,7 @@ void main()
     volatile union TVE_CSR *tve_csr = (volatile union TVE_CSR *)REG_TVE_CSR;
 
     constexpr uint16_t FPS = 11; // Частота обновления кадров
-    *t_limit = 3000000 / 128 / 4 / FPS;
+    *t_limit = (bk_11m ? TVE_FREQ_11M : TVE_FREQ_0010) / 4 / FPS;
 
     init_game(); // Начальная инициализация игры (init_level стартует музыку с начала)
 
