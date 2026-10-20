@@ -2367,13 +2367,13 @@ static void process_man()
                         break;
                     }
 
-                    case 'S':  // Звуковые эффекты: пищалка, AY (БК 0011М), выключены
+                    case 'S':  // Звуковые эффекты: пищалка, AY, выключены
                     {
                         fx_mode = sound_mode_next(fx_mode);
                         break;
                     }
 
-                    case 'M':  // Режим фоновой музыки: пищалка, AY (БК 0011М), выключена
+                    case 'M':  // Режим фоновой музыки: пищалка, AY, выключена
                     {
                         bg_music_mute();
                         music_mode = sound_mode_next(music_mode);
