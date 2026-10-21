@@ -15,8 +15,6 @@ MAP_FILE_2=title.map
 # process_bugs/bags/missile/bonus/game_state, sound_effect и draw_man
 # растворяются в main и профилировщик не может их разделить.
 PROF_FLAG=-fno-inline-functions-called-once -fno-inline-small-functions
-# Для digger.c: без этих оптимизаций код игры короче (ОЗУ до 040000 занято почти целиком)
-DIGGER_FLAG=-fno-tree-pre -fno-code-hoisting -fno-ssa-phiopt
 OPT_FLAG=-Os -mlra -fno-reorder-blocks -fno-caller-saves -fno-if-conversion -fno-tree-tail-merge
 XGCC=/home/prcoder/xgcc
 LIBGCC=$(shell pdp11-aout-gcc -m10 -m1801vm1 -msoft-float $(OPT_FLAG) -print-libgcc-file-name)
@@ -39,7 +37,7 @@ asm-files: digger.c sprites.c tools.c
 	pdp11-aout-gcc ${GCC_FLAGS} ${GCC_ASM_FLAGS} tools.c
 
 digger-main-file: digger.c
-	pdp11-aout-gcc ${GCC_FLAGS} ${DIGGER_FLAG} -c -o digger.o digger.c
+	pdp11-aout-gcc ${GCC_FLAGS} -c -o digger.o digger.c
 
 title-main-file: title.c
 	pdp11-aout-gcc ${GCC_FLAGS} -DBIN_FILE_1="${FILE_1}" -c -o title.o title.c
