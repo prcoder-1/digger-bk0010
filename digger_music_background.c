@@ -171,11 +171,13 @@ static uint16_t bg_music_advance(void)
     return started;
 }
 
-// Запись в регистр AY: словом - номер регистра, байтом - данные; линии порта инверсные
+// Запись в регистр AY: словом - номер регистра, байтом - данные; линии порта инверсные.
+// Старший байт слова - 0, как у INSULT: на платах с двумя AY (AZБК, «Грифон») разряды
+// 15/14 выбирают чип нулём, а при 0377 запись не попадала ни в один чип
 static void ay_write(uint8_t reg, uint8_t value)
 {
     volatile uint16_t *port = (volatile uint16_t *)REG_PAR_INTERF;
-    *port = (uint16_t)~reg;
+    *port = (uint8_t)~reg;
     *(volatile uint8_t *)port = (uint8_t)~value;
 }
 
