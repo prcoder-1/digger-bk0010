@@ -171,18 +171,11 @@ static uint16_t bg_music_advance(void)
     return started;
 }
 
-// Запись в регистр AY. На AZБК - в его регистры AY1 0177172/0177173 байтами, в прямом
-// коде (0177714 там делят AY и Covox). Иначе - порт 0177714: словом номер регистра,
-// байтом данные, линии порта инверсные. Старший байт слова - 0, как у INSULT: на платах
-// с двумя AY («Грифон») разряды 15/14 выбирают чип нулём
-__attribute__((noinline)) static void ay_write(uint8_t reg, uint8_t value)
+// Запись в регистр AY на порту 0177714, как у INSULT: словом - номер регистра,
+// байтом - данные; линии порта инверсные. В слове номера инвертирован только младший
+// байт, старший - 0 (с 0377 там платы на два AY не выбирали ни один чип)
+static void ay_write(uint8_t reg, uint8_t value)
 {
-    if (ay_azbk)
-    {
-        *(volatile uint8_t *)0177172 = reg;
-        *(volatile uint8_t *)0177173 = value;
-        return;
-    }
     volatile uint16_t *port = (volatile uint16_t *)REG_PAR_INTERF;
     *port = (uint8_t)~reg;
     *(volatile uint8_t *)port = (uint8_t)~value;
@@ -194,9 +187,9 @@ static void ay_out(uint16_t tp, uint8_t vol)
     ay_regs[AY_TONE_B_LO] = (uint8_t)tp;
     ay_regs[AY_TONE_B_HI] = (uint8_t)(tp >> 8);
     ay_regs[AY_VOL_B] = vol;
-    // TurboSound на порту («Мультизвук»): выбрать чип 1 - номер 255 в инверсии. Чип мог
-    // остаться выбранным другой программой; одиночному AY и «Грифону» это не мешает
-    if (!ay_azbk) *(volatile uint16_t *)REG_PAR_INTERF = 0;
+    // Выбрать первый чип TurboSound (номер 255 в инверсии), как Prince of Persia
+    // (CLR @#177714): второй мог остаться выбранным, и запись уходила в него
+    *(volatile uint16_t *)REG_PAR_INTERF = 0;
     for (uint16_t r = 0; r < AY_ENV_SHAPE; ++r) ay_write(r, ay_regs[r]);
 }
 
