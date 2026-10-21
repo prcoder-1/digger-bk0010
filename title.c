@@ -18,7 +18,9 @@
 // 300 тактов ≈ 12.8 мс/кадр, на БК 0011М пересчитывается под 31250 Гц
 constexpr uint16_t FRAME_TICKS = 300;
 
-#define FRAME_TIMER_MODE ((1 << TVE_CSR_MON) | (1 << TVE_CSR_RUN))
+// Однократный счёт: конец кадра - таймер сам сбросил RUN (флаг FL в GID 4.6 без
+// прерываний не выставляется)
+#define FRAME_TIMER_MODE ((1 << TVE_CSR_OS) | (1 << TVE_CSR_RUN))
 
 /**
  * @brief Заливка прямоугольника однобайтовым образцом color в видеопамяти
@@ -161,8 +163,8 @@ static void init_demo()
     // Нижняя линия рамки
     paint_brick(0, y_pos, SCREEN_BYTE_WIDTH, 2, 0b01010101);
 
-    // Запустить кадровый таймер демо. Лимит выставляется один раз; режим
-    // непрерывный (CAP=0, OS=0), счётчик автоматически перезагружается.
+    // Запустить кадровый таймер демо. Лимит выставляется один раз, каждый кадр
+    // запускается записью в CSR.
     volatile uint16_t      *lim = (volatile uint16_t *)REG_TVE_LIMIT;
     volatile union TVE_CSR *csr = (volatile union TVE_CSR *)REG_TVE_CSR;
     *lim = bk_11m ? FRAME_TICKS * TVE_FREQ_11M / TVE_FREQ_0010 : FRAME_TICKS;
@@ -412,9 +414,9 @@ static void process_demo_state()
     }
 
     // Ограничение частоты кадров демо.
-    // Ждём истечения таймера FRAME_TICKS, перезапускаем его (запись в CSR сбрасывает флаг FL).
+    // Ждём истечения таймера FRAME_TICKS и перезапускаем его.
     volatile union TVE_CSR *csr = (volatile union TVE_CSR *)REG_TVE_CSR;
-    while ((csr->reg & (1 << TVE_CSR_FL)) == 0);
+    while (csr->reg & (1 << TVE_CSR_RUN));
     csr->reg = FRAME_TIMER_MODE;
 }
 
