@@ -13,18 +13,17 @@ constexpr uint16_t bonus_slots_ne = 4u;         // Слотов в 1/8 ноте 
 constexpr uint8_t  note_kinds = 14u;            // Число различных высот в общей таблице
 constexpr uint16_t music_chunks_per_frame = 4u; // Слотов музыки за кадр — задаёт темп
 constexpr uint16_t music_chunk_ref = 1400u;     // Размер кусочка = music_chunk_ref/period полупериодов
-constexpr uint16_t music_chunk_counts = 60u;    // Ниже music_chunk_counts отсчётов кадра новый кусочек не начинаем.
 
-enum : uint8_t { AY_TONE_B_LO = 2, AY_TONE_B_HI = 3, AY_VOL_B = 9, AY_ENV_HI = 12, AY_ENV_SHAPE = 13 };
+enum : uint8_t { AY_TONE_B_LO = 2, AY_VOL_B = 9, AY_REGS = 11 };
 
-// Регистры AY 0..12, пишутся целиком (ay_out). Тон только в канале B - при стерео ABC
-// он посередине, в обоих каналах; его делят музыка и эффекты. Громкость музыки - от
-// огибающей «спад до нуля» (13 = 011, запись формы её перезапускает). Период огибающей -
-// слоты ноты * 256: спад ~1.7 длительности ноты.
-static uint8_t ay_regs[AY_ENV_SHAPE] = { [7] = 075 };
+// Регистры AY 0..10, пишутся целиком (ay_out). Тон только в канале B - при стерео ABC
+// он посередине, в обоих каналах; его делят музыка и эффекты. Громкость - всегда
+// фиксированная, огибающую AY (R11-R13) не используем.
+static uint8_t ay_regs[AY_REGS] __attribute__((aligned(2))) = { [7] = 075 };
 
 uint16_t music_mode = SOUND_BEEPER;
-static uint8_t music_vol; // Громкость музыки в канале B: 020 (огибающая) или 0 (заглушена)
+static uint8_t music_vol; // Громкость музыки в канале B (0..15), затухает каждый кадр
+static uint8_t music_gap; // Кадр кончается паузой между нотами - выдержать её в конце кадра
 
 // Состояние проигрывателя фоновой музыки
 struct {
@@ -157,7 +156,6 @@ static uint16_t bg_music_advance(void)
             mus.period = note_period[n];
             mus.chunk = note_chunk[n];
             mus.ay_period = ay_tp(note_period[n]);
-            ay_regs[AY_ENV_HI] = (uint8_t)slots;
             started = 1;
 
             // Пауза ~1/8 длительности, но не меньше слота (у бонуса 1/8 нота = 4 слота)
@@ -184,13 +182,18 @@ static void ay_write(uint8_t reg, uint8_t value)
 // Записать регистры AY 0..12 с тоном и громкостью канала B
 static void ay_out(uint16_t tp, uint8_t vol)
 {
-    ay_regs[AY_TONE_B_LO] = (uint8_t)tp;
-    ay_regs[AY_TONE_B_HI] = (uint8_t)(tp >> 8);
+    *(uint16_t *)&ay_regs[AY_TONE_B_LO] = tp; // R2 и R3 одним словом
     ay_regs[AY_VOL_B] = vol;
     // Выбрать первый чип TurboSound (номер 255 в инверсии), как Prince of Persia
     // (CLR @#177714): второй мог остаться выбранным, и запись уходила в него
-    *(volatile uint16_t *)REG_PAR_INTERF = 0;
-    for (uint16_t r = 0; r < AY_ENV_SHAPE; ++r) ay_write(r, ay_regs[r]);
+    volatile uint16_t *port = (volatile uint16_t *)REG_PAR_INTERF;
+    const uint8_t *v = ay_regs;
+    *port = 0;
+    for (uint16_t r = 0377; r > 0377 - AY_REGS; --r) // Номер регистра в инверсии
+    {
+        *port = r;
+        *(volatile uint8_t *)port = ~*v++;
+    }
 }
 
 void ay_fx(uint16_t period)
@@ -199,10 +202,15 @@ void ay_fx(uint16_t period)
     else ay_out(mus.ay_period, music_vol); // Вернуть канал музыке
 }
 
+__attribute__((noinline)) static void ay_mute()
+{
+    ay_write(AY_VOL_B, music_vol = 0);
+}
+
 void bg_music_mute()
 {
+    if (music_mode == SOUND_AY) ay_mute();
     music_vol = 0;
-    if (music_mode == SOUND_AY) ay_write(AY_VOL_B, 0);
 }
 
 uint16_t sound_mode_next(uint16_t m)
@@ -210,34 +218,54 @@ uint16_t sound_mode_next(uint16_t m)
     return ++m > SOUND_OFF ? SOUND_BEEPER : m;
 }
 
-// Пауза перед нотой не нужна: ноты разделяет перезапуск огибающей. Ноты начинаются
-// на границе кадра (длительности кратны четырём слотам), поэтому шаг - целый кадр.
+// Пауза перед нотой не нужна: ноты разделяет скачок громкости в начале ноты. Ноты
+// начинаются на границе кадра (длительности кратны четырём слотам), поэтому шаг - кадр.
 void bg_music_frame()
 {
     if (music_mode != SOUND_AY) return;
 
     uint16_t started = 0;
-    for (uint16_t i = music_chunks_per_frame; i; --i) started |= bg_music_advance();
+    uint8_t quiet = 1; // Все слоты кадра - пауза между нотами
+    for (uint16_t i = music_chunks_per_frame; i; --i)
+    {
+        started |= bg_music_advance();
+        quiet &= mus.silent;
+    }
 
-    ay_out(mus.ay_period, music_vol = 020); // Каждый кадр: заодно снимает bg_music_mute
-    if (started) ay_write(AY_ENV_SHAPE, 011);
+    // Громкость ноты затухает программно, как у Goonies: 14 в начале ноты, затем на 3
+    // за кадр (переход через 0 - тишина). С огибающей AY (период в R11/R12) на AZБК
+    // вместо нот были щелчки. Кадр целиком в паузе между нотами - тишина
+    if (started) music_vol = 14;
+    else if (quiet || (music_vol -= 3) > 15) music_vol = 0;
+    music_gap = mus.silent - quiet; // Звучавший кадр кончается паузой
+    ay_out(mus.ay_period, music_vol);
 }
 
-// Воспроизвести фоновую музыку в свободном времени кадра
+// Конец кадра: музыка пищалкой в свободном времени кадра; на AY - пауза между нотами
 void bg_music_play()
 {
-        if (music_mode != SOUND_BEEPER) return;
-
         volatile uint16_t *t_count = (volatile uint16_t *)REG_TVE_COUNT;
         volatile union TVE_CSR *tve_csr = (volatile union TVE_CSR *)REG_TVE_CSR;
+        const uint16_t limit = *(volatile uint16_t *)REG_TVE_LIMIT; // Длина кадра в отсчётах
 
-        uint16_t music_budget = music_chunks_per_frame;
-        // Порог в реальном времени: на БК 0011М таймер считает быстрее
-        const uint16_t chunk_counts = bk_11m ? music_chunk_counts * TVE_FREQ_11M / TVE_FREQ_0010 : music_chunk_counts;
-        while (music_budget && *t_count > chunk_counts && (tve_csr->reg & (1 << TVE_CSR_RUN)))
+        if (music_mode == SOUND_AY)
         {
+            // Нота кончается с кадром: последняя четверть кадра - пауза, как слот-пауза
+            // у пищалки. Без неё одинаковые ноты (галоп в бонусе) сливались в одну
+            if (music_gap)
+            {
+                while (*t_count > (limit >> 2) && (tve_csr->reg & (1 << TVE_CSR_RUN)));
+                ay_mute();
+            }
+            return;
+        }
+        if (music_mode != SOUND_BEEPER) return;
+
+        // Новый кусочек не начинаем в последней восьмой части кадра (~11 мс)
+        for (uint16_t i = music_chunks_per_frame; i; --i)
+        {
+            if (*t_count <= (limit >> 3) || !(tve_csr->reg & (1 << TVE_CSR_RUN))) break;
             bg_music_advance();
             if (!mus.silent) sound_pwm(mus.period, mus.chunk, 1);
-            --music_budget;
         }
 }
