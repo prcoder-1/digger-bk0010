@@ -14,15 +14,15 @@ constexpr uint8_t  note_kinds = 14u;            // Число различных
 constexpr uint16_t music_chunks_per_frame = 4u; // Слотов музыки за кадр — задаёт темп
 constexpr uint16_t music_chunk_ref = 1400u;     // Размер кусочка = music_chunk_ref/period полупериодов
 
-enum : uint8_t { AY_TONE_B_LO = 2, AY_VOL_B = 9, AY_REGS = 11 };
+enum : uint8_t { AY_TONE_B_LO = 2, AY_VOL_B = 9, AY_ENV_HI = 12, AY_ENV_SHAPE = 13, AY_REGS = 13 };
 
-// Регистры AY 0..10, пишутся целиком (ay_out). Тон только в канале B - при стерео ABC
-// он посередине, в обоих каналах; его делят музыка и эффекты. Громкость - всегда
-// фиксированная, огибающую AY (R11-R13) не используем.
+// Регистры AY 0..12, пишутся целиком (ay_out); форма огибающей R13 - отдельно, в
+// начале ноты. Тон только в канале B - при стерео ABC он посередине, в обоих каналах;
+// его делят музыка и эффекты.
 static uint8_t ay_regs[AY_REGS] __attribute__((aligned(2))) = { [7] = 075 };
 
 uint16_t music_mode = SOUND_BEEPER;
-static uint8_t music_vol; // Громкость музыки в канале B (0..15), затухает каждый кадр
+static uint8_t music_vol; // Громкость музыки в канале B: 020 - от огибающей, 0 - пауза
 static uint8_t music_gap; // Кадр кончается паузой между нотами - выдержать её в конце кадра
 
 // Состояние проигрывателя фоновой музыки
@@ -156,6 +156,7 @@ static uint16_t bg_music_advance(void)
             mus.period = note_period[n];
             mus.chunk = note_chunk[n];
             mus.ay_period = ay_tp(note_period[n]);
+            ay_regs[AY_ENV_HI] = (uint8_t)slots; // Спад огибающей ~1.7 длительности ноты
             started = 1;
 
             // Пауза ~1/8 длительности, но не меньше слота (у бонуса 1/8 нота = 4 слота)
@@ -218,8 +219,9 @@ uint16_t sound_mode_next(uint16_t m)
     return ++m > SOUND_OFF ? SOUND_BEEPER : m;
 }
 
-// Пауза перед нотой не нужна: ноты разделяет скачок громкости в начале ноты. Ноты
-// начинаются на границе кадра (длительности кратны четырём слотам), поэтому шаг - кадр.
+// Ноты начинаются на границе кадра (длительности кратны четырём слотам), поэтому
+// шаг - кадр. Нота затухает огибающей AY: форма 9 (спад до нуля) в начале ноты,
+// период - R12.
 void bg_music_frame()
 {
     if (music_mode != SOUND_AY) return;
@@ -232,13 +234,10 @@ void bg_music_frame()
         quiet &= mus.silent;
     }
 
-    // Громкость ноты затухает программно, как у Goonies: 14 в начале ноты, затем на 3
-    // за кадр (переход через 0 - тишина). С огибающей AY (период в R11/R12) на AZБК
-    // вместо нот были щелчки. Кадр целиком в паузе между нотами - тишина
-    if (started) music_vol = 14;
-    else if (quiet || (music_vol -= 3) > 15) music_vol = 0;
+    music_vol = quiet ? 0 : 020;
     music_gap = mus.silent - quiet; // Звучавший кадр кончается паузой
     ay_out(mus.ay_period, music_vol);
+    if (started) ay_write(AY_ENV_SHAPE, 011);
 }
 
 // Конец кадра: музыка пищалкой в свободном времени кадра; на AY - пауза между нотами
