@@ -995,6 +995,77 @@
  	  *pop0 = adjust_address_nv (op0, narrow_mode_iter, offset);
  	  *pop1 = gen_int_mode (n, narrow_mode_iter);
  	  return adjusted_code;
+--- a/gcc/reload.cc
++++ b/gcc/reload.cc
+@@ -205,6 +205,12 @@
+ /* Set to 1 in subst_reg_equivs if it changes anything.  */
+ static int subst_reg_equivs_changed;
+ 
++/* Set to 1 in find_reloads_address if a spilled pseudo used as an
++   indirect address must become its stack slot at the current, not the
++   initial, elimination offset.  Makes find_reloads report the insn as
++   changed, so that the final pass does the substitution.  */
++static int indirect_equiv_pending;
++
+ /* On return from push_reload, holds the reload-number for the OUT
+    operand, which can be different for that from the input operand.  */
+ static int output_reloadnum;
+@@ -2657,6 +2663,7 @@
+   n_replacements = 0;
+   n_earlyclobbers = 0;
+   replace_reloads = replace;
++  indirect_equiv_pending = 0;
+   hard_regs_live_known = live_known;
+   static_reload_reg_p = reload_reg_p;
+ 
+@@ -4599,7 +4606,7 @@
+ 	  }
+       }
+ 
+-  return retval;
++  return retval | indirect_equiv_pending;
+ }
+ 
+ /* Return true if alternative number ALTNUM in constraint-string
+@@ -4930,19 +4937,27 @@
+ 		  /* TEM is not the same as what we'll be replacing the
+ 		     pseudo with after reload, put a USE in front of INSN
+ 		     in the final reload pass.  */
+-		  if (replace_reloads
+-		      && num_not_at_initial_offset
++		  if (num_not_at_initial_offset
+ 		      && ! rtx_equal_p (tem, reg_equiv_mem (regno)))
+ 		    {
+-		      *loc = tem;
+-		      /* We mark the USE with QImode so that we
+-			 recognize it as one that can be safely
+-			 deleted at the end of reload.  */
+-		      PUT_MODE (emit_insn_before (gen_rtx_USE (VOIDmode, ad),
+-						  insn), QImode);
+-
+-		      /* This doesn't really count as replacing the address
+-			 as a whole, since it is still a memory access.  */
++		      /* Without reloads or eliminations the final pass
++			 would skip INSN, and the pseudo would become
++			 its slot at the initial offset.  */
++		      indirect_equiv_pending = 1;
++		      if (replace_reloads)
++			{
++			  *loc = tem;
++			  /* We mark the USE with QImode so that we
++			     recognize it as one that can be safely
++			     deleted at the end of reload.  */
++			  PUT_MODE (emit_insn_before (gen_rtx_USE (VOIDmode,
++								   ad),
++						      insn), QImode);
++
++			  /* This doesn't really count as replacing the
++			     address as a whole, since it is still a
++			     memory access.  */
++			}
+ 		    }
+ 		  return 0;
+ 		}
 --- a/libgcc/config/pdp11/t-pdp11
 +++ b/libgcc/config/pdp11/t-pdp11
 @@ -8,5 +8,18 @@
