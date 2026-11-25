@@ -1,7 +1,7 @@
 #include "sprites.h"
 #include "memory.h"
 
-
+// Вывод спрайта 4x15 отзеркаленного горизонтально и вертикально
 void sp_4_15_hv_mirror_put(uint16_t x, uint16_t y, const uint8_t *image)
 {
     asm(
@@ -64,6 +64,7 @@ void sp_4_15_hv_mirror_put(uint16_t x, uint16_t y, const uint8_t *image)
     );
 }
 
+// Вывод спрайта 4x15 с использованием маски
 void sp_4_15_mask(uint16_t x, uint16_t y, const uint8_t *image, const uint8_t *outline)
 {
     asm(
@@ -158,6 +159,7 @@ void sp_4_15_mask(uint16_t x, uint16_t y, const uint8_t *image, const uint8_t *o
     );
 }
 
+// Стирание блока 4x15
 void erase_4_15(uint16_t x_graph, uint16_t y_graph)
 {
     asm volatile (
@@ -198,6 +200,7 @@ void erase_4_15(uint16_t x_graph, uint16_t y_graph)
     );
 }
 
+// Стирание прямоугольника произвольного размера
 void sp_clear_brick(uint16_t x, uint16_t y, uint8_t x_width, uint8_t y_width)
 {
     asm(

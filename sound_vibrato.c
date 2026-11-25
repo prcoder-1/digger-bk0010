@@ -1,8 +1,7 @@
 #include "sound.h"
 #include "memory.h"
 
-// Вынесено в отдельный модуль из sound.c: так заставка (нужен только sound_pwm)
-// не втягивает этот код в DIGTIT. Геймплей (digger.c) линкует его как прежде.
+// Звук с эффектом "вибрато"
 void sound_vibrato(uint16_t period, uint16_t durance)
 {
     // На AY - ровный тон: sound() с периодом на 3 больше звучит столько же

@@ -1,6 +1,8 @@
 #pragma once
 #include <stdint.h>
 
+// Спрайты игры
+
 /**
  * @brief Диггер перемещается вправо
  */

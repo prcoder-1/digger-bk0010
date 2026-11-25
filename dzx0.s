@@ -1,6 +1,6 @@
 / Распаковщик ZX0 v2.2 (формат Einar Saukas & Urusergi).
 / PDP11-версия reddie, 02-may-2024 (upd), 92 байта — перевод в синтаксис
-/ GNU as из /home/prcoder/БК0010/lz0/dzx0_pdp11_upd.asm.
+/ GNU as из dzx0_pdp11_upd.asm.
 /
 / dzx0:  r0 — сжатый поток, r1 — приёмник;
 /        на выходе r0/r1 — за концом источника/приёмника;

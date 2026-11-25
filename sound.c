@@ -3,7 +3,7 @@
 
 uint16_t fx_mode; // SOUND_BEEPER
 
-static uint16_t fx_dummy; // Сюда пишет цикл вместо пищалки, пока звучит AY
+static uint16_t fx_dummy; // Сюда пишет цикл вместо пищалки, пока звучит AY (для компенсации времени)
 
 void sound(uint16_t period, uint16_t durance)
 {
